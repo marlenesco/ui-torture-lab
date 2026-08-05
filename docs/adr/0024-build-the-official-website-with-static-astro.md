@@ -1,0 +1,3 @@
+# Build the Official Website with static Astro
+
+The Official Website uses Astro strictly as a build-time compiler and small component templating layer, producing portable static files with no server adapter, SSR, on-demand rendering, API routes, React integration, hydration, CMS, or client application state. Required pages use individual `.astro` or Markdown files, essential content is present in generated HTML, and content collections or client JavaScript appear only after a demonstrated need. The site uses strict TypeScript, minimal intentional dependencies, semantic HTML and progressive enhancement, no third-party runtime services or tracking, and remains independent of any hosting provider.

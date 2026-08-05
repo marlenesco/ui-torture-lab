@@ -1,0 +1,3 @@
+# Use a minimal pnpm monorepo
+
+Extension, Official Website, Engine, tests, glossary, ADRs, and Chrome Web Store copy live in one pnpm workspace so behavior and public claims can change atomically. The only production workspaces are `apps/extension`, `apps/site`, and `packages/engine`; extension depends on Engine, Engine never depends on an app, and the site normally remains independent. Scenario, Detector, reporting, types, redaction, and fixtures stay internal modules or root tests rather than separate packages, no generic shared package or Turborepo is introduced, and new package or task-runner boundaries require a demonstrated independent consumer, lifecycle, or build problem.

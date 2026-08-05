@@ -1,0 +1,3 @@
+# Report measurements without severity
+
+The MVP reports detector-specific before-and-after Evidence, Measured Delta, mechanism, subject, contributors, and optional evidence-derived Possible Cause, but assigns no severity, priority, risk, confidence percentage, quality score, or global ranking. Magnitude retains its natural unit and may deterministically order Findings only within one Detector; values from different Detectors are never normalized or compared. Inconclusive is an explicit reliability state rather than a low-severity result, and any future priority requires developer-provided project policy instead of geometric thresholds inferred by the engine.

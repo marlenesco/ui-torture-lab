@@ -1,0 +1,3 @@
+# Support only Google Chrome desktop with Manifest V3
+
+The MVP is developed, validated, and officially supported only on the current stable desktop release of Google Chrome for macOS, Windows, and Linux using Manifest V3. Other Chromium browsers may work but receive no compatibility claim, dedicated build, workaround, or release-blocking status; Firefox, Safari, mobile, and non-stable channels require future validation matrices. Domain logic and Detectors avoid unnecessary Chrome coupling, while actual Chrome APIs remain in a narrow extension adapter and may be used when they materially simplify the supported workflow. The minimum Chrome version and platform-specific smoke procedure follow from prototypes of the APIs actually used.

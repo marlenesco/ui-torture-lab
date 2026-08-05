@@ -1,0 +1,3 @@
+# Limit the MVP to deterministic layout stress testing
+
+The MVP reports only measurable layout and rendering regressions caused by controlled content or presentation stress. Detectors capture serializable observations, compare the same elements before and after Mutation, and neither interact with the page nor claim standards conformance. Accessibility auditing, semantic validation, behavioral testing, interaction sequences, network simulation, runtime errors, and generic scoring are deliberately excluded because they require different execution models and evidence contracts; the MVP will not introduce a universal abstraction for possible future capabilities.

@@ -1,0 +1,3 @@
+# Include a static Official Website in the MVP
+
+The MVP includes a public static website as the canonical pre-installation product contract, with a landing page plus Privacy, Permissions, Supported Scope, and concise usage documentation for Run, Evidence, Findings, inconclusive results, Restore, retention, and Markdown export. It must agree with the Chrome Web Store listing, present only released capabilities, remain accessible without authentication or essential client-side JavaScript, and use no backend, accounts, analytics, telemetry, non-essential cookies, forms, hosted reports, or future-feature claims. Framework, hosting, domain, visual design, and open-source licensing remain separate decisions.

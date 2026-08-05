@@ -1,0 +1,3 @@
+# Use conflict-aware best-effort Restore
+
+Restore reverts a Mutation only when its original target remains connected to the same document and the current property value and priority exactly match the state applied by that Mutation. Each Mutation Record retains direct target identity plus exact original and applied state; locators never rematch targets. Restore proceeds in reverse application order and continues after individual conflicts, leaving externally changed values untouched. Any conflict makes the MVP Run reload-required and blocks another Run in that document until an explicit top-level reload or new document, while already valid Findings remain valid and the UI explains the conservative cleanup outcome.

@@ -1,0 +1,3 @@
+# Retain one ephemeral Run Result per tab
+
+Active Run State—including DOM references, complete source values, Mutation Journal, and Restore data—exists only in memory and never survives Restore, abort, reload, or document loss. After completion, the MVP retains only the latest reduced, serializable, redacted Current Run Result for each tab in extension-owned session-scoped storage; when its Target Page authorization is invalidated it remains as a Previous-Target Snapshot with live DOM actions disabled, is replaced by the next completed Run, and is deleted manually or when the tab closes. There is no multi-Run history, permanent or synchronized storage, server transfer, full-text retention, Target Page storage, or automatic screenshot capture.

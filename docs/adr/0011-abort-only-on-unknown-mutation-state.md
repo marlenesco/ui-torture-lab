@@ -1,0 +1,3 @@
+# Abort only on unknown Mutation state
+
+The page-wide Run accepts partial eligibility, skipped targets, safe local failures, and applied-but-ineffective Mutations as long as it knows with certainty whether and how every attempted target changed. Each Mutation Record is journaled before its write, its source state is revalidated, and its owned applied state is verified immediately; local known outcomes remain reportable as coverage and only the affected comparisons become inconclusive. Any possible unrecorded or unverifiable write, journal loss, document replacement, or equivalent Unknown Mutation State aborts the entire Run, suppresses all Findings, stops further writes, and triggers immediate conflict-aware best-effort Restore.

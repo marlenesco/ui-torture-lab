@@ -1,0 +1,3 @@
+# Attribute Text Clipping to the nearest proven boundary
+
+The Finding Subject for Text Clipping is the nearest element demonstrably responsible for hiding one or more stable descendant text ranges, not the text-owning element by default. Evidence must show that the same boundary and affected text nodes were visible together in the Baseline and that the same ranges became geometrically outside and hidden by that boundary after Mutation; overflow styling alone is insufficient. Text ranges sharing one boundary, axis, mechanism, and Scenario attribution aggregate into one Finding, farther-ancestor duplicates are suppressed, independently proven nested clipping may remain separate, and inability to isolate the responsible boundary is inconclusive.

@@ -1,0 +1,3 @@
+# Use one canonical Unbreakable Token
+
+Unbreakable Text appends the same deterministic, continuous ASCII-alphanumeric token to the meaningful interior of each eligible text node after a normal wrapping opportunity, preserving the original content, exact boundary whitespace, node identity, and original value for Restore. The MVP performs no language or content-type classification and does not claim URL, email, path, hash, identifier, or internationalization simulation. Token length, minimum source-content length, and exclusions require fixtures and benchmarks, but the MVP exposes only one intensity and restores from the captured original node value rather than searching for or partially removing the token.

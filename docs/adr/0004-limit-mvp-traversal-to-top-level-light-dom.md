@@ -1,0 +1,3 @@
+# Limit MVP traversal to the top-level light DOM
+
+Every Run targets the entire top-level document, while each Scenario and Detector applies its own explicit eligibility rules within that document's light DOM. The MVP does not offer manual element or subtree selection and does not traverse iframe documents, open or closed Shadow DOM, or the extension interface. This preserves a zero-configuration page-wide workflow without pretending to provide partial support for encapsulated or separate documents; Findings may still concern eligible elements that were not directly mutated when a Scenario causes reflow, displacement, or obstruction elsewhere in the traversed document.

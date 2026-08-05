@@ -1,0 +1,3 @@
+# Require bounded detector-specific stability
+
+Baseline and mutated measurements are comparable only when each Detector's relevant values for the same element remain within detector-specific tolerances for a bounded, frame-based observation window. Instability or timeout makes only that element's measurement inconclusive unless a structural page event invalidates the whole Run. The MVP will not freeze JavaScript, timers, networking, animations, transitions, or the DOM to manufacture stability; exact frame counts, timeouts, and tolerances remain internal and must be selected through prototypes and benchmarks rather than fixed during product design.

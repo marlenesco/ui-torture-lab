@@ -1,0 +1,3 @@
+# Exclude explicit truncation from Text Clipping Findings
+
+Text Clipping omits elements whose mutated state demonstrably activates a supported explicit truncation mechanism: a behaviorally effective single-line ellipsis configuration or active multiline line clamp. Activation only after the Scenario is still excluded, because the CSS demonstrates implementation intent even though the MVP cannot judge product, UX, or accessibility correctness. Overflow hidden or clip alone is not sufficient evidence of intent and remains evaluable; ambiguous truncation detection is inconclusive. Exclusions contribute to coverage metrics rather than Findings, and any future informational Truncation Activated detector must remain separate.

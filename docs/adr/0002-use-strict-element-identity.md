@@ -1,0 +1,3 @@
+# Use strict element identity for comparisons
+
+Baseline Evidence and Mutated Evidence are comparable only when they were collected from the exact same DOM node object, that node remains connected to its original document, and no rematching was required. Locators remain diagnostic metadata only; replacement, disconnection, document changes, navigation, or unavailable measurements produce an inconclusive result rather than a Finding. This deliberately prefers missing a possible Finding over attributing one to the wrong element, and requires MVP Mutations and Restore operations to modify original nodes in place whenever technically possible instead of reconstructing or replacing DOM from serialized HTML.
