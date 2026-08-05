@@ -1,0 +1,65 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+
+const description =
+  "Deterministic text stress testing for measurable web layout regressions.";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content={description} />
+    <meta name="viewport" content="width=device-width" />
+    <title>UI Torture Lab</title>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Public workspace scaffold</p>
+      <h1>UI Torture Lab</h1>
+      <p>{description}</p>
+      <p>
+        Product capabilities are under active development and are not yet available
+        as an Official Distribution.
+      </p>
+    </main>
+  </body>
+</html>
+
+<style>
+  :global(*) {
+    box-sizing: border-box;
+  }
+
+  :global(body) {
+    min-height: 100vh;
+    margin: 0;
+    color: #151515;
+    background: #f4f1e8;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+
+  main {
+    width: min(42rem, calc(100% - 2rem));
+    margin-inline: auto;
+    padding-block: clamp(4rem, 12vw, 9rem);
+  }
+
+  .eyebrow {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    margin-block: 0.25rem 1rem;
+    font-size: clamp(2.5rem, 9vw, 5rem);
+    line-height: 0.95;
+  }
+
+  p {
+    max-width: 62ch;
+    line-height: 1.6;
+  }
+</style>
