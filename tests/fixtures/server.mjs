@@ -8,6 +8,12 @@ import { fileURLToPath } from "node:url";
 const host = "127.0.0.1";
 const port = Number.parseInt(process.env.FIXTURE_PORT ?? "4173", 10);
 const fixtureRoot = fileURLToPath(new URL("./pages/", import.meta.url));
+const engineBuildRoot = fileURLToPath(
+  new URL("../../packages/engine/dist/", import.meta.url),
+);
+const siteBuildRoot = fileURLToPath(
+  new URL("../../apps/site/dist/", import.meta.url),
+);
 
 const contentTypes = new Map([
   [".css", "text/css; charset=utf-8"],
@@ -37,11 +43,25 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  const engineModulePrefix = "/__engine__/";
+  const siteBuildPrefix = "/__site__/";
+  const servesEngineModule = pathname.startsWith(engineModulePrefix);
+  const servesSiteBuild = pathname.startsWith(siteBuildPrefix);
+  const selectedRoot = servesEngineModule
+    ? engineBuildRoot
+    : servesSiteBuild
+      ? siteBuildRoot
+      : fixtureRoot;
+  const unprefixedPath = servesEngineModule
+    ? pathname.slice(engineModulePrefix.length)
+    : servesSiteBuild
+      ? pathname.slice(siteBuildPrefix.length)
+      : pathname.slice(1);
   const relativePath = pathname.endsWith("/")
-    ? `${pathname.slice(1)}index.html`
-    : pathname.slice(1);
-  const filePath = resolve(fixtureRoot, relativePath);
-  const pathFromRoot = relative(fixtureRoot, filePath);
+    ? `${unprefixedPath}index.html`
+    : unprefixedPath;
+  const filePath = resolve(selectedRoot, relativePath);
+  const pathFromRoot = relative(selectedRoot, filePath);
 
   if (pathFromRoot.startsWith("..") || isAbsolute(pathFromRoot)) {
     response.writeHead(403).end();

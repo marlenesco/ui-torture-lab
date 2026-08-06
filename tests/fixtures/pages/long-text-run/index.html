@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Long Text Run fixture</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        font: 16px/1.5 system-ui, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p id="primary-target">  Checkout now!  </p>
+      <p id="inline-target">Hello <strong>brave</strong> world</p>
+      <p id="emoji-target">👩🏽‍💻 builds interfaces</p>
+      <p id="hidden-target" hidden>Hidden text</p>
+      <p id="editable-target" contenteditable="true">Editable text</p>
+      <code id="code-target">const answer = 42;</code>
+      <i id="icon-target" aria-label="Favorite icon">heart</i>
+      <p id="structured-target" style="white-space: pre-wrap">Structured
+        whitespace</p>
+      <p id="short-target">!</p>
+      <p id="minimum-target">OK</p>
+      <p id="extension-owned-probe">Extension-owned probe</p>
+      <div id="shadow-host"></div>
+      <iframe
+        id="frame-target"
+        srcdoc="<!doctype html><p id='frame-text'>Frame text</p>"
+      ></iframe>
+    </main>
+    <script>
+      document
+        .querySelector("#shadow-host")
+        .attachShadow({ mode: "open" })
+        .innerHTML = "<p id='shadow-text'>Shadow text</p>";
+    </script>
+  </body>
+</html>
