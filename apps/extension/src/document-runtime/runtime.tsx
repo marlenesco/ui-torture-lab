@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createRoot, type Root } from "react-dom/client";
+import { createRunController, type RunController } from "@ui-torture-lab/engine";
 import { ExtensionPanel } from "./panel";
 
 const runtimeKey = Symbol.for("ui-torture-lab/document-runtime");
@@ -113,6 +114,34 @@ const panelCss = `
 
   .panel-toggle:focus-visible {
     outline: 2px solid #d7f36b;
+    outline-offset: 2px;
+  }
+
+  .run-controls {
+    display: grid;
+    gap: 12px;
+    margin-block-start: 16px;
+  }
+
+  .run-controls p {
+    margin: 0;
+  }
+
+  .panel-action {
+    appearance: none;
+    justify-self: start;
+    border: 1px solid #d7f36b;
+    border-radius: 7px;
+    color: #191a17;
+    background: #d7f36b;
+    padding: 8px 12px;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .panel-action:focus-visible {
+    outline: 2px solid #f7f7f2;
     outline-offset: 2px;
   }
 
@@ -242,10 +271,18 @@ type DocumentRuntimeGlobal = typeof globalThis & {
 class DocumentRuntime {
   readonly document = document;
   readonly runtimeId = crypto.randomUUID();
+  readonly runController: RunController;
   private readonly ownership = new ExtensionDomOwnership();
   private readonly diagnosticHighlights = new Set<HTMLElement>();
   private overlay: MountedOverlay | undefined;
   private panel: MountedPanel | undefined;
+
+  constructor() {
+    this.runController = createRunController({
+      document: this.document,
+      isExtensionOwnedNode: (node) => this.isExtensionOwnedNode(node),
+    });
+  }
 
   mountOrReveal(): void {
     if (this.panel?.host.isConnected) {
@@ -354,6 +391,13 @@ class DocumentRuntime {
           collapsed={collapsed}
           onCollapse={() => render(true)}
           onExpand={() => render(false)}
+          onRestore={() => this.runController.restore()}
+          onStartLongText={() => {
+            void this.withMeasurementSafeUi(() =>
+              this.runController.startScenario("long-text")
+            );
+          }}
+          runController={this.runController}
         />,
       );
     };
