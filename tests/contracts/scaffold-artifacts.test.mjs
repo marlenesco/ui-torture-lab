@@ -21,7 +21,21 @@ test("workspace builds the loadable Chrome MV3 scaffold", async () => {
     "storage",
   ]);
   assert.equal("host_permissions" in manifest, false);
+  assert.equal("content_scripts" in manifest, false);
+  assert.equal("default_popup" in manifest.action, false);
   assert.match(manifest.background.service_worker, /\.js$/u);
+});
+
+test("built extension contains no MAIN-world or page bridge path", async () => {
+  const background = await readFile(
+    "apps/extension/.output/chrome-mv3/background.js",
+    "utf8",
+  );
+
+  assert.doesNotMatch(background, /world:["'`]MAIN["'`]/u);
+  assert.doesNotMatch(background, /window\.postMessage/u);
+  assert.doesNotMatch(background, /new CustomEvent/u);
+  assert.doesNotMatch(background, /createElement\(["'`]script["'`]\)/u);
 });
 
 test("workspace builds a portable static website scaffold", async () => {
