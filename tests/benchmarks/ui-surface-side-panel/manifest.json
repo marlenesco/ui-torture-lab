@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "UI Torture Lab Side Panel Spike",
+  "version": "0.0.0",
+  "permissions": ["sidePanel"],
+  "action": {
+    "default_title": "Open side panel spike"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  }
+}

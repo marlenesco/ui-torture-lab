@@ -111,7 +111,7 @@ test("toolbar authorizes one supported top-level Document in ISOLATED world", as
     url: "http://127.0.0.1:4173/smoke/",
   });
 
-  assert.equal(background.scriptCalls.length, 2);
+  assert.equal(background.scriptCalls.length, 3);
   const probe = background.scriptCalls[0];
   assert.deepEqual(JSON.parse(JSON.stringify(probe.target)), {
     frameIds: [0],
@@ -135,10 +135,69 @@ test("toolbar authorizes one supported top-level Document in ISOLATED world", as
     "http://127.0.0.1:4173/smoke/",
   ]);
   assert.equal(typeof bootstrap.func, "function");
+
+  const controlShell = background.scriptCalls[2];
+  assert.deepEqual(JSON.parse(JSON.stringify(controlShell.target)), {
+    documentIds: ["document-1"],
+    tabId: 42,
+  });
+  assert.equal(controlShell.world, "ISOLATED");
+  assert.equal(controlShell.injectImmediately, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(controlShell.files)), [
+    "/document-runtime.js",
+  ]);
+  assert.equal(controlShell.func, undefined);
   assert.ok(
     background.feedback.some(
       ([kind, details]) =>
         kind === "badge" && details.tabId === 42 && details.text === "OK",
+    ),
+  );
+});
+
+test("authorization is rejected when the floating control shell cannot mount", async () => {
+  let injectionNumber = 0;
+  const background = await loadBackground({
+    executeScript: async () => {
+      injectionNumber += 1;
+      if (injectionNumber === 3) {
+        throw new Error("Document changed before the UI bundle mounted");
+      }
+      return [
+        {
+          documentId: "document-4",
+          frameId: 0,
+          result:
+            injectionNumber === 1
+              ? {
+                  type: "target-probe-response",
+                  status: "matched",
+                  protocol: "https:",
+                }
+              : {
+                  type: "target-bootstrap-response",
+                  status: "bootstrapped",
+                  protocol: "https:",
+                  contentType: "text/html",
+                  topLevel: true,
+                },
+        },
+      ];
+    },
+  });
+
+  await background.invokeToolbar({
+    id: 42,
+    url: "https://fixture.test/",
+  });
+
+  assert.equal(background.scriptCalls.length, 3);
+  assert.ok(
+    background.feedback.some(
+      ([kind, details]) =>
+        kind === "title" &&
+        details.tabId === 42 &&
+        details.title.includes("could not mount its control shell"),
     ),
   );
 });

@@ -25,11 +25,15 @@ const rejectionMessages: Readonly<Record<TargetRejectionReason, string>> = {
   "not-top-level-document":
     "This page is not supported. UI Torture Lab runs only in the top-level document.",
   "protected-page": "This protected Chrome page cannot be analyzed.",
+  "ui-mount-failed":
+    "UI Torture Lab could not mount its control shell in this document. Click the toolbar action again.",
   "unsupported-protocol":
     "This page is not supported. UI Torture Lab runs only on HTTP or HTTPS HTML pages. Serve local files through localhost.",
 };
 
-const reject = (reason: TargetRejectionReason): TargetAuthorizationResponse => ({
+export const rejectTargetAuthorization = (
+  reason: TargetRejectionReason,
+): TargetAuthorizationResponse => ({
   type: authorizationResponseType,
   status: "rejected",
   reason,
@@ -40,22 +44,22 @@ const validateTargetUrl = (
   url: string | undefined,
 ): { readonly supported: true; readonly url: string } | TargetAuthorizationResponse => {
   if (url === undefined) {
-    return reject("missing-target");
+    return rejectTargetAuthorization("missing-target");
   }
 
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(url);
   } catch {
-    return reject("unsupported-protocol");
+    return rejectTargetAuthorization("unsupported-protocol");
   }
 
   if (protectedProtocols.has(parsedUrl.protocol)) {
-    return reject("protected-page");
+    return rejectTargetAuthorization("protected-page");
   }
 
   if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-    return reject("unsupported-protocol");
+    return rejectTargetAuthorization("unsupported-protocol");
   }
 
   return { supported: true, url: parsedUrl.href };
@@ -65,7 +69,7 @@ export async function authorizeTargetPage(
   tab: Pick<Browser.tabs.Tab, "id" | "url">,
 ): Promise<TargetAuthorizationResponse> {
   if (tab.id === undefined) {
-    return reject("missing-target");
+    return rejectTargetAuthorization("missing-target");
   }
 
   const target = validateTargetUrl(tab.url);
@@ -83,7 +87,7 @@ export async function authorizeTargetPage(
       args: [target.url],
     });
   } catch {
-    return reject("injection-failed");
+    return rejectTargetAuthorization("injection-failed");
   }
 
   const probeInjection = probeInjections[0];
@@ -94,11 +98,11 @@ export async function authorizeTargetPage(
     probeInjection.documentId.length === 0 ||
     !isTargetProbeResponse(probeInjection.result)
   ) {
-    return reject("invalid-bootstrap-response");
+    return rejectTargetAuthorization("invalid-bootstrap-response");
   }
 
   if (probeInjection.result.status === "rejected") {
-    return reject(probeInjection.result.reason);
+    return rejectTargetAuthorization(probeInjection.result.reason);
   }
 
   let bootstrapInjections: Browser.scripting.InjectionResult<unknown>[];
@@ -114,7 +118,7 @@ export async function authorizeTargetPage(
       args: [target.url],
     });
   } catch {
-    return reject("document-changed");
+    return rejectTargetAuthorization("document-changed");
   }
 
   const bootstrapInjection = bootstrapInjections[0];
@@ -124,11 +128,11 @@ export async function authorizeTargetPage(
     bootstrapInjection.documentId !== probeInjection.documentId ||
     !isTargetBootstrapResponse(bootstrapInjection.result)
   ) {
-    return reject("invalid-bootstrap-response");
+    return rejectTargetAuthorization("invalid-bootstrap-response");
   }
 
   if (bootstrapInjection.result.status === "rejected") {
-    return reject(bootstrapInjection.result.reason);
+    return rejectTargetAuthorization(bootstrapInjection.result.reason);
   }
 
   return {

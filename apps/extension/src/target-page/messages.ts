@@ -14,6 +14,7 @@ export type TargetRejectionReason =
   | "non-html-document"
   | "not-top-level-document"
   | "protected-page"
+  | "ui-mount-failed"
   | "unsupported-protocol";
 
 export type TargetBootstrapResponse =
