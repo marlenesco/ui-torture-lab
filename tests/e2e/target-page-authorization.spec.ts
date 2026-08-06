@@ -15,6 +15,15 @@ type ActionState = {
   readonly title: string;
 };
 
+type FixtureGeometry = {
+  readonly bodyScrollWidth: number;
+  readonly breakpoint: string;
+  readonly clientWidth: number;
+  readonly documentScrollWidth: number;
+  readonly innerWidth: number;
+  readonly resizeCount: number;
+};
+
 type ExtensionChromeApi = {
   readonly action: {
     getBadgeText(details: { readonly tabId: number }): Promise<string>;
@@ -25,6 +34,23 @@ type ExtensionChromeApi = {
       Array<{ readonly id?: number }>
     >;
   };
+  readonly scripting: {
+    executeScript<TResult>(details: {
+      readonly target: { readonly frameIds: number[]; readonly tabId: number };
+      readonly world: "ISOLATED";
+      readonly func: () => TResult | Promise<TResult>;
+    }): Promise<Array<{ readonly result?: TResult }>>;
+  };
+};
+
+type RuntimeDiagnostics = {
+  readonly diagnosticHighlightCount: number;
+  readonly diagnosticHighlightsRendered: number;
+  readonly ownedRootCount: number;
+  readonly overlayRendered: boolean;
+  readonly panelRendered: boolean;
+  readonly ownsOverlay: boolean;
+  readonly ownsPanel: boolean;
 };
 
 test.describe.configure({ mode: "serial" });
@@ -57,6 +83,85 @@ const triggerToolbarAction = async (page: Page): Promise<void> => {
   await page.bringToFront();
   await page.triggerExtensionAction(extension);
 };
+
+const readFixtureGeometry = async (page: Page): Promise<FixtureGeometry> =>
+  page.evaluate(() => {
+    const breakpointState = document.querySelector("#breakpoint-state");
+    if (breakpointState === null) {
+      throw new Error("Controlled fixture breakpoint state was unavailable");
+    }
+    return {
+      bodyScrollWidth: document.body.scrollWidth,
+      breakpoint: getComputedStyle(breakpointState, "::after").content,
+      clientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+      resizeCount: (window as typeof window & { fixtureResizeCount: number })
+        .fixtureResizeCount,
+    };
+  });
+
+const exerciseMeasurementSafeRuntime = async (): Promise<{
+  readonly after: RuntimeDiagnostics;
+  readonly before: RuntimeDiagnostics;
+  readonly during: RuntimeDiagnostics;
+}> =>
+  serviceWorker.evaluate(async () => {
+    const chromeApi = (globalThis as unknown as { chrome: ExtensionChromeApi })
+      .chrome;
+    const [tab] = await chromeApi.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    if (tab?.id === undefined) {
+      throw new Error("No active Chrome tab was available to inspect");
+    }
+
+    const [injection] = await chromeApi.scripting.executeScript({
+      target: { tabId: tab.id, frameIds: [0] },
+      world: "ISOLATED",
+      func: async () => {
+        type RuntimeProbe = {
+          clearDiagnosticHighlights(): void;
+          getDiagnostics(): RuntimeDiagnostics;
+          showDiagnosticHighlight(rect: {
+            readonly height: number;
+            readonly width: number;
+            readonly x: number;
+            readonly y: number;
+          }): void;
+          withMeasurementSafeUi<T>(measure: () => T): Promise<T>;
+        };
+
+        const key = Symbol.for("ui-torture-lab/document-runtime");
+        const runtime = (globalThis as typeof globalThis & {
+          [key]?: RuntimeProbe;
+        })[key];
+        if (runtime === undefined) {
+          throw new Error("Document Runtime was not available");
+        }
+
+        runtime.showDiagnosticHighlight({
+          x: 24,
+          y: 24,
+          width: 120,
+          height: 40,
+        });
+        const before = runtime.getDiagnostics();
+        const during = await runtime.withMeasurementSafeUi(() =>
+          runtime.getDiagnostics(),
+        );
+        const after = runtime.getDiagnostics();
+        runtime.clearDiagnosticHighlights();
+        return { before, during, after };
+      },
+    });
+
+    if (injection?.result === undefined) {
+      throw new Error("Document Runtime probe returned no result");
+    }
+    return injection.result;
+  });
 
 test.beforeAll(async () => {
   browser = await puppeteer.launch({
@@ -100,6 +205,274 @@ test("toolbar authorizes the actual built extension on localhost", async () => {
       badge: "OK",
       title: "UI Torture Lab — Target Page authorized",
     });
+  } finally {
+    await page.close();
+  }
+});
+
+test("toolbar mounts one floating control shell without geometry contamination", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto(
+      "http://127.0.0.1:4173/extension-ui-contamination/",
+    );
+    const before = await readFixtureGeometry(page);
+
+    await triggerToolbarAction(page);
+    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await page.waitForFunction(() =>
+      document
+        .querySelector("[data-ui-torture-lab-root]")
+        ?.shadowRoot?.querySelector(".panel-shell"),
+    );
+
+    const after = await readFixtureGeometry(page);
+    const panel = await page.evaluate(() => {
+      const hosts = document.querySelectorAll("[data-ui-torture-lab-root]");
+      const host = hosts[0];
+      if (!(host instanceof HTMLElement)) {
+        throw new Error("Floating panel host was not mounted");
+      }
+      const rect = host.getBoundingClientRect();
+      return {
+        hostCount: hosts.length,
+        inlineEnd: rect.right,
+        inlineStart: rect.left,
+        runtimeId: host.dataset.uiTortureLabRuntimeId,
+        surface: host.dataset.uiTortureLabSurface,
+      };
+    });
+
+    expect(after).toEqual(before);
+    expect(panel).toMatchObject({
+      hostCount: 1,
+      surface: "floating-panel",
+    });
+    expect(panel.runtimeId).toBeTruthy();
+    expect(panel.inlineStart).toBeGreaterThanOrEqual(0);
+    expect(panel.inlineEnd).toBeLessThanOrEqual(before.innerWidth);
+  } finally {
+    await page.close();
+  }
+});
+
+test("floating UI events stop before Target Page bubble handlers", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto(
+      "http://127.0.0.1:4173/extension-ui-contamination/",
+    );
+    await triggerToolbarAction(page);
+    await page.waitForFunction(() =>
+      document
+        .querySelector("[data-ui-torture-lab-root]")
+        ?.shadowRoot?.querySelector('[aria-label="Collapse UI Torture Lab"]'),
+    );
+
+    const observed = await page.evaluate(() => {
+      const host = document.querySelector("[data-ui-torture-lab-root]");
+      const collapse = host?.shadowRoot?.querySelector<HTMLButtonElement>(
+        '[aria-label="Collapse UI Torture Lab"]',
+      );
+      if (collapse === null || collapse === undefined) {
+        throw new Error("Collapse control was not rendered");
+      }
+      collapse.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, composed: true }),
+      );
+      collapse.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          composed: true,
+          key: "Enter",
+        }),
+      );
+      collapse.click();
+
+      const targetAction = document.querySelector<HTMLButtonElement>(
+        "#target-page-action",
+      );
+      targetAction?.click();
+      const fixture = window as typeof window & {
+        fixtureCapturedUiEvents: string[];
+        fixtureObservedUiEvents: string[];
+        fixtureTargetPageActionCount: number;
+      };
+      return {
+        capturedEvents: fixture.fixtureCapturedUiEvents,
+        bubbledEvents: fixture.fixtureObservedUiEvents,
+        targetPageActionCount: fixture.fixtureTargetPageActionCount,
+      };
+    });
+
+    expect(observed).toEqual({
+      capturedEvents: ["pointerdown", "keydown", "click", "click"],
+      bubbledEvents: ["click"],
+      targetPageActionCount: 1,
+    });
+  } finally {
+    await page.close();
+  }
+});
+
+test("Document Runtime excludes owned UI and hides diagnostics during capture", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto(
+      "http://127.0.0.1:4173/extension-ui-contamination/",
+    );
+    await triggerToolbarAction(page);
+    await page.waitForSelector("[data-ui-torture-lab-root]");
+
+    const probe = await exerciseMeasurementSafeRuntime();
+
+    expect(probe.before).toMatchObject({
+      diagnosticHighlightCount: 1,
+      diagnosticHighlightsRendered: 1,
+      overlayRendered: true,
+      panelRendered: true,
+      ownsOverlay: true,
+      ownsPanel: true,
+    });
+    expect(probe.before.ownedRootCount).toBeGreaterThanOrEqual(4);
+    expect(probe.during).toMatchObject({
+      diagnosticHighlightCount: 1,
+      diagnosticHighlightsRendered: 0,
+      overlayRendered: false,
+      panelRendered: false,
+    });
+    expect(probe.after).toEqual(probe.before);
+  } finally {
+    await page.close();
+  }
+});
+
+test("floating UI collapse and remount reuse one Document Runtime", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto(
+      "http://127.0.0.1:4173/extension-ui-contamination/",
+    );
+    await triggerToolbarAction(page);
+    await page.waitForSelector("[data-ui-torture-lab-root]");
+
+    const initialRuntimeId = await page.$eval(
+      "[data-ui-torture-lab-root]",
+      (host) => (host as HTMLElement).dataset.uiTortureLabRuntimeId,
+    );
+    await page.evaluate(() => {
+      const host = document.querySelector("[data-ui-torture-lab-root]");
+      const collapse = host?.shadowRoot?.querySelector<HTMLButtonElement>(
+        '[aria-label="Collapse UI Torture Lab"]',
+      );
+      collapse?.click();
+    });
+    await expect
+      .poll(() =>
+        page.$eval(
+          "[data-ui-torture-lab-root]",
+          (host) => (host as HTMLElement).dataset.uiTortureLabCollapsed,
+        ),
+      )
+      .toBe("true");
+
+    await triggerToolbarAction(page);
+    await expect
+      .poll(() =>
+        page.$eval(
+          "[data-ui-torture-lab-root]",
+          (host) => (host as HTMLElement).dataset.uiTortureLabCollapsed,
+        ),
+      )
+      .toBe("false");
+
+    await page.evaluate(() => {
+      document.querySelector("[data-ui-torture-lab-root]")?.remove();
+      document.querySelector("[data-ui-torture-lab-overlay-root]")?.remove();
+    });
+    await triggerToolbarAction(page);
+    await page.waitForSelector("[data-ui-torture-lab-root]");
+
+    const remounted = await page.evaluate(() => ({
+      hostCount: document.querySelectorAll("[data-ui-torture-lab-root]").length,
+      overlayCount: document.querySelectorAll(
+        "[data-ui-torture-lab-overlay-root]",
+      ).length,
+      runtimeId: document.querySelector<HTMLElement>(
+        "[data-ui-torture-lab-root]",
+      )?.dataset.uiTortureLabRuntimeId,
+    }));
+    expect(remounted).toEqual({
+      hostCount: 1,
+      overlayCount: 1,
+      runtimeId: initialRuntimeId,
+    });
+  } finally {
+    await page.close();
+  }
+});
+
+test("a replacement Document creates a fresh runtime only after a new toolbar action", async () => {
+  const page = await browser.newPage();
+  try {
+    const fixtureUrl =
+      "http://127.0.0.1:4173/extension-ui-contamination/";
+    await page.goto(fixtureUrl);
+    await triggerToolbarAction(page);
+    const previousRuntimeId = await page.$eval(
+      "[data-ui-torture-lab-root]",
+      (host) => (host as HTMLElement).dataset.uiTortureLabRuntimeId,
+    );
+
+    await page.reload();
+    expect(await page.$$("[data-ui-torture-lab-root]")).toHaveLength(0);
+
+    await triggerToolbarAction(page);
+    await page.waitForSelector("[data-ui-torture-lab-root]");
+    const nextRuntimeId = await page.$eval(
+      "[data-ui-torture-lab-root]",
+      (host) => (host as HTMLElement).dataset.uiTortureLabRuntimeId,
+    );
+    expect(nextRuntimeId).toBeTruthy();
+    expect(nextRuntimeId).not.toBe(previousRuntimeId);
+    expect(await page.$$("[data-ui-torture-lab-root]")).toHaveLength(1);
+  } finally {
+    await page.close();
+  }
+});
+
+test("floating UI remains inside a small viewport without document overflow", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.setViewport({ width: 320, height: 480 });
+    await page.goto(
+      "http://127.0.0.1:4173/extension-ui-contamination/",
+    );
+    const before = await readFixtureGeometry(page);
+    await triggerToolbarAction(page);
+
+    const surface = await page.$eval(
+      "[data-ui-torture-lab-root]",
+      (host) => {
+        const panel = host.shadowRoot?.querySelector(".panel-shell");
+        if (!(panel instanceof HTMLElement)) {
+          throw new Error("Floating panel was not rendered");
+        }
+        const rect = panel.getBoundingClientRect();
+        return {
+          blockEnd: rect.bottom,
+          blockStart: rect.top,
+          inlineEnd: rect.right,
+          inlineStart: rect.left,
+        };
+      },
+    );
+
+    expect(await readFixtureGeometry(page)).toEqual(before);
+    expect(surface.inlineStart).toBeGreaterThanOrEqual(0);
+    expect(surface.inlineEnd).toBeLessThanOrEqual(320);
+    expect(surface.blockStart).toBeGreaterThanOrEqual(0);
+    expect(surface.blockEnd).toBeLessThanOrEqual(480);
   } finally {
     await page.close();
   }

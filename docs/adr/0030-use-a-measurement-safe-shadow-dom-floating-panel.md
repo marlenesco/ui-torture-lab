@@ -1,0 +1,15 @@
+# Use a measurement-safe Shadow DOM floating panel
+
+UI Torture Lab uses a floating in-page panel mounted in an open Shadow Root as the primary MVP surface. The panel and diagnostic overlay are fixed, zero-footprint extension-owned roots in Chrome's `ISOLATED` world; one Document Runtime owns them through direct node references, remounts them idempotently, and temporarily removes both from rendering during every Evidence acquisition. This keeps the toolbar-driven `activeTab` workflow, leaves the base permission budget unchanged, and prevents the UI from becoming traversal, eligibility, Mutation, measurement, Evidence, contributor, or locator input.
+
+## Evidence
+
+The controlled Chrome 150 spike is recorded in [the UI surface benchmark](../../tests/benchmarks/ui-surface-comparison.md). Opening the floating panel left the fixture's layout viewport, document and body scroll extents, resize count, and responsive breakpoint unchanged. The same held at a 320 x 480 viewport and with docked DevTools already open. Collapse, repeated toolbar activation, external host removal, remount, reload, and navigation produced at most one panel, one overlay, and one Document Runtime per Document. Composed pointer, keyboard, and activation events were stopped at the Shadow Root after React handled them, while equivalent Target Page interaction remained unaffected. During the measurement-safe callback, both extension roots and every diagnostic highlight were non-rendered and their exact prior visibility was restored afterward.
+
+## Rejected option
+
+Chrome Side Panel was exercised with a minimal MV3 extension against the same fixture. In a 900 px browser window it reduced `window.innerWidth`, `documentElement.clientWidth`, `documentElement.scrollWidth`, and `body.scrollWidth` from 900 px to 514 px, emitted 36 resize events, and crossed the fixture from its `wide` to `narrow` breakpoint; that 514 px state persisted across reload and navigation. It also requires the additional `sidePanel` permission, and Chrome's action-toggle path does not preserve the toolbar action's `activeTab` grant semantics. Stabilizing a post-resize baseline would measure a different responsive page rather than avoid contamination, so Side Panel is rejected for the MVP.
+
+## Consequences
+
+The production manifest retains only `activeTab`, `scripting`, and `storage`. The page can still remove or externally style the light-DOM hosts, so host existence is never runtime identity or ownership proof; a new toolbar action reconnects the UI to the isolated singleton and direct ownership references remain authoritative. Shadow-boundary event isolation stops UI events before Target Page bubble handlers, but a Target Page capture listener runs earlier in the event path and may observe them; the UI is non-rendered and accepts no interaction during Evidence acquisition. Diagnostic highlights are rendered only after acquisition and are hidden with the panel during later measurements. If this surface ever changes page geometry on a supported fixture, the response is to replace the surface, not compensate inside a Detector.
