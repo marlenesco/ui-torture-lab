@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  prepareLongTextMutations,
-  type LongTextMutation,
-} from "../scenarios/long-text.js";
+  createMutationJournal,
+  type MutationJournal,
+  type MutationOutcome,
+  type RestoreConflictReason,
+  type RestoreResult,
+} from "./mutation-journal.js";
+import { prepareLongTextMutations } from "../scenarios/long-text.js";
 
 export type ScenarioId = "long-text";
 
@@ -13,6 +17,7 @@ export type RunPhase =
   | "ready-for-inspection"
   | "restoring"
   | "completed"
+  | "aborted"
   | "reload-required";
 
 export type RunCoverage = {
@@ -23,14 +28,32 @@ export type RunCoverage = {
   readonly inconclusiveTargets: number;
 };
 
-export type SerializedRunResult = {
+export type SerializedRestoreConflict = {
+  readonly kind: string;
+  readonly reason: RestoreConflictReason;
+};
+
+export type SerializedRestoreResult = {
+  readonly conflicts: readonly SerializedRestoreConflict[];
+  readonly status: RestoreResult["status"];
+};
+
+type SerializedRunResultBase = {
   readonly scenarioId: ScenarioId;
-  readonly status: "completed";
   readonly coverage: RunCoverage;
   readonly findings: readonly never[];
-  readonly restoreStatus: "restored";
+  readonly restore: SerializedRestoreResult;
   readonly summary: string;
 };
+
+export type SerializedRunResult =
+  | (SerializedRunResultBase & {
+      readonly status: "completed";
+    })
+  | (SerializedRunResultBase & {
+      readonly status: "aborted";
+      readonly terminationReason: "unknown-mutation-state";
+    });
 
 export type RunSnapshot = {
   readonly phase: RunPhase;
@@ -63,11 +86,31 @@ const zeroCoverage = (): RunCoverage =>
 const freezeCoverage = (coverage: RunCoverage): RunCoverage =>
   Object.freeze({ ...coverage });
 
+const serializeRestore = (restore: RestoreResult): SerializedRestoreResult =>
+  Object.freeze({
+    status: restore.status,
+    conflicts: Object.freeze(
+      restore.conflicts.map(({ kind, reason }) =>
+        Object.freeze({ kind, reason }),
+      ),
+    ),
+  });
+
+const summaryForRestore = (restore: RestoreResult): string => {
+  if (restore.status === "restored") {
+    return "No supported Finding was produced. This does not claim the Target Page has no layout problems.";
+  }
+  if (restore.status === "conflict") {
+    return "Restore conflicts were left untouched to avoid overwriting external changes. Reload required.";
+  }
+  return "Restore could not be verified completely. Reload required.";
+};
+
 export function createRunController(
   options: RunControllerOptions,
 ): RunController {
   const listeners = new Set<() => void>();
-  let journal: LongTextMutation[] = [];
+  let journal: MutationJournal | null = null;
   let snapshot: RunSnapshot = Object.freeze({
     phase: "idle",
     scenarioId: null,
@@ -82,6 +125,38 @@ export function createRunController(
     }
   };
 
+  const completedResult = (
+    scenarioId: ScenarioId,
+    coverage: RunCoverage,
+    restore: RestoreResult,
+  ): SerializedRunResult =>
+    Object.freeze({
+      scenarioId,
+      status: "completed",
+      coverage,
+      findings: Object.freeze([]),
+      restore: serializeRestore(restore),
+      summary: summaryForRestore(restore),
+    });
+
+  const abortedResult = (
+    scenarioId: ScenarioId,
+    coverage: RunCoverage,
+    restore: RestoreResult,
+  ): SerializedRunResult =>
+    Object.freeze({
+      scenarioId,
+      status: "aborted",
+      terminationReason: "unknown-mutation-state",
+      coverage,
+      findings: Object.freeze([]),
+      restore: serializeRestore(restore),
+      summary:
+        restore.status === "restored"
+          ? "The Run was aborted after an unverified Mutation. Applied values were restored; no Findings were produced."
+          : "The Run was aborted after an unverified Mutation and cleanup was incomplete. Reload required; no Findings were produced.",
+    });
+
   const controller: RunController = {
     getSnapshot: () => snapshot,
     subscribe: (listener) => {
@@ -89,9 +164,13 @@ export function createRunController(
       return () => listeners.delete(listener);
     },
     startScenario: async (scenarioId) => {
+      if (snapshot.phase === "reload-required") {
+        throw new Error("The Document requires reload before another Run");
+      }
       if (
         snapshot.phase !== "idle" &&
-        snapshot.phase !== "completed"
+        snapshot.phase !== "completed" &&
+        snapshot.phase !== "aborted"
       ) {
         throw new Error("A Run is already active");
       }
@@ -103,93 +182,75 @@ export function createRunController(
         result: null,
       });
 
-      journal = prepareLongTextMutations(options);
-      const eligibleTargets = journal.length;
+      const records = prepareLongTextMutations(options);
+      const activeJournal = createMutationJournal(options.document);
+      journal = activeJournal;
       let mutatedTargets = 0;
       let skippedTargets = 0;
+      let ineffectiveTargets = 0;
       let inconclusiveTargets = 0;
-      const appliedJournal: LongTextMutation[] = [];
 
-      const stopAfterUnverifiedWrite = (
-        uncertainRecord: LongTextMutation,
-      ): void => {
-        journal = [...appliedJournal, uncertainRecord];
-        for (const appliedRecord of [...journal].reverse()) {
-          if (
-            appliedRecord.target.isConnected &&
-            appliedRecord.target.ownerDocument === options.document &&
-            appliedRecord.target.data === appliedRecord.appliedValue
-          ) {
-            try {
-              appliedRecord.target.data = appliedRecord.originalValue;
-            } catch {
-              // The terminal state remains reload-required. Never overwrite a
-              // value whose ownership cannot be verified.
-            }
-          }
+      const recordOutcome = (outcome: MutationOutcome): void => {
+        switch (outcome) {
+          case "applied":
+            mutatedTargets += 1;
+            break;
+          case "applied-ineffective":
+            mutatedTargets += 1;
+            ineffectiveTargets += 1;
+            inconclusiveTargets += 1;
+            break;
+          case "safe-failure":
+            inconclusiveTargets += 1;
+            break;
+          case "skipped":
+            skippedTargets += 1;
+            break;
+          case "unknown":
+            inconclusiveTargets += 1;
+            break;
         }
-        publish({
-          phase: "reload-required",
-          scenarioId,
-          coverage: freezeCoverage({
-            eligibleTargets,
-            mutatedTargets,
-            skippedTargets,
-            ineffectiveTargets: 0,
-            inconclusiveTargets: inconclusiveTargets + 1,
-          }),
-          result: null,
-        });
       };
 
-      for (const record of journal) {
-        if (
-          !record.target.isConnected ||
-          record.target.ownerDocument !== options.document ||
-          record.target.data !== record.originalValue
-        ) {
-          skippedTargets += 1;
-          continue;
+      for (const record of records) {
+        const outcome = activeJournal.apply(record);
+        recordOutcome(outcome);
+        if (outcome === "unknown") {
+          const coverage = freezeCoverage({
+            eligibleTargets: records.length,
+            mutatedTargets,
+            skippedTargets,
+            ineffectiveTargets,
+            inconclusiveTargets,
+          });
+          const restore = activeJournal.restore();
+          journal = null;
+          publish({
+            phase:
+              restore.status === "restored" ? "aborted" : "reload-required",
+            scenarioId,
+            coverage,
+            result: abortedResult(scenarioId, coverage, restore),
+          });
+          return;
         }
-
-        try {
-          record.target.data = record.appliedValue;
-        } catch {
-          if (record.target.data !== record.originalValue) {
-            stopAfterUnverifiedWrite(record);
-            return;
-          }
-          inconclusiveTargets += 1;
-          continue;
-        }
-
-        if (record.target.data !== record.appliedValue) {
-          if (record.target.data !== record.originalValue) {
-            stopAfterUnverifiedWrite(record);
-            return;
-          }
-          inconclusiveTargets += 1;
-          continue;
-        }
-        appliedJournal.push(record);
-        mutatedTargets += 1;
       }
-      journal = appliedJournal;
+
       publish({
         phase: "ready-for-inspection",
         scenarioId,
         coverage: freezeCoverage({
-          eligibleTargets,
+          eligibleTargets: records.length,
           mutatedTargets,
           skippedTargets,
-          ineffectiveTargets: 0,
+          ineffectiveTargets,
           inconclusiveTargets,
         }),
         result: null,
       });
     },
     restore: () => {
-      if (snapshot.phase !== "ready-for-inspection") {
+      if (snapshot.phase !== "ready-for-inspection" || journal === null) {
         throw new Error("No active Run is ready to Restore");
       }
       const scenarioId = snapshot.scenarioId;
@@ -198,44 +259,11 @@ export function createRunController(
       }
       publish({ ...snapshot, phase: "restoring" });
 
-      let restoreIncomplete = false;
-      for (const record of [...journal].reverse()) {
-        if (
-          !record.target.isConnected ||
-          record.target.ownerDocument !== options.document ||
-          record.target.data !== record.appliedValue
-        ) {
-          restoreIncomplete = true;
-          continue;
-        }
-        try {
-          record.target.data = record.originalValue;
-        } catch {
-          restoreIncomplete = true;
-          continue;
-        }
-        if (record.target.data !== record.originalValue) {
-          restoreIncomplete = true;
-        }
-      }
-
-      if (restoreIncomplete) {
-        publish({ ...snapshot, phase: "reload-required" });
-        return;
-      }
-
-      const result: SerializedRunResult = Object.freeze({
-        scenarioId,
-        status: "completed",
-        coverage: snapshot.coverage,
-        findings: Object.freeze([]),
-        restoreStatus: "restored",
-        summary:
-          "No supported Finding was produced. This does not claim the Target Page has no layout problems.",
-      });
-      journal = [];
+      const restore = journal.restore();
+      journal = null;
+      const result = completedResult(scenarioId, snapshot.coverage, restore);
       publish({
-        phase: "completed",
+        phase: restore.status === "restored" ? "completed" : "reload-required",
         scenarioId,
         coverage: snapshot.coverage,
         result,

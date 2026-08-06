@@ -8,5 +8,7 @@ export type {
   RunPhase,
   RunSnapshot,
   ScenarioId,
+  SerializedRestoreConflict,
+  SerializedRestoreResult,
   SerializedRunResult,
 } from "./run/run-controller.js";

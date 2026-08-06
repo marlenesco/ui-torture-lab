@@ -423,3 +423,211 @@ test("the built panel exposes Apply, active inspection, Restore, and result", as
     await page.close();
   }
 });
+
+test("Restore conflict leaves external text untouched and blocks another Run", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await triggerToolbarAction(page);
+    await clickPanelButton(page, "Apply Long Text");
+    await page.waitForFunction(
+      () => document.querySelector("#minimum-target")?.textContent === "OK OK OK",
+    );
+    await page.$eval("#primary-target", (target) => {
+      target.textContent = "Developer-owned change";
+    });
+
+    await clickPanelButton(page, "Restore");
+    await page.waitForFunction(
+      () =>
+        document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
+          ?.textContent?.includes("Reload required") === true,
+    );
+    const panelText = await readPanelText(page);
+    expect(panelText).toContain("Restore conflict");
+    expect(panelText).toContain("External changes were left untouched");
+    expect(panelText).not.toContain("Apply Long Text");
+    expect(
+      await page.$eval("#primary-target", (target) => target.textContent),
+    ).toBe("Developer-owned change");
+    expect(
+      await page.$eval("#minimum-target", (target) => target.textContent),
+    ).toBe("OK");
+
+    const blockedMessage = await serviceWorker.evaluate(async () => {
+      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
+      const [tab] = await chromeApi.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (tab?.id === undefined) {
+        throw new Error("No active fixture tab was available");
+      }
+      const [injection] = await chromeApi.scripting.executeScript({
+        target: { tabId: tab.id, frameIds: [0] },
+        world: "ISOLATED",
+        func: async () => {
+          type Controller = {
+            startScenario(scenarioId: "long-text"): Promise<void>;
+          };
+          const runtime = (globalThis as typeof globalThis & {
+            [key: symbol]: { readonly runController?: Controller } | undefined;
+          })[Symbol.for("ui-torture-lab/document-runtime")];
+          try {
+            await runtime?.runController?.startScenario("long-text");
+            return "not blocked";
+          } catch (error) {
+            return error instanceof Error ? error.message : "unknown";
+          }
+        },
+      });
+      return injection?.result;
+    });
+    expect(blockedMessage).toContain("requires reload");
+  } finally {
+    await page.close();
+  }
+});
+
+test("an Engine safety abort is distinct from Restore conflict in the built UI", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await triggerToolbarAction(page);
+
+    await serviceWorker.evaluate(async () => {
+      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
+      const [tab] = await chromeApi.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (tab?.id === undefined) {
+        throw new Error("No active fixture tab was available");
+      }
+      await chromeApi.scripting.executeScript({
+        target: { tabId: tab.id, frameIds: [0] },
+        world: "ISOLATED",
+        func: async () => {
+          type Controller = {
+            startScenario(scenarioId: "long-text"): Promise<void>;
+          };
+          const runtime = (globalThis as typeof globalThis & {
+            [key: symbol]: { readonly runController?: Controller } | undefined;
+          })[Symbol.for("ui-torture-lab/document-runtime")];
+          const target = document.querySelector("#primary-target")?.firstChild;
+          const descriptor = Object.getOwnPropertyDescriptor(
+            CharacterData.prototype,
+            "data",
+          );
+          if (
+            runtime?.runController === undefined ||
+            !(target instanceof Text) ||
+            descriptor?.get === undefined ||
+            descriptor.set === undefined
+          ) {
+            throw new Error("Safety-abort fixture was unavailable");
+          }
+          const nativeGet = descriptor.get;
+          const nativeSet = descriptor.set;
+          let writes = 0;
+          Object.defineProperty(target, "data", {
+            configurable: true,
+            get() {
+              return nativeGet.call(this) as string;
+            },
+            set(value: string) {
+              writes += 1;
+              nativeSet.call(this, value);
+              if (writes === 1) {
+                throw new Error("Synthetic unverified write");
+              }
+            },
+          });
+          await runtime.runController.startScenario("long-text");
+        },
+      });
+    });
+
+    await page.waitForFunction(
+      () =>
+        document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
+          ?.textContent?.includes("Run aborted") === true,
+    );
+    const panelText = await readPanelText(page);
+    expect(panelText).toContain("Run aborted");
+    expect(panelText).toContain("Restore completed");
+    expect(panelText).toContain("No Findings were produced");
+    expect(panelText).not.toContain("Restore conflict");
+  } finally {
+    await page.close();
+  }
+});
+
+test("an unverified cleanup is distinct from an external Restore conflict", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await triggerToolbarAction(page);
+    await clickPanelButton(page, "Apply Long Text");
+    await page.waitForFunction(
+      () => document.querySelector("#minimum-target")?.textContent === "OK OK OK",
+    );
+
+    await serviceWorker.evaluate(async () => {
+      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
+      const [tab] = await chromeApi.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (tab?.id === undefined) {
+        throw new Error("No active fixture tab was available");
+      }
+      await chromeApi.scripting.executeScript({
+        target: { tabId: tab.id, frameIds: [0] },
+        world: "ISOLATED",
+        func: () => {
+          type Controller = { restore(): void };
+          const runtime = (globalThis as typeof globalThis & {
+            [key: symbol]: { readonly runController?: Controller } | undefined;
+          })[Symbol.for("ui-torture-lab/document-runtime")];
+          const target = document.querySelector("#primary-target")?.firstChild;
+          const descriptor = Object.getOwnPropertyDescriptor(
+            CharacterData.prototype,
+            "data",
+          );
+          if (
+            runtime?.runController === undefined ||
+            !(target instanceof Text) ||
+            descriptor?.get === undefined ||
+            descriptor.set === undefined
+          ) {
+            throw new Error("Restore-exception fixture was unavailable");
+          }
+          const nativeGet = descriptor.get;
+          Object.defineProperty(target, "data", {
+            configurable: true,
+            get() {
+              return nativeGet.call(this) as string;
+            },
+            set() {
+              throw new Error("Synthetic Restore exception");
+            },
+          });
+          runtime.runController.restore();
+        },
+      });
+    });
+
+    await page.waitForFunction(
+      () =>
+        document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
+          ?.textContent?.includes("Restore unverified") === true,
+    );
+    const panelText = await readPanelText(page);
+    expect(panelText).toContain("Reload required");
+    expect(panelText).toContain("Restore unverified");
+    expect(panelText).not.toContain("Restore conflict");
+  } finally {
+    await page.close();
+  }
+});
