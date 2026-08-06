@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useSyncExternalStore } from "react";
-import type { RunController } from "@ui-torture-lab/engine";
+import type { RunController, ScenarioId } from "@ui-torture-lab/engine";
 
 type ExtensionPanelProps = {
   readonly collapsed: boolean;
   readonly onCollapse: () => void;
   readonly onExpand: () => void;
   readonly onRestore: () => void;
-  readonly onStartLongText: () => void;
+  readonly onStartScenario: (scenarioId: ScenarioId) => void;
   readonly runController: RunController;
 };
 
@@ -17,7 +17,7 @@ export function ExtensionPanel({
   onCollapse,
   onExpand,
   onRestore,
-  onStartLongText,
+  onStartScenario,
   runController,
 }: ExtensionPanelProps) {
   const snapshot = useSyncExternalStore(
@@ -57,7 +57,7 @@ export function ExtensionPanel({
       </header>
       <RunControls
         onRestore={onRestore}
-        onStartLongText={onStartLongText}
+        onStartScenario={onStartScenario}
         snapshot={snapshot}
       />
     </section>
@@ -66,35 +66,33 @@ export function ExtensionPanel({
 
 type RunControlsProps = Pick<
   ExtensionPanelProps,
-  "onRestore" | "onStartLongText"
+  "onRestore" | "onStartScenario"
 > & {
   readonly snapshot: ReturnType<RunController["getSnapshot"]>;
 };
 
 function RunControls({
   onRestore,
-  onStartLongText,
+  onStartScenario,
   snapshot,
 }: RunControlsProps) {
   if (snapshot.phase === "idle") {
     return (
       <div className="run-controls">
         <p>Apply one Scenario to the current Target Page.</p>
-        <button className="panel-action" onClick={onStartLongText} type="button">
-          Apply Long Text
-        </button>
+        <ScenarioButtons onStartScenario={onStartScenario} />
       </div>
     );
   }
 
   if (snapshot.phase === "applying-mutations") {
-    return <p role="status">Applying Long Text…</p>;
+    return <p role="status">Applying {scenarioLabel(snapshot.scenarioId)}…</p>;
   }
 
   if (snapshot.phase === "ready-for-inspection") {
     return (
       <div className="run-controls">
-        <p role="status">Long Text Scenario active</p>
+        <p role="status">{scenarioLabel(snapshot.scenarioId)} Scenario active</p>
         <CoverageSummary coverage={snapshot.coverage} />
         <button className="panel-action" onClick={onRestore} type="button">
           Restore
@@ -114,9 +112,7 @@ function RunControls({
         <p>No Findings were produced.</p>
         <RestoreSummary result={snapshot.result} />
         <p>{snapshot.result?.summary}</p>
-        <button className="panel-action" onClick={onStartLongText} type="button">
-          Apply Long Text
-        </button>
+        <ScenarioButtons onStartScenario={onStartScenario} />
       </div>
     );
   }
@@ -136,14 +132,48 @@ function RunControls({
 
   return (
     <div className="run-controls">
-      <p role="status">Run completed</p>
+      <p role="status">{scenarioLabel(snapshot.scenarioId)} Run completed</p>
       <CoverageSummary coverage={snapshot.coverage} />
       <RestoreSummary result={snapshot.result} />
       <p>{snapshot.result?.summary}</p>
-      <button className="panel-action" onClick={onStartLongText} type="button">
+      <ScenarioButtons onStartScenario={onStartScenario} />
+    </div>
+  );
+}
+
+const scenarioLabel = (scenarioId: ScenarioId | null): string => {
+  switch (scenarioId) {
+    case "long-text":
+      return "Long Text";
+    case "unbreakable-text":
+      return "Unbreakable Text";
+    case null:
+      return "Scenario";
+  }
+};
+
+function ScenarioButtons({
+  onStartScenario,
+}: {
+  readonly onStartScenario: (scenarioId: ScenarioId) => void;
+}) {
+  return (
+    <>
+      <button
+        className="panel-action"
+        onClick={() => onStartScenario("long-text")}
+        type="button"
+      >
         Apply Long Text
       </button>
-    </div>
+      <button
+        className="panel-action"
+        onClick={() => onStartScenario("unbreakable-text")}
+        type="button"
+      >
+        Apply Unbreakable Text
+      </button>
+    </>
   );
 }
 

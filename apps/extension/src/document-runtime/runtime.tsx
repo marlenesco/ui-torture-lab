@@ -392,9 +392,9 @@ class DocumentRuntime {
           onCollapse={() => render(true)}
           onExpand={() => render(false)}
           onRestore={() => this.runController.restore()}
-          onStartLongText={() => {
+          onStartScenario={(scenarioId) => {
             void this.withMeasurementSafeUi(() =>
-              this.runController.startScenario("long-text")
+              this.runController.startScenario(scenarioId)
             );
           }}
           runController={this.runController}

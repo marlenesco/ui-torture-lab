@@ -8,8 +8,9 @@ import {
   type RestoreResult,
 } from "./mutation-journal.js";
 import { prepareLongTextMutations } from "../scenarios/long-text.js";
+import { prepareUnbreakableTextMutations } from "../scenarios/unbreakable-text.js";
 
-export type ScenarioId = "long-text";
+export type ScenarioId = "long-text" | "unbreakable-text";
 
 export type RunPhase =
   | "idle"
@@ -106,6 +107,18 @@ const summaryForRestore = (restore: RestoreResult): string => {
   return "Restore could not be verified completely. Reload required.";
 };
 
+const prepareScenarioMutations = (
+  scenarioId: ScenarioId,
+  options: RunControllerOptions,
+) => {
+  switch (scenarioId) {
+    case "long-text":
+      return prepareLongTextMutations(options);
+    case "unbreakable-text":
+      return prepareUnbreakableTextMutations(options);
+  }
+};
+
 export function createRunController(
   options: RunControllerOptions,
 ): RunController {
@@ -182,7 +195,7 @@ export function createRunController(
         result: null,
       });
 
-      const records = prepareLongTextMutations(options);
+      const records = prepareScenarioMutations(scenarioId, options);
       const activeJournal = createMutationJournal(options.document);
       journal = activeJournal;
       let mutatedTargets = 0;
