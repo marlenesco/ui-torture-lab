@@ -107,20 +107,71 @@ function RunControls({
     return <p role="status">Restoring…</p>;
   }
 
+  if (snapshot.phase === "aborted") {
+    return (
+      <div className="run-controls">
+        <p role="alert">Run aborted</p>
+        <p>No Findings were produced.</p>
+        <RestoreSummary result={snapshot.result} />
+        <p>{snapshot.result?.summary}</p>
+        <button className="panel-action" onClick={onStartLongText} type="button">
+          Apply Long Text
+        </button>
+      </div>
+    );
+  }
+
   if (snapshot.phase === "reload-required") {
-    return <p role="alert">Restore could not be verified. Reload required.</p>;
+    return (
+      <div className="run-controls">
+        {snapshot.result?.status === "aborted" ? (
+          <p role="alert">Run aborted</p>
+        ) : null}
+        <p role="alert">Reload required</p>
+        <RestoreSummary result={snapshot.result} />
+        <p>{snapshot.result?.summary}</p>
+      </div>
+    );
   }
 
   return (
     <div className="run-controls">
       <p role="status">Run completed</p>
       <CoverageSummary coverage={snapshot.coverage} />
+      <RestoreSummary result={snapshot.result} />
       <p>{snapshot.result?.summary}</p>
       <button className="panel-action" onClick={onStartLongText} type="button">
         Apply Long Text
       </button>
     </div>
   );
+}
+
+function RestoreSummary({
+  result,
+}: {
+  readonly result: ReturnType<RunController["getSnapshot"]>["result"];
+}) {
+  if (result?.restore.status === "restored") {
+    return <p>Restore completed</p>;
+  }
+  if (result?.restore.status === "conflict") {
+    return (
+      <p>
+        Restore conflict · {result.restore.conflicts.length} external change(s).
+        External changes were left untouched.
+      </p>
+    );
+  }
+  if (result?.restore.status === "unverified") {
+    return (
+      <p>
+        Restore unverified · {result.restore.conflicts.length} cleanup problem(s).
+        External changes were left untouched.
+      </p>
+    );
+  }
+  return null;
 }
 
 function CoverageSummary({

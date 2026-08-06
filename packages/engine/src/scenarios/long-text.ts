@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import {
+  createTextMutationRecord,
+  type MutationRecord,
+} from "../run/mutation-journal.js";
+
 const expansionFactor = 3;
 const minimumMeaningfulGraphemes = 2;
 const structuredWhiteSpaceValues = new Set([
@@ -25,11 +30,7 @@ const excludedTextOwnerSelector = [
   "[role='img']",
 ].join(",");
 
-export type LongTextMutation = {
-  readonly appliedValue: string;
-  readonly originalValue: string;
-  readonly target: Text;
-};
+export type LongTextMutation = MutationRecord<string>;
 
 export type LongTextPreparationOptions = {
   readonly document: Document;
@@ -111,11 +112,7 @@ export function prepareLongTextMutations(
       hasSupportedTextOwner(target) &&
       isRenderedNormalText(target, options.document)
     ) {
-      records.push({
-        target,
-        originalValue: target.data,
-        appliedValue,
-      });
+      records.push(createTextMutationRecord({ target, appliedValue }));
     }
     current = walker.nextNode();
   }
