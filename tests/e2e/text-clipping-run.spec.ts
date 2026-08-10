@@ -173,6 +173,7 @@ test("built extension shows containment and Viewport Overflow from Unbreakable T
     expect(panelText).toContain("Boundary div#containing-boundary");
     expect(panelText).toContain("Target Page");
     expect(panelText).toContain("via p#viewport-child");
+    expect(panelText).toContain("Contributors: inline-end p#viewport-child");
     expect(panelText).toContain("baseline");
     expect(panelText).toContain("delta");
     expect(panelText).toContain("extends the Target Page beyond its layout viewport");

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Viewport overflow fixture</title>
+    <style>
+      html { overflow-y: scroll; }
+      body { margin: 0; width: calc(100% - 32px); font: 16px/1.5 system-ui, sans-serif; }
+      #ltr-primary, #ltr-secondary, #rtl-contributor, #nested-outer, #nested-both-outer { display: inline-block; margin: 0 0 0 900px; width: max-content; }
+      #ltr-primary { margin-left: 1900px; }
+      #rtl-contributor { direction: rtl; margin-left: 820px; }
+      #nested-outer { font-size: 0; }
+      #nested-inner { font-size: 16px; }
+      #nested-both-outer { margin-left: -200px; font-size: 0; }
+      #nested-both-inner { font-size: 60px; }
+      #pre-existing-page-excess { height: 1px; margin-left: 1400px; width: 1px; }
+      #absolute-only, #fixed-only { display: none; }
+      #absolute-only { left: 1450px; position: absolute; width: max-content; }
+      #fixed-only { left: 1450px; position: fixed; width: max-content; }
+      #generated-only { display: none; margin-left: 900px; width: max-content; }
+      #generated-only::after { content: " generated"; }
+      #scrollbar-spacer { height: 2000px; }
+      #subpixel-boundary { width: 180.25px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div id="ltr-primary">Checkout</div>
+      <div id="ltr-secondary">Checkout</div>
+      <div id="rtl-contributor">Checkout</div>
+      <div id="nested-outer">Checkout<span id="nested-inner">Checkout</span></div>
+      <div id="nested-both-outer">Checkout<span id="nested-both-inner">Checkout</span></div>
+      <div id="pre-existing-page-excess"></div>
+      <div id="absolute-only">Checkout</div>
+      <div id="fixed-only">Checkout</div>
+      <div id="generated-only">Checkout</div>
+      <div id="scrollbar-spacer"></div>
+      <div id="subpixel-boundary"></div>
+    </main>
+  </body>
+</html>
