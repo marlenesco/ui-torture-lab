@@ -151,13 +151,18 @@ function FindingSummary({
   if (findings.length === 0) {
     return <p>No Findings were produced.</p>;
   }
+  const heading = findings.every((finding) => finding.detectorId === "text-clipping")
+    ? "Text Clipping"
+    : "Findings";
   return (
-    <section aria-label="Text Clipping Findings">
-      <strong>Text Clipping</strong>
+    <section aria-label={`${heading} Findings`}>
+      <strong>{heading}</strong>
       <ul>
         {findings.map((finding) => (
           <li key={`${finding.locator}-${finding.measuredDelta}`}>
-            Boundary {finding.locator} · hidden extent {finding.mutated.hiddenExtent.toFixed(1)}px
+            Boundary {finding.locator} · {finding.detectorId === "text-clipping"
+              ? `hidden extent ${finding.mutated.hiddenExtent.toFixed(1)}px`
+              : `maximum excess ${finding.mutated.maximumExcess.toFixed(1)}px`}
           </li>
         ))}
       </ul>
