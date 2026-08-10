@@ -5,6 +5,7 @@ export type {
   RunController,
   RunControllerOptions,
   RunCoverage,
+  LiveFindingReference,
   RunPhase,
   RunSnapshot,
   ScenarioId,

@@ -3,6 +3,12 @@
 export const bootstrapResponseType = "target-bootstrap-response" as const;
 export const probeResponseType = "target-probe-response" as const;
 export const authorizationResponseType = "target-authorization-response" as const;
+export const runActivityMessageType = "run-activity-changed" as const;
+
+export type RunActivityMessage = {
+  readonly active: boolean;
+  readonly type: typeof runActivityMessageType;
+};
 
 export type SupportedTargetProtocol = "http:" | "https:";
 
@@ -71,6 +77,14 @@ export type TargetAuthorizationResponse =
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+export const isRunActivityMessage = (
+  value: unknown,
+): value is RunActivityMessage =>
+  isRecord(value) &&
+  hasExactKeys(value, ["active", "type"]) &&
+  value.type === runActivityMessageType &&
+  typeof value.active === "boolean";
 
 const hasExactKeys = (
   value: Record<string, unknown>,

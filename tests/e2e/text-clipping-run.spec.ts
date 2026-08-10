@@ -134,6 +134,135 @@ test("built extension groups the completed Finding under Text Clipping", async (
   }
 });
 
+test("built extension inspects a live Finding without rematching a disconnected Subject", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto("http://127.0.0.1:4173/text-clipping-run/");
+    await page.bringToFront();
+    await page.triggerExtensionAction(extension);
+    await page.waitForSelector("[data-ui-torture-lab-root]");
+
+    await page.evaluate(() => {
+      const button = [...(
+        document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
+          ?.querySelectorAll("button") ?? []
+      )].find(
+        (candidate) => candidate.textContent?.trim() === "Apply Long Text",
+      );
+      if (!(button instanceof HTMLButtonElement)) {
+        throw new Error("Long Text control was unavailable");
+      }
+      button.click();
+    });
+
+    try {
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector("[data-ui-torture-lab-root]")
+            ?.shadowRoot?.textContent?.includes("Finding detail") === true,
+        { timeout: 5_000 },
+      );
+    } catch {
+      const state = await page.evaluate(() => ({
+        panel:
+          document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
+            ?.textContent ?? "",
+        target: document.querySelector("#clipping-boundary")?.textContent ?? "",
+      }));
+      throw new Error(`Finding detail was unavailable: ${JSON.stringify(state)}`);
+    }
+
+    const detail = await page.evaluate(
+      () =>
+        document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
+          ?.textContent ?? "",
+    );
+    expect(detail).toContain("Evidence");
+    expect(detail).toContain("Computed CSS");
+    expect(detail).toContain("Possible Cause");
+
+    await page.evaluate(() => {
+      const button = document
+        .querySelector("[data-ui-torture-lab-root]")
+        ?.shadowRoot?.querySelector<HTMLButtonElement>(
+          '[aria-label="Highlight Finding Subject p#clipping-boundary"]',
+        );
+      if (button === null || button === undefined) {
+        throw new Error("Finding highlight control was unavailable");
+      }
+      button.click();
+    });
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector("[data-ui-torture-lab-overlay-root]")
+          ?.shadowRoot?.querySelector(
+            '[data-ui-torture-lab-highlight][data-ui-torture-lab-highlight-kind="subject"]',
+          ) !== null,
+    );
+
+    await page.evaluate(() => {
+      document.querySelector("[data-ui-torture-lab-overlay-root]")?.remove();
+      document
+        .querySelector("[data-ui-torture-lab-root]")
+        ?.shadowRoot?.querySelector<HTMLButtonElement>(
+          '[aria-label="Highlight Finding Subject p#clipping-boundary"]',
+        )
+        ?.click();
+    });
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector("[data-ui-torture-lab-overlay-root]")
+          ?.shadowRoot?.querySelector(
+            '[data-ui-torture-lab-highlight][data-ui-torture-lab-highlight-kind="subject"]',
+          ) !== null,
+    );
+
+    await page.evaluate(() => {
+      document
+        .querySelector("[data-ui-torture-lab-root]")
+        ?.shadowRoot?.querySelector<HTMLButtonElement>(
+          '[aria-label="Copy diagnostic locator p#clipping-boundary"]',
+        )
+        ?.click();
+    });
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(
+      "p#clipping-boundary",
+    );
+
+    await page.evaluate(() => {
+      document.querySelector("#clipping-boundary")?.remove();
+      document
+        .querySelector("[data-ui-torture-lab-root]")
+        ?.shadowRoot?.querySelector<HTMLButtonElement>(
+          '[aria-label="Highlight Finding Subject p#clipping-boundary"]',
+        )
+        ?.click();
+    });
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector("[data-ui-torture-lab-root]")
+          ?.shadowRoot?.textContent?.includes(
+            "Live Finding reference is no longer available.",
+          ) === true,
+    );
+    expect(
+      await page.$eval(
+        '[data-ui-torture-lab-root]',
+        (host) =>
+          host.shadowRoot?.querySelector<HTMLButtonElement>(
+            '[aria-label="Highlight Finding Subject p#clipping-boundary"]',
+          )?.disabled,
+      ),
+    ).toBe(true);
+  } finally {
+    await page.close();
+  }
+});
+
 test("built extension shows containment and Viewport Overflow from Unbreakable Text", async () => {
   const page = await browser.newPage();
   try {

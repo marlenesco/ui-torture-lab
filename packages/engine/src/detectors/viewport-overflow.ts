@@ -65,6 +65,10 @@ export type ViewportOverflowDetection = {
   readonly comparableTargets: readonly Text[];
   readonly contributorTargets: readonly Text[];
   readonly findings: readonly SerializedViewportOverflowFinding[];
+  readonly liveReferences: ReadonlyMap<
+    SerializedViewportOverflowFinding,
+    { readonly primaryContributor: HTMLElement }
+  >;
   readonly inconclusiveReasons: readonly string[];
   readonly inconclusiveTargets: number;
 };
@@ -261,18 +265,19 @@ export async function detectViewportOverflow(options: {
       comparableTargets: [],
       contributorTargets: [],
       findings: [],
+      liveReferences: new Map(),
       inconclusiveReasons: view === null ? ["viewport-overflow-view-unavailable"] : options.baseline.inconclusiveReasons,
       inconclusiveTargets: options.baseline.inconclusiveTargets + (view === null ? 1 : 0),
     };
   }
   const baselineGeometry = options.baseline.geometry;
   if (!(await nextMeasurementFrame(view))) {
-    return { comparableTargets: [], contributorTargets: [], findings: [], inconclusiveReasons: ["viewport-overflow-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
+    return { comparableTargets: [], contributorTargets: [], findings: [], liveReferences: new Map(), inconclusiveReasons: ["viewport-overflow-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
   }
   const geometry = documentGeometry(options.document);
   const candidates = options.baseline.snapshots.map((snapshot) => ({ snapshot, geometry: elementGeometry(snapshot.element, view) }));
   if (!(await nextMeasurementFrame(view))) {
-    return { comparableTargets: [], contributorTargets: [], findings: [], inconclusiveReasons: ["viewport-overflow-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
+    return { comparableTargets: [], contributorTargets: [], findings: [], liveReferences: new Map(), inconclusiveReasons: ["viewport-overflow-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
   }
   const stableDocument = stable(geometry, documentGeometry(options.document));
   if (!stableDocument) {
@@ -280,6 +285,7 @@ export async function detectViewportOverflow(options: {
       comparableTargets: [],
       contributorTargets: [],
       findings: [],
+      liveReferences: new Map(),
       inconclusiveReasons: [...options.baseline.inconclusiveReasons, "viewport-overflow-mutated-geometry-unstable"],
       inconclusiveTargets: options.baseline.inconclusiveTargets + 1,
     };
@@ -322,6 +328,7 @@ export async function detectViewportOverflow(options: {
       comparableTargets: [...comparableTargets],
       contributorTargets: [],
       findings: [],
+      liveReferences: new Map(),
       inconclusiveReasons,
       inconclusiveTargets,
     };
@@ -331,6 +338,7 @@ export async function detectViewportOverflow(options: {
       comparableTargets: [...comparableTargets],
       contributorTargets: [],
       findings: [],
+      liveReferences: new Map(),
       inconclusiveReasons: [...inconclusiveReasons, "viewport-contributor-not-isolated"],
       inconclusiveTargets: inconclusiveTargets + 1,
     };
@@ -362,6 +370,7 @@ export async function detectViewportOverflow(options: {
       comparableTargets: [...comparableTargets],
       contributorTargets: [],
       findings: [],
+      liveReferences: new Map(),
       inconclusiveReasons: [...inconclusiveReasons, "viewport-contributor-not-isolated"],
       inconclusiveTargets: inconclusiveTargets + 1,
     };
@@ -397,6 +406,7 @@ export async function detectViewportOverflow(options: {
     comparableTargets: [...comparableTargets],
     contributorTargets: [...new Set(ordered.map((candidate) => candidate.snapshot.target))],
     findings: [finding],
+    liveReferences: new Map([[finding, { primaryContributor: primary.snapshot.element }]]),
     inconclusiveReasons,
     inconclusiveTargets,
   };

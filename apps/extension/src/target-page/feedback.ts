@@ -43,3 +43,23 @@ export async function showAuthorizationFeedback(
     }, feedbackDurationMs),
   );
 }
+
+export async function showRunActivity(
+  tabId: number,
+  active: boolean,
+): Promise<void> {
+  const timer = feedbackTimers.get(tabId);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    feedbackTimers.delete(tabId);
+  }
+  if (!active) {
+    await clearFeedback(tabId);
+    return;
+  }
+  await Promise.all([
+    browser.action.setBadgeBackgroundColor({ tabId, color: "#16794b" }),
+    browser.action.setBadgeText({ tabId, text: "RUN" }),
+    browser.action.setTitle({ tabId, title: "UI Torture Lab — Scenario active" }),
+  ]);
+}
