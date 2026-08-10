@@ -97,6 +97,13 @@ test("built extension applies Large Text through exact Restore", async () => {
         "40px",
       { timeout: 5_000 },
     );
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector("[data-ui-torture-lab-root]")
+          ?.shadowRoot?.textContent?.includes("Large Text Scenario active") === true,
+      { timeout: 5_000 },
+    );
     const activePanel = await readPanelText(page);
     expect(activePanel).toContain("Large Text Scenario active");
     expect(activePanel).toContain("5 mutated");

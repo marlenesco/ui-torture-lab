@@ -614,7 +614,7 @@ test("Engine Run excludes an outer boundary around already-active intentional tr
 test("Engine Run orders Text Clipping magnitude deterministically", async ({ page }) => {
   await page.goto("/text-clipping-run/");
   const findings = await page.evaluate(async () => {
-    type Finding = { readonly measuredDelta: number };
+    type Finding = { readonly detectorId: string; readonly measuredDelta: number };
     type Controller = {
       getSnapshot(): { readonly result: { readonly findings: readonly Finding[] } | null };
       restore(): void;
@@ -630,7 +630,9 @@ test("Engine Run orders Text Clipping magnitude deterministically", async ({ pag
     const controller = engine.createRunController({ document, isExtensionOwnedNode: () => false });
     await controller.startScenario("long-text");
     controller.restore();
-    return controller.getSnapshot().result?.findings.map(({ measuredDelta }) => measuredDelta);
+    return controller.getSnapshot().result?.findings
+      .filter((finding) => finding.detectorId === "text-clipping")
+      .map(({ measuredDelta }) => measuredDelta);
   });
   expect(findings).toEqual([...findings ?? []].sort((a, b) => b - a));
 });

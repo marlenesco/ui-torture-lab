@@ -160,7 +160,13 @@ test("Large Text scales each text owner from its baseline and restores exact inl
     phase: "completed",
     scenarioId: "large-text",
     result: {
-      findings: [],
+      findings: [
+        expect.objectContaining({
+          detectorId: "text-clipping",
+          locator: "div#fixed-container",
+          scenarioId: "large-text",
+        }),
+      ],
       scenarioId: "large-text",
       status: "completed",
     },
@@ -222,11 +228,9 @@ test("Large Text reports an unverifiable computed application as inconclusive", 
       throw new Error("Missing primary fixture element");
     }
     const nativeGetComputedStyle = window.getComputedStyle.bind(window);
-    let primaryReads = 0;
     window.getComputedStyle = ((target: Element) => {
       if (target === primary) {
-        primaryReads += 1;
-        if (primaryReads === 4) {
+        if (primary.style.getPropertyValue("font-size") === "40px") {
           throw new Error("Synthetic computed-style verification failure");
         }
       }

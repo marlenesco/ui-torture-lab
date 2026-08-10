@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import type { ScenarioId } from "../run/run-controller.js";
+import { nextMeasurementFrame } from "./measurement-window.js";
+
 type OverflowSide = "inline-start" | "inline-end" | "both";
 
 type ElementEvidence = {
@@ -20,7 +23,7 @@ export type SerializedHorizontalContainmentOverflowFinding = {
   readonly overflowSide: OverflowSide;
   readonly overflowingElements: readonly ElementEvidence[];
   readonly possibleCause: string;
-  readonly scenarioId: "unbreakable-text";
+  readonly scenarioId: ScenarioId;
 };
 
 type Geometry = {
@@ -54,14 +57,20 @@ export type HorizontalContainmentOverflowBaseline = {
 };
 
 export type HorizontalContainmentOverflowDetection = {
+  readonly comparableTargets: readonly Text[];
+  readonly contributorTargets: readonly Text[];
   readonly findings: readonly SerializedHorizontalContainmentOverflowFinding[];
   readonly inconclusiveReasons: readonly string[];
   readonly inconclusiveTargets: number;
 };
 
 const epsilon = 0.5;
-const nextFrame = (view: Window): Promise<void> =>
-  new Promise((resolve) => view.requestAnimationFrame(() => resolve()));
+const scenarioLabel = (scenarioId: ScenarioId): string =>
+  scenarioId === "large-text"
+    ? "Large Text"
+    : scenarioId === "long-text"
+      ? "Long Text"
+      : "Unbreakable Text";
 
 const locatorFor = (element: Element): string => {
   const id = element.getAttribute("id");
@@ -236,6 +245,28 @@ const geometryStable = (before: Geometry, after: Geometry): boolean =>
     (key) => Math.abs(before[key] - after[key]) <= epsilon,
   );
 
+const clippingStateForText = (
+  target: Text,
+  boundary: HTMLElement,
+  document: Document,
+): "clipped" | "unavailable" | "visible" => {
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(target);
+    const rect = range.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return "unavailable";
+    const boundaryRect = boundary.getBoundingClientRect();
+    return (
+      rect.left < boundaryRect.left - epsilon ||
+      rect.right > boundaryRect.right + epsilon
+    )
+      ? "clipped"
+      : "visible";
+  } catch {
+    return "unavailable";
+  }
+};
+
 const combinedSide = (current: OverflowSide, next: OverflowSide): OverflowSide =>
   current === next ? current : "both";
 
@@ -251,7 +282,9 @@ export async function captureHorizontalContainmentOverflowBaseline(options: {
       snapshots: [],
     };
   }
-  await nextFrame(view);
+  if (!(await nextMeasurementFrame(view))) {
+    return { inconclusiveReasons: ["horizontal-containment-sampling-timeout"], inconclusiveTargets: 1, snapshots: [] };
+  }
   const seenElements = new Set<HTMLElement>();
   const inconclusiveTargets = new Set<Text>();
   const candidates: Snapshot[] = [];
@@ -267,10 +300,11 @@ export async function captureHorizontalContainmentOverflowBaseline(options: {
     }
     seenElements.add(element);
     const boundaries = resolveBoundaries(element, options.document);
-    if (boundaries === null || boundaries.length === 0) {
+    if (boundaries === null) {
       inconclusiveTargets.add(target);
       continue;
     }
+    if (boundaries.length === 0) continue;
     for (const boundary of boundaries) {
       const direction = view.getComputedStyle(boundary).direction === "rtl" ? "rtl" : "ltr";
       const boundaryClipsOverflow = isClippingOverflow(
@@ -292,7 +326,9 @@ export async function captureHorizontalContainmentOverflowBaseline(options: {
       });
     }
   }
-  await nextFrame(view);
+  if (!(await nextMeasurementFrame(view))) {
+    return { inconclusiveReasons: ["horizontal-containment-sampling-timeout"], inconclusiveTargets: 1, snapshots: [] };
+  }
   const unstableTargets = new Set<Text>();
   for (const candidate of candidates) {
     const direction = view.getComputedStyle(candidate.boundary).direction === "rtl" ? "rtl" : "ltr";
@@ -336,16 +372,22 @@ export async function detectHorizontalContainmentOverflow(options: {
   readonly baseline: HorizontalContainmentOverflowBaseline;
   readonly document: Document;
   readonly expectedAppliedValues: ReadonlyMap<Text, string>;
+  readonly isTargetMutationCurrent: (target: Text) => boolean;
+  readonly scenarioId: ScenarioId;
 }): Promise<HorizontalContainmentOverflowDetection> {
   const view = options.document.defaultView;
   if (view === null) {
     return {
+      comparableTargets: [],
+      contributorTargets: [],
       findings: [],
       inconclusiveReasons: ["horizontal-containment-view-unavailable"],
       inconclusiveTargets: 1,
     };
   }
-  await nextFrame(view);
+  if (!(await nextMeasurementFrame(view))) {
+    return { comparableTargets: [], contributorTargets: [], findings: [], inconclusiveReasons: ["horizontal-containment-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
+  }
   const first = options.baseline.snapshots.map((snapshot) => ({
     snapshot,
     geometry: geometryFor(
@@ -354,9 +396,13 @@ export async function detectHorizontalContainmentOverflow(options: {
       snapshot.direction,
     ),
   }));
-  await nextFrame(view);
+  if (!(await nextMeasurementFrame(view))) {
+    return { comparableTargets: [], contributorTargets: [], findings: [], inconclusiveReasons: ["horizontal-containment-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
+  }
   const findings = new Map<HTMLElement, SerializedHorizontalContainmentOverflowFinding>();
   const inconclusiveTargets = new Set<Text>();
+  const comparableTargets = new Set<Text>();
+  const contributorTargets = new Set<Text>();
   const inconclusiveReasons = [...options.baseline.inconclusiveReasons];
   const snapshotsByTarget = new Map<Text, (typeof first)[number][]>();
   for (const candidate of first) {
@@ -367,7 +413,7 @@ export async function detectHorizontalContainmentOverflow(options: {
   for (const [target, candidates] of snapshotsByTarget) {
     const expectedValue = options.expectedAppliedValues.get(target);
     if (expectedValue === undefined) continue;
-    if (target.data !== expectedValue) {
+    if (target.data !== expectedValue || !options.isTargetMutationCurrent(target)) {
       inconclusiveTargets.add(target);
       appendReason(inconclusiveReasons, "horizontal-containment-target-replaced-or-changed");
       continue;
@@ -403,6 +449,22 @@ export async function detectHorizontalContainmentOverflow(options: {
         break;
       }
       const mutated = excessFor(geometry, direction);
+      comparableTargets.add(target);
+      if (snapshot.boundaryClipsOverflow) {
+        const clippingState = clippingStateForText(
+          target,
+          snapshot.boundary,
+          options.document,
+        );
+        if (clippingState !== "visible") {
+          inconclusiveTargets.add(target);
+          appendReason(
+            inconclusiveReasons,
+            "horizontal-containment-text-clipping-ambiguous",
+          );
+          break;
+        }
+      }
       const measuredDelta = mutated.maximum - snapshot.baseline.maximum;
       const inlineStartGrowth = Math.max(0, mutated.inlineStart - snapshot.baseline.inlineStart);
       const inlineEndGrowth = Math.max(0, mutated.inlineEnd - snapshot.baseline.inlineEnd);
@@ -445,15 +507,18 @@ export async function detectHorizontalContainmentOverflow(options: {
           mutated: { maximumExcess: mutated.maximum },
           overflowSide: mutated.side,
           overflowingElements: [evidence],
-          possibleCause: `${evidence.locator} newly exceeds ${locator}'s usable ${mutated.side} boundary after Unbreakable Text.`,
-          scenarioId: "unbreakable-text",
+          possibleCause: `${evidence.locator} newly exceeds ${locator}'s usable ${mutated.side} boundary after ${scenarioLabel(options.scenarioId)}.`,
+          scenarioId: options.scenarioId,
         });
       }
+      contributorTargets.add(target);
       foundGrowth.inlineStart = Math.max(foundGrowth.inlineStart, inlineStartGrowth);
       foundGrowth.inlineEnd = Math.max(foundGrowth.inlineEnd, inlineEndGrowth);
     }
   }
   return {
+    comparableTargets: [...comparableTargets],
+    contributorTargets: [...contributorTargets],
     findings: [...findings.values()].sort(
       (left, right) =>
         right.measuredDelta - left.measuredDelta || left.locator.localeCompare(right.locator),

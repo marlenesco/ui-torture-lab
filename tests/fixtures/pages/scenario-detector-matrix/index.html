@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scenario detector matrix fixture</title>
+    <style>
+      body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, sans-serif; }
+      #clipping { overflow: hidden; white-space: nowrap; width: 180px; }
+      #clipping > p { margin: 0; }
+      #rtl-clipping { direction: rtl; overflow: hidden; white-space: nowrap; width: 180px; }
+      #rtl-clipping > p { margin: 0; }
+      #containment { width: 180px; }
+      #containment > p { margin: 0; white-space: nowrap; }
+      #viewport { margin: 0 0 0 1000px; white-space: nowrap; width: max-content; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div id="clipping"><p>Checkout today</p></div>
+      <div id="rtl-clipping"><p>Checkout today</p></div>
+      <div id="containment"><p>Checkout today</p></div>
+      <p id="viewport">Checkout today now</p>
+    </main>
+  </body>
+</html>

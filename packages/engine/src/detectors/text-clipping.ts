@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import type { ScenarioId } from "../run/run-controller.js";
+import { nextMeasurementFrame } from "./measurement-window.js";
+
 type SupportingRange = {
   readonly baselineRects: readonly RangeRect[];
   readonly locator: string;
@@ -31,7 +34,7 @@ export type SerializedTextClippingFinding = {
   readonly measuredDelta: number;
   readonly mutated: { readonly hiddenExtent: number };
   readonly possibleCause: string;
-  readonly scenarioId: "long-text";
+  readonly scenarioId: ScenarioId;
   readonly textOwner: { readonly locator: string };
 };
 
@@ -50,6 +53,8 @@ export type TextClippingBaseline = {
 };
 
 export type TextClippingDetection = {
+  readonly comparableTargets: readonly Text[];
+  readonly contributorTargets: readonly Text[];
   readonly excludedTargets: number;
   readonly findings: readonly SerializedTextClippingFinding[];
   readonly inconclusiveReasons: readonly string[];
@@ -65,8 +70,6 @@ type Geometry = {
 type HiddenInterval = { readonly end: number; readonly start: number };
 
 const epsilon = 0.5;
-const nextFrame = (view: Window): Promise<void> =>
-  new Promise((resolve) => view.requestAnimationFrame(() => resolve()));
 
 const locatorFor = (element: Element): string => {
   const id = element.getAttribute("id");
@@ -232,7 +235,9 @@ export async function captureTextClippingBaseline(options: {
 }): Promise<TextClippingBaseline> {
   const view = options.document.defaultView;
   if (view === null) return { excludedTargets: 0, inconclusiveReasons: ["text-clipping-view-unavailable"], inconclusiveTargets: 1, snapshots: [] };
-  await nextFrame(view);
+  if (!(await nextMeasurementFrame(view))) {
+    return { excludedTargets: 0, inconclusiveReasons: ["text-clipping-sampling-timeout"], inconclusiveTargets: 1, snapshots: [] };
+  }
   const excludedTargets = new Set<Text>();
   const replacedTargets = new Set<Text>();
   const candidates = options.targets.flatMap((target) => {
@@ -270,7 +275,9 @@ export async function captureTextClippingBaseline(options: {
       geometry !== null && visibleInside(geometry) ? [{ boundary, first: geometry, target }] : [],
     );
   });
-  await nextFrame(view);
+  if (!(await nextMeasurementFrame(view))) {
+    return { excludedTargets: excludedTargets.size, inconclusiveReasons: ["text-clipping-sampling-timeout"], inconclusiveTargets: 1, snapshots: [] };
+  }
   const inconclusiveReasons: string[] =
     replacedTargets.size > 0 ? ["text-clipping-target-replaced-or-disconnected"] : [];
   const inconclusiveTargets = new Set<Text>(replacedTargets);
@@ -304,16 +311,22 @@ export async function detectTextClipping(options: {
   readonly baseline: TextClippingBaseline;
   readonly document: Document;
   readonly expectedAppliedValues: ReadonlyMap<Text, string>;
+  readonly isTargetMutationCurrent: (target: Text) => boolean;
+  readonly scenarioId: ScenarioId;
   readonly targets: readonly Text[];
 }): Promise<TextClippingDetection> {
   const view = options.document.defaultView;
-  if (view === null) return { excludedTargets: options.baseline.excludedTargets, findings: [], inconclusiveReasons: ["text-clipping-view-unavailable"], inconclusiveTargets: 1 };
-  await nextFrame(view);
+  if (view === null) return { comparableTargets: [], contributorTargets: [], excludedTargets: options.baseline.excludedTargets, findings: [], inconclusiveReasons: ["text-clipping-view-unavailable"], inconclusiveTargets: 1 };
+  if (!(await nextMeasurementFrame(view))) {
+    return { comparableTargets: [], contributorTargets: [], excludedTargets: options.baseline.excludedTargets, findings: [], inconclusiveReasons: ["text-clipping-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
+  }
   const candidates = options.baseline.snapshots.map((snapshot) => ({
     first: geometryFor(options.document, snapshot.range, snapshot.boundary),
     snapshot,
   }));
-  await nextFrame(view);
+  if (!(await nextMeasurementFrame(view))) {
+    return { comparableTargets: [], contributorTargets: [], excludedTargets: options.baseline.excludedTargets, findings: [], inconclusiveReasons: ["text-clipping-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
+  }
   const inconclusiveReasons = [...options.baseline.inconclusiveReasons];
   const findings = new Map<HTMLElement, Map<string, SerializedTextClippingFinding>>();
   const knownRanges = new Set(options.baseline.snapshots.map(({ range }) => range));
@@ -323,6 +336,8 @@ export async function detectTextClipping(options: {
   >();
   const excludedTargets = new Set<Text>();
   const inconclusiveTargets = new Set<Text>();
+  const comparableTargets = new Set<Text>();
+  const contributorTargets = new Set<Text>();
   for (const candidate of candidates) {
     const { snapshot } = candidate;
     if (
@@ -336,7 +351,12 @@ export async function detectTextClipping(options: {
       inconclusiveTargets.add(snapshot.range);
       continue;
     }
-    if (options.expectedAppliedValues.get(snapshot.range) !== snapshot.range.data) {
+    const expectedValue = options.expectedAppliedValues.get(snapshot.range);
+    if (expectedValue === undefined) continue;
+    if (
+      expectedValue !== snapshot.range.data ||
+      !options.isTargetMutationCurrent(snapshot.range)
+    ) {
       appendReason(inconclusiveReasons, "text-clipping-mutated-source-changed");
       inconclusiveTargets.add(snapshot.range);
       continue;
@@ -356,6 +376,7 @@ export async function detectTextClipping(options: {
       inconclusiveTargets.add(snapshot.range);
       continue;
     }
+    comparableTargets.add(snapshot.range);
     const style = view.getComputedStyle(snapshot.boundary);
     const clippedAxes = [
       ...(isClippingOverflow(style.overflowX)
@@ -417,6 +438,7 @@ export async function detectTextClipping(options: {
           mutated: { hiddenExtent: Math.max(existing.mutated.hiddenExtent, hiddenExtent) },
         });
         findings.set(snapshot.boundary, findingsForBoundary);
+        contributorTargets.add(snapshot.range);
         appendCoveredInterval(foundIntervals, snapshot.range, clippedAxis, interval);
         continue;
       }
@@ -437,9 +459,10 @@ export async function detectTextClipping(options: {
           whiteSpace: style.whiteSpace,
         },
         possibleCause: `${locator} has overflow-${clippedAxis === "horizontal" ? "x" : "y"}: ${overflow} while the affected text exceeds its ${edge} boundary.`,
-        scenarioId: "long-text",
+        scenarioId: options.scenarioId,
       });
       findings.set(snapshot.boundary, findingsForBoundary);
+      contributorTargets.add(snapshot.range);
       appendCoveredInterval(foundIntervals, snapshot.range, clippedAxis, interval);
     }
   }
@@ -459,6 +482,8 @@ export async function detectTextClipping(options: {
     }
   }
   return {
+    comparableTargets: [...comparableTargets],
+    contributorTargets: [...contributorTargets],
     excludedTargets: excludedTargets.size + options.baseline.excludedTargets,
     findings: [...findings.values()].flatMap((findingsForBoundary) => [...findingsForBoundary.values()]).sort(
       (a, b) =>
