@@ -347,12 +347,10 @@ test("Document Runtime excludes owned UI and hides diagnostics during capture", 
   }
 });
 
-test("floating UI collapse and remount reuse one Document Runtime", async () => {
+test("floating UI loss and remount preserve one active Document Runtime without Restore", async () => {
   const page = await browser.newPage();
   try {
-    await page.goto(
-      "http://127.0.0.1:4173/extension-ui-contamination/",
-    );
+    await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await triggerToolbarAction(page);
     await page.waitForSelector("[data-ui-torture-lab-root]");
 
@@ -387,6 +385,51 @@ test("floating UI collapse and remount reuse one Document Runtime", async () => 
       .toBe("false");
 
     await page.evaluate(() => {
+      const start = [...(
+        document
+          .querySelector("[data-ui-torture-lab-root]")
+          ?.shadowRoot?.querySelectorAll("button") ?? []
+      )].find((button) => button.textContent?.trim() === "Apply Long Text");
+      if (!(start instanceof HTMLButtonElement)) {
+        throw new Error("Long Text control was unavailable");
+      }
+      start.click();
+    });
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector("[data-ui-torture-lab-root]")
+          ?.shadowRoot?.textContent?.includes("Long Text Scenario active") === true,
+    );
+    const mutatedTarget = await page.$eval(
+      "#clipping-boundary",
+      (element) => element.textContent,
+    );
+
+    const devTools = await page.target().createCDPSession();
+    const { root } = await devTools.send("DOM.getDocument");
+    for (const selector of [
+      "[data-ui-torture-lab-root]",
+      "[data-ui-torture-lab-overlay-root]",
+    ]) {
+      const { nodeId } = await devTools.send("DOM.querySelector", {
+        nodeId: root.nodeId,
+        selector,
+      });
+      await devTools.send("DOM.removeNode", { nodeId });
+    }
+    await triggerToolbarAction(page);
+    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await expect
+      .poll(() =>
+        page.$eval(
+          "[data-ui-torture-lab-root]",
+          (host) => host.shadowRoot?.textContent?.includes("Long Text Scenario active"),
+        ),
+      )
+      .toBe(true);
+
+    await page.evaluate(() => {
       document.querySelector("[data-ui-torture-lab-root]")?.remove();
       document.querySelector("[data-ui-torture-lab-overlay-root]")?.remove();
     });
@@ -406,6 +449,85 @@ test("floating UI collapse and remount reuse one Document Runtime", async () => 
       hostCount: 1,
       overlayCount: 1,
       runtimeId: initialRuntimeId,
+    });
+    expect(await page.$eval("#clipping-boundary", (element) => element.textContent)).toBe(
+      mutatedTarget,
+    );
+  } finally {
+    await page.close();
+  }
+});
+
+test("toolbar marks an active Run while collapsed and clears after Restore", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto("http://127.0.0.1:4173/text-clipping-run/");
+    await triggerToolbarAction(page);
+    await page.waitForSelector("[data-ui-torture-lab-root]");
+
+    await page.evaluate(() => {
+      const root = document.querySelector("[data-ui-torture-lab-root]");
+      const start = [...(root?.shadowRoot?.querySelectorAll("button") ?? [])].find(
+        (button) => button.textContent?.trim() === "Apply Long Text",
+      );
+      if (!(start instanceof HTMLButtonElement)) {
+        throw new Error("Long Text control was unavailable");
+      }
+      start.click();
+    });
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector("[data-ui-torture-lab-root]")
+          ?.shadowRoot?.textContent?.includes("Long Text Scenario active") === true,
+    );
+    await page.evaluate(() => {
+      document
+        .querySelector("[data-ui-torture-lab-root]")
+        ?.shadowRoot?.querySelector<HTMLButtonElement>(
+          '[aria-label="Collapse UI Torture Lab"]',
+        )
+        ?.click();
+    });
+
+    await expect.poll(readActiveTabActionState).toEqual({
+      badge: "RUN",
+      title: "UI Torture Lab — Scenario active",
+    });
+
+    await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+    await expect.poll(readActiveTabActionState).toEqual({
+      badge: "",
+      title: "Open UI Torture Lab",
+    });
+
+    await page.evaluate(() => {
+      const root = document.querySelector("[data-ui-torture-lab-root]");
+      root?.shadowRoot?.querySelector<HTMLButtonElement>(
+        '[aria-label="Expand UI Torture Lab"]',
+      )?.click();
+    });
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector("[data-ui-torture-lab-root]")
+          ?.shadowRoot?.querySelector('[aria-label="Expand UI Torture Lab"]') === null,
+    );
+    await page.evaluate(() => {
+      const restore = [...(
+        document
+          .querySelector("[data-ui-torture-lab-root]")
+          ?.shadowRoot?.querySelectorAll("button") ?? []
+      )].find((button) => button.textContent?.trim() === "Restore");
+      if (!(restore instanceof HTMLButtonElement)) {
+        throw new Error("Restore control was unavailable");
+      }
+      restore.click();
+    });
+
+    await expect.poll(readActiveTabActionState).toEqual({
+      badge: "",
+      title: "Open UI Torture Lab",
     });
   } finally {
     await page.close();

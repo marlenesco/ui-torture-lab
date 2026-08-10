@@ -5,8 +5,9 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 
-const loadBackground = async ({ executeScript }) => {
-  const listeners = [];
+const loadBackground = async ({ executeScript, session = new Map() }) => {
+  const messageListeners = [];
+  const toolbarListeners = [];
   const scriptCalls = [];
   const feedback = [];
   const scheduledFeedback = [];
@@ -19,7 +20,7 @@ const loadBackground = async ({ executeScript }) => {
     action: {
       onClicked: {
         addListener(listener) {
-          listeners.push(listener);
+          toolbarListeners.push(listener);
         },
       },
       async setBadgeBackgroundColor(details) {
@@ -32,7 +33,14 @@ const loadBackground = async ({ executeScript }) => {
         feedback.push(["title", details]);
       },
     },
-    runtime: { id: "test-extension" },
+    runtime: {
+      id: "test-extension",
+      onMessage: {
+        addListener(listener) {
+          messageListeners.push(listener);
+        },
+      },
+    },
     scripting: {
       async executeScript(details) {
         scriptCalls.push(details);
@@ -41,11 +49,13 @@ const loadBackground = async ({ executeScript }) => {
     },
     storage: {
       session: {
-        async get() {
-          throw new Error("Target authorization must not read Run Results");
+        async get(key) {
+          return { [key]: session.get(key) };
         },
-        async set() {
-          throw new Error("Target authorization must not replace Run Results");
+        async set(values) {
+          for (const [key, value] of Object.entries(values)) {
+            session.set(key, value);
+          }
         },
       },
     },
@@ -64,7 +74,8 @@ const loadBackground = async ({ executeScript }) => {
     URL,
   });
 
-  assert.equal(listeners.length, 1, "toolbar action must be the sole trigger");
+  assert.equal(toolbarListeners.length, 1, "toolbar action must be the sole trigger");
+  assert.equal(messageListeners.length, 1, "trusted context must accept Run activity updates");
 
   return {
     feedback,
@@ -74,7 +85,9 @@ const loadBackground = async ({ executeScript }) => {
       }
       await new Promise((resolve) => setImmediate(resolve));
     },
-    invokeToolbar: listeners[0],
+    invokeToolbar: toolbarListeners[0],
+    invokeMessage: messageListeners[0],
+    session,
     scriptCalls,
   };
 };
@@ -151,6 +164,75 @@ test("toolbar authorizes one supported top-level Document in ISOLATED world", as
     background.feedback.some(
       ([kind, details]) =>
         kind === "badge" && details.tabId === 42 && details.text === "OK",
+    ),
+  );
+});
+
+test("Run activity survives a service-worker restart for its authorized Document", async () => {
+  let injectionNumber = 0;
+  const initialWorker = await loadBackground({
+    executeScript: async () => {
+      injectionNumber += 1;
+      return [{
+        documentId: "document-1",
+        frameId: 0,
+        result: injectionNumber === 1
+          ? { type: "target-probe-response", status: "matched", protocol: "https:" }
+          : { type: "target-bootstrap-response", status: "bootstrapped", protocol: "https:", contentType: "text/html", topLevel: true },
+      }];
+    },
+  });
+  await initialWorker.invokeToolbar({ id: 42, url: "https://fixture.test/" });
+
+  const restartedWorker = await loadBackground({
+    executeScript: async () => {
+      throw new Error("A Run activity message must not inject a new Document Runtime");
+    },
+    session: initialWorker.session,
+  });
+  restartedWorker.invokeMessage(
+    { active: true, type: "run-activity-changed" },
+    { documentId: "document-1", frameId: 0, tab: { id: 42 } },
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(
+    restartedWorker.feedback.some(
+      ([kind, details]) => kind === "badge" && details.tabId === 42 && details.text === "RUN",
+    ),
+  );
+});
+
+test("Run activity only accepts the currently authorized Document", async () => {
+  let injectionNumber = 0;
+  const background = await loadBackground({
+    executeScript: async () => {
+      injectionNumber += 1;
+      return [{
+        documentId: "document-1",
+        frameId: 0,
+        result: injectionNumber === 1
+          ? { type: "target-probe-response", status: "matched", protocol: "https:" }
+          : { type: "target-bootstrap-response", status: "bootstrapped", protocol: "https:", contentType: "text/html", topLevel: true },
+      }];
+    },
+  });
+
+  await background.invokeToolbar({ id: 42, url: "https://fixture.test/" });
+  const feedbackBeforeStaleMessage = background.feedback.length;
+  background.invokeMessage(
+    { active: true, type: "run-activity-changed" },
+    { documentId: "document-previous", frameId: 0, tab: { id: 42 } },
+  );
+  assert.equal(background.feedback.length, feedbackBeforeStaleMessage);
+
+  background.invokeMessage(
+    { active: true, type: "run-activity-changed" },
+    { documentId: "document-1", frameId: 0, tab: { id: 42 } },
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(
+    background.feedback.some(
+      ([kind, details]) => kind === "badge" && details.tabId === 42 && details.text === "RUN",
     ),
   );
 });

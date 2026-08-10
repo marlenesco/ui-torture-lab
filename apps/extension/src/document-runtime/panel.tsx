@@ -5,8 +5,16 @@ import type { RunController, ScenarioId } from "@ui-torture-lab/engine";
 
 type ExtensionPanelProps = {
   readonly collapsed: boolean;
+  readonly liveFindingMessage: string | null;
   readonly onCollapse: () => void;
   readonly onExpand: () => void;
+  readonly onInspectFinding: (
+    finding: ReturnType<RunController["getSnapshot"]>["findings"][number],
+    action: "copy-locator" | "highlight-ranges" | "highlight-subject" | "navigate",
+  ) => void;
+  readonly isFindingActionEnabled: (
+    finding: ReturnType<RunController["getSnapshot"]>["findings"][number],
+  ) => boolean;
   readonly onRestore: () => void;
   readonly onStartScenario: (scenarioId: ScenarioId) => void;
   readonly runController: RunController;
@@ -14,8 +22,11 @@ type ExtensionPanelProps = {
 
 export function ExtensionPanel({
   collapsed,
+  liveFindingMessage,
   onCollapse,
   onExpand,
+  onInspectFinding,
+  isFindingActionEnabled,
   onRestore,
   onStartScenario,
   runController,
@@ -55,8 +66,11 @@ export function ExtensionPanel({
           Collapse
         </button>
       </header>
+      {liveFindingMessage === null ? null : <p role="status">{liveFindingMessage}</p>}
       <RunControls
         onRestore={onRestore}
+        onInspectFinding={onInspectFinding}
+        isFindingActionEnabled={isFindingActionEnabled}
         onStartScenario={onStartScenario}
         snapshot={snapshot}
       />
@@ -66,12 +80,14 @@ export function ExtensionPanel({
 
 type RunControlsProps = Pick<
   ExtensionPanelProps,
-  "onRestore" | "onStartScenario"
+  "isFindingActionEnabled" | "onInspectFinding" | "onRestore" | "onStartScenario"
 > & {
   readonly snapshot: ReturnType<RunController["getSnapshot"]>;
 };
 
 function RunControls({
+  onInspectFinding,
+  isFindingActionEnabled,
   onRestore,
   onStartScenario,
   snapshot,
@@ -94,7 +110,11 @@ function RunControls({
       <div className="run-controls">
         <p role="status">{scenarioLabel(snapshot.scenarioId)} Scenario active</p>
         <CoverageSummary coverage={snapshot.coverage} />
-        <FindingSummary findings={snapshot.findings} />
+        <FindingSummary
+          findings={snapshot.findings}
+          isFindingActionEnabled={isFindingActionEnabled}
+          onInspectFinding={onInspectFinding}
+        />
         <button className="panel-action" onClick={onRestore} type="button">
           Restore
         </button>
@@ -135,7 +155,11 @@ function RunControls({
     <div className="run-controls">
       <p role="status">{scenarioLabel(snapshot.scenarioId)} Run completed</p>
       <CoverageSummary coverage={snapshot.coverage} />
-      <FindingSummary findings={snapshot.findings} />
+      <FindingSummary
+        findings={snapshot.findings}
+        isFindingActionEnabled={undefined}
+        onInspectFinding={undefined}
+      />
       <RestoreSummary result={snapshot.result} />
       <p>{snapshot.result?.summary}</p>
       <ScenarioButtons onStartScenario={onStartScenario} />
@@ -145,8 +169,14 @@ function RunControls({
 
 function FindingSummary({
   findings,
+  onInspectFinding,
+  isFindingActionEnabled,
 }: {
   readonly findings: ReturnType<RunController["getSnapshot"]>["findings"];
+  readonly onInspectFinding: ExtensionPanelProps["onInspectFinding"] | undefined;
+  readonly isFindingActionEnabled:
+    | ExtensionPanelProps["isFindingActionEnabled"]
+    | undefined;
 }) {
   if (findings.length === 0) {
     return <p>No Findings were produced.</p>;
@@ -163,7 +193,14 @@ function FindingSummary({
           <section aria-label={`${detectorLabel(group.detectorId)} Findings`} key={group.detectorId}>
             <strong>{detectorLabel(group.detectorId)}</strong>
             <ul>
-              {group.findings.map((finding) => <FindingItem finding={finding} key={`${finding.locator}-${finding.measuredDelta}`} />)}
+              {group.findings.map((finding) => (
+                <FindingItem
+                  finding={finding}
+                  isFindingActionEnabled={isFindingActionEnabled}
+                  key={`${finding.locator}-${finding.measuredDelta}`}
+                  onInspectFinding={onInspectFinding}
+                />
+              ))}
             </ul>
           </section>
         ))}
@@ -184,16 +221,71 @@ function detectorLabel(detectorId: ReturnType<RunController["getSnapshot"]>["fin
 
 function FindingItem({
   finding,
+  onInspectFinding,
+  isFindingActionEnabled,
 }: {
   readonly finding: ReturnType<RunController["getSnapshot"]>["findings"][number];
+  readonly onInspectFinding: ExtensionPanelProps["onInspectFinding"] | undefined;
+  readonly isFindingActionEnabled:
+    | ExtensionPanelProps["isFindingActionEnabled"]
+    | undefined;
 }) {
   return (
     <li>
-      {finding.detectorId === "viewport-overflow" ? (
-        <>Target Page · baseline {finding.baseline.documentExtent.toFixed(1)}px/{finding.baseline.viewportWidth.toFixed(1)}px · mutated {finding.mutated.documentExtent.toFixed(1)}px/{finding.mutated.viewportWidth.toFixed(1)}px · delta {finding.measuredDelta.toFixed(1)}px · {finding.contributionSide} via {finding.primaryContributor.locator} ({finding.primaryContributor.baseline.left.toFixed(1)}–{finding.primaryContributor.baseline.right.toFixed(1)}px → {finding.primaryContributor.mutated.left.toFixed(1)}–{finding.primaryContributor.mutated.right.toFixed(1)}px; contribution {finding.primaryContributor.contribution.toFixed(1)}px). Contributors: {finding.contributors.map((contributor) => `${contributor.contributionSide} ${contributor.locator} ${contributor.contribution.toFixed(1)}px`).join("; ")}. {finding.possibleCause}</>
-      ) : <>Boundary {finding.locator} · {finding.detectorId === "text-clipping"
-        ? `hidden extent ${finding.mutated.hiddenExtent.toFixed(1)}px`
-        : `maximum excess ${finding.mutated.maximumExcess.toFixed(1)}px`}</>}
+      <article aria-label={`Finding detail ${finding.locator}`}>
+        <strong>Finding detail · <code data-ui-torture-lab-diagnostic-locator="">{finding.locator}</code></strong>
+        <p>{finding.detectorId === "viewport-overflow"
+          ? `Target Page · baseline ${finding.baseline.documentExtent.toFixed(1)}px/${finding.baseline.viewportWidth.toFixed(1)}px · mutated ${finding.mutated.documentExtent.toFixed(1)}px/${finding.mutated.viewportWidth.toFixed(1)}px · delta ${finding.measuredDelta.toFixed(1)}px · ${finding.contributionSide} via ${finding.primaryContributor.locator} (${finding.primaryContributor.baseline.left.toFixed(1)}–${finding.primaryContributor.baseline.right.toFixed(1)}px → ${finding.primaryContributor.mutated.left.toFixed(1)}–${finding.primaryContributor.mutated.right.toFixed(1)}px; contribution ${finding.primaryContributor.contribution.toFixed(1)}px). Contributors: ${finding.contributors.map((contributor) => `${contributor.contributionSide} ${contributor.locator} ${contributor.contribution.toFixed(1)}px`).join("; ")}.`
+          : `Boundary ${finding.locator}; delta ${finding.measuredDelta.toFixed(1)}px.`}</p>
+        <p><strong>Evidence</strong> · {finding.detectorId === "text-clipping"
+          ? `visible ${finding.baseline.visibleExtent.toFixed(1)}px; hidden ${finding.mutated.hiddenExtent.toFixed(1)}px; ${finding.affectedRanges.length} affected range(s).`
+          : finding.detectorId === "horizontal-containment-overflow"
+            ? `maximum excess ${finding.baseline.maximumExcess.toFixed(1)}px → ${finding.mutated.maximumExcess.toFixed(1)}px; ${finding.affectedElementCount} affected element(s).`
+            : `${finding.contributors.length} contributor(s); ${finding.contributionSide} excess.`}</p>
+        {finding.detectorId === "text-clipping" ? (
+          <p><strong>Computed CSS</strong> · overflow-x: {finding.computedStyles.overflowX}; overflow-y: {finding.computedStyles.overflowY}; white-space: {finding.computedStyles.whiteSpace}.</p>
+        ) : null}
+        <p><strong>Possible Cause</strong> · {finding.possibleCause}</p>
+        {onInspectFinding === undefined ? null : <div className="finding-actions">
+          <button
+            aria-label={`Highlight Finding Subject ${finding.locator}`}
+            className="panel-toggle"
+            disabled={isFindingActionEnabled?.(finding) === false}
+            onClick={() => onInspectFinding(finding, "highlight-subject")}
+            type="button"
+          >
+            Highlight subject
+          </button>
+          <button
+            aria-label={`Navigate to Finding Subject ${finding.locator}`}
+            className="panel-toggle"
+            disabled={isFindingActionEnabled?.(finding) === false}
+            onClick={() => onInspectFinding(finding, "navigate")}
+            type="button"
+          >
+            Navigate
+          </button>
+          {finding.detectorId === "text-clipping" ? (
+            <button
+              aria-label={`Highlight affected ranges for ${finding.locator}`}
+              className="panel-toggle"
+              disabled={isFindingActionEnabled?.(finding) === false}
+              onClick={() => onInspectFinding(finding, "highlight-ranges")}
+              type="button"
+            >
+              Highlight ranges
+            </button>
+          ) : null}
+          <button
+            aria-label={`Copy diagnostic locator ${finding.locator}`}
+            className="panel-toggle"
+            onClick={() => onInspectFinding(finding, "copy-locator")}
+            type="button"
+          >
+            Select locator to copy
+          </button>
+        </div>}
+      </article>
     </li>
   );
 }

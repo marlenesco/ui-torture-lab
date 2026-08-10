@@ -66,6 +66,12 @@ export type SerializedFinding =
   | SerializedHorizontalContainmentOverflowFinding
   | SerializedViewportOverflowFinding;
 
+export type LiveFindingReference = {
+  readonly affectedRanges: readonly Text[];
+  readonly primaryContributor: HTMLElement | null;
+  readonly subject: HTMLElement | null;
+};
+
 type SerializedRunResultBase = {
   readonly scenarioId: ScenarioId;
   readonly coverage: RunCoverage;
@@ -93,6 +99,9 @@ export type RunSnapshot = {
 };
 
 export type RunController = {
+  getLiveFindingReference(
+    finding: SerializedFinding,
+  ): LiveFindingReference | null;
   getSnapshot(): RunSnapshot;
   restore(): void;
   startScenario(scenarioId: ScenarioId): Promise<void>;
@@ -212,6 +221,7 @@ export function createRunController(
   const listeners = new Set<() => void>();
   let activeFindings: readonly SerializedFinding[] = [];
   let activeInconclusiveReasons: readonly string[] = [];
+  let liveFindingReferences = new Map<SerializedFinding, LiveFindingReference>();
   let journal: MutationJournal | null = null;
   let snapshot: RunSnapshot = Object.freeze({
     phase: "idle",
@@ -266,6 +276,10 @@ export function createRunController(
 
   const controller: RunController = {
     getSnapshot: () => snapshot,
+    getLiveFindingReference: (finding) =>
+      snapshot.phase === "ready-for-inspection"
+        ? liveFindingReferences.get(finding) ?? null
+        : null,
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -291,6 +305,7 @@ export function createRunController(
       });
       activeFindings = [];
       activeInconclusiveReasons = [];
+      liveFindingReferences = new Map();
 
       const records = await prepareScenarioMutations(scenarioId, options);
       const textTargets = textTargetsForRecords(records);
@@ -396,6 +411,7 @@ export function createRunController(
           });
           const restore = activeJournal.restore();
           journal = null;
+          liveFindingReferences = new Map();
           publish({
             phase:
               restore.status === "restored" ? "aborted" : "reload-required",
@@ -435,6 +451,32 @@ export function createRunController(
         ...horizontalContainment.findings,
         ...viewportOverflow.findings,
       ];
+      const nextLiveFindingReferences = new Map<
+        SerializedFinding,
+        LiveFindingReference
+      >();
+      for (const [finding, reference] of textClipping.liveReferences) {
+        nextLiveFindingReferences.set(finding, {
+          affectedRanges: reference.affectedRanges,
+          primaryContributor: null,
+          subject: reference.subject,
+        });
+      }
+      for (const [finding, reference] of horizontalContainment.liveReferences) {
+        nextLiveFindingReferences.set(finding, {
+          affectedRanges: [],
+          primaryContributor: null,
+          subject: reference.subject,
+        });
+      }
+      for (const [finding, reference] of viewportOverflow.liveReferences) {
+        nextLiveFindingReferences.set(finding, {
+          affectedRanges: [],
+          primaryContributor: reference.primaryContributor,
+          subject: null,
+        });
+      }
+      liveFindingReferences = nextLiveFindingReferences;
       const coverage = freezeCoverage({
         comparableTargets: new Set([
           ...textClipping.comparableTargets,
@@ -493,6 +535,7 @@ export function createRunController(
       );
       activeFindings = [];
       activeInconclusiveReasons = [];
+      liveFindingReferences = new Map();
       publish({
         phase: restore.status === "restored" ? "completed" : "reload-required",
         scenarioId,

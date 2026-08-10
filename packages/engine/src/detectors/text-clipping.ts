@@ -57,6 +57,10 @@ export type TextClippingDetection = {
   readonly contributorTargets: readonly Text[];
   readonly excludedTargets: number;
   readonly findings: readonly SerializedTextClippingFinding[];
+  readonly liveReferences: ReadonlyMap<
+    SerializedTextClippingFinding,
+    { readonly affectedRanges: readonly Text[]; readonly subject: HTMLElement }
+  >;
   readonly inconclusiveReasons: readonly string[];
   readonly inconclusiveTargets: number;
 };
@@ -316,19 +320,20 @@ export async function detectTextClipping(options: {
   readonly targets: readonly Text[];
 }): Promise<TextClippingDetection> {
   const view = options.document.defaultView;
-  if (view === null) return { comparableTargets: [], contributorTargets: [], excludedTargets: options.baseline.excludedTargets, findings: [], inconclusiveReasons: ["text-clipping-view-unavailable"], inconclusiveTargets: 1 };
+  if (view === null) return { comparableTargets: [], contributorTargets: [], excludedTargets: options.baseline.excludedTargets, findings: [], liveReferences: new Map(), inconclusiveReasons: ["text-clipping-view-unavailable"], inconclusiveTargets: 1 };
   if (!(await nextMeasurementFrame(view))) {
-    return { comparableTargets: [], contributorTargets: [], excludedTargets: options.baseline.excludedTargets, findings: [], inconclusiveReasons: ["text-clipping-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
+    return { comparableTargets: [], contributorTargets: [], excludedTargets: options.baseline.excludedTargets, findings: [], liveReferences: new Map(), inconclusiveReasons: ["text-clipping-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
   }
   const candidates = options.baseline.snapshots.map((snapshot) => ({
     first: geometryFor(options.document, snapshot.range, snapshot.boundary),
     snapshot,
   }));
   if (!(await nextMeasurementFrame(view))) {
-    return { comparableTargets: [], contributorTargets: [], excludedTargets: options.baseline.excludedTargets, findings: [], inconclusiveReasons: ["text-clipping-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
+    return { comparableTargets: [], contributorTargets: [], excludedTargets: options.baseline.excludedTargets, findings: [], liveReferences: new Map(), inconclusiveReasons: ["text-clipping-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
   }
   const inconclusiveReasons = [...options.baseline.inconclusiveReasons];
   const findings = new Map<HTMLElement, Map<string, SerializedTextClippingFinding>>();
+  const findingRanges = new Map<SerializedTextClippingFinding, readonly Text[]>();
   const knownRanges = new Set(options.baseline.snapshots.map(({ range }) => range));
   const foundIntervals = new Map<
     Text,
@@ -425,7 +430,7 @@ export async function detectTextClipping(options: {
       const findingsForBoundary = findings.get(snapshot.boundary) ?? new Map();
       const existing = findingsForBoundary.get(findingKey);
       if (existing !== undefined) {
-        findingsForBoundary.set(findingKey, {
+        const updated = {
           ...existing,
           affectedRanges: [...existing.affectedRanges, affectedRange],
           baseline: {
@@ -436,14 +441,17 @@ export async function detectTextClipping(options: {
           },
           measuredDelta: Math.max(existing.measuredDelta, hiddenExtent),
           mutated: { hiddenExtent: Math.max(existing.mutated.hiddenExtent, hiddenExtent) },
-        });
+        };
+        findingRanges.set(updated, [...(findingRanges.get(existing) ?? []), snapshot.range]);
+        findingRanges.delete(existing);
+        findingsForBoundary.set(findingKey, updated);
         findings.set(snapshot.boundary, findingsForBoundary);
         contributorTargets.add(snapshot.range);
         appendCoveredInterval(foundIntervals, snapshot.range, clippedAxis, interval);
         continue;
       }
       const edge = clippedAxis === "horizontal" ? "right" : "bottom";
-      findingsForBoundary.set(findingKey, {
+      const finding: SerializedTextClippingFinding = {
         detectorId: "text-clipping",
         clippedAxis,
         locator,
@@ -460,7 +468,9 @@ export async function detectTextClipping(options: {
         },
         possibleCause: `${locator} has overflow-${clippedAxis === "horizontal" ? "x" : "y"}: ${overflow} while the affected text exceeds its ${edge} boundary.`,
         scenarioId: options.scenarioId,
-      });
+      };
+      findingRanges.set(finding, [snapshot.range]);
+      findingsForBoundary.set(findingKey, finding);
       findings.set(snapshot.boundary, findingsForBoundary);
       contributorTargets.add(snapshot.range);
       appendCoveredInterval(foundIntervals, snapshot.range, clippedAxis, interval);
@@ -481,16 +491,26 @@ export async function detectTextClipping(options: {
       inconclusiveTargets.add(target);
     }
   }
+  const findingsWithSubjects = [...findings.entries()].flatMap(([subject, findingsForBoundary]) =>
+    [...findingsForBoundary.values()].map((finding) => ({ finding, subject })),
+  ).sort(
+    (a, b) =>
+      b.finding.measuredDelta - a.finding.measuredDelta ||
+      a.finding.locator.localeCompare(b.finding.locator) ||
+      a.finding.clippedAxis.localeCompare(b.finding.clippedAxis),
+  );
+  const liveReferences = new Map(
+    findingsWithSubjects.map(({ finding, subject }) => [
+      finding,
+      { affectedRanges: findingRanges.get(finding) ?? [], subject },
+    ]),
+  );
   return {
     comparableTargets: [...comparableTargets],
     contributorTargets: [...contributorTargets],
     excludedTargets: excludedTargets.size + options.baseline.excludedTargets,
-    findings: [...findings.values()].flatMap((findingsForBoundary) => [...findingsForBoundary.values()]).sort(
-      (a, b) =>
-        b.measuredDelta - a.measuredDelta ||
-        a.locator.localeCompare(b.locator) ||
-        a.clippedAxis.localeCompare(b.clippedAxis),
-    ),
+    findings: findingsWithSubjects.map(({ finding }) => finding),
+    liveReferences,
     inconclusiveReasons,
     inconclusiveTargets: inconclusiveTargets.size + options.baseline.inconclusiveTargets,
   };

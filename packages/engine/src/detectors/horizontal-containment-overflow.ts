@@ -60,6 +60,10 @@ export type HorizontalContainmentOverflowDetection = {
   readonly comparableTargets: readonly Text[];
   readonly contributorTargets: readonly Text[];
   readonly findings: readonly SerializedHorizontalContainmentOverflowFinding[];
+  readonly liveReferences: ReadonlyMap<
+    SerializedHorizontalContainmentOverflowFinding,
+    { readonly subject: HTMLElement }
+  >;
   readonly inconclusiveReasons: readonly string[];
   readonly inconclusiveTargets: number;
 };
@@ -381,12 +385,13 @@ export async function detectHorizontalContainmentOverflow(options: {
       comparableTargets: [],
       contributorTargets: [],
       findings: [],
+      liveReferences: new Map(),
       inconclusiveReasons: ["horizontal-containment-view-unavailable"],
       inconclusiveTargets: 1,
     };
   }
   if (!(await nextMeasurementFrame(view))) {
-    return { comparableTargets: [], contributorTargets: [], findings: [], inconclusiveReasons: ["horizontal-containment-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
+    return { comparableTargets: [], contributorTargets: [], findings: [], liveReferences: new Map(), inconclusiveReasons: ["horizontal-containment-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
   }
   const first = options.baseline.snapshots.map((snapshot) => ({
     snapshot,
@@ -397,7 +402,7 @@ export async function detectHorizontalContainmentOverflow(options: {
     ),
   }));
   if (!(await nextMeasurementFrame(view))) {
-    return { comparableTargets: [], contributorTargets: [], findings: [], inconclusiveReasons: ["horizontal-containment-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
+    return { comparableTargets: [], contributorTargets: [], findings: [], liveReferences: new Map(), inconclusiveReasons: ["horizontal-containment-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
   }
   const findings = new Map<HTMLElement, SerializedHorizontalContainmentOverflowFinding>();
   const inconclusiveTargets = new Set<Text>();
@@ -516,12 +521,22 @@ export async function detectHorizontalContainmentOverflow(options: {
       foundGrowth.inlineEnd = Math.max(foundGrowth.inlineEnd, inlineEndGrowth);
     }
   }
+  const findingsWithSubjects = [...findings.entries()].map(
+    ([subject, serializedFinding]) => ({ serializedFinding, subject }),
+  ).sort(
+    (left, right) =>
+      right.serializedFinding.measuredDelta - left.serializedFinding.measuredDelta ||
+      left.serializedFinding.locator.localeCompare(right.serializedFinding.locator),
+  );
   return {
     comparableTargets: [...comparableTargets],
     contributorTargets: [...contributorTargets],
-    findings: [...findings.values()].sort(
-      (left, right) =>
-        right.measuredDelta - left.measuredDelta || left.locator.localeCompare(right.locator),
+    findings: findingsWithSubjects.map(({ serializedFinding }) => serializedFinding),
+    liveReferences: new Map(
+      findingsWithSubjects.map(({ serializedFinding, subject }) => [
+        serializedFinding,
+        { subject },
+      ]),
     ),
     inconclusiveReasons,
     inconclusiveTargets: inconclusiveTargets.size + options.baseline.inconclusiveTargets,
