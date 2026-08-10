@@ -103,6 +103,14 @@ test("built extension applies, identifies, and restores Unbreakable Text", async
       }));
       throw new Error(`Unbreakable Text did not apply: ${JSON.stringify(state)}`);
     }
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector("[data-ui-torture-lab-root]")
+          ?.shadowRoot?.textContent?.includes("Unbreakable Text Scenario active") ===
+        true,
+      { timeout: 5_000 },
+    );
     const activePanel = await readPanelText(page);
     expect(activePanel).toContain("Unbreakable Text Scenario active");
     expect(activePanel).toContain("8 mutated");

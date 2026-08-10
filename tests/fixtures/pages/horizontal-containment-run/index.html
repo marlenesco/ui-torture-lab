@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Horizontal containment fixture</title>
+    <style>
+      body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, sans-serif; }
+      #containing-boundary { width: 180px; }
+      #overflowing-element { margin: 0; }
+      #aggregate-boundary { width: 180px; }
+      #aggregate-boundary p { margin: 0; }
+      #flex-boundary { display: flex; width: 180px; }
+      #flex-overflowing { min-width: 0; margin: 0; }
+      #grid-boundary { display: grid; grid-template-columns: 180px; width: 180px; }
+      #grid-overflowing { margin: 0; }
+      #clipped-child-boundary, #scrolling-boundary, #ambiguous-boundary { width: 180px; }
+      #clipped-child { margin: 0; overflow-x: hidden; white-space: nowrap; width: 180px; }
+      #scrolling-boundary { overflow-x: auto; }
+      #scrolling-child, #ambiguous-child { margin: 0; }
+      #ambiguous-boundary { transform: translateX(0); }
+      #rtl-boundary { direction: rtl; width: 180px; }
+      #rtl-child { margin: 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div id="containing-boundary"><p id="overflowing-element">Checkout</p></div>
+      <div id="aggregate-boundary"><p>Checkout</p><p>Checkout</p></div>
+      <div id="flex-boundary"><p id="flex-overflowing">Checkout</p></div>
+      <div id="grid-boundary"><p id="grid-overflowing">Checkout</p></div>
+      <div id="clipped-child-boundary"><p id="clipped-child">Checkout</p></div>
+      <div id="scrolling-boundary"><p id="scrolling-child">Checkout</p></div>
+      <div id="ambiguous-boundary"><p id="ambiguous-child">Checkout</p></div>
+      <div id="rtl-boundary"><p id="rtl-child">Checkout</p></div>
+      <p id="unisolated">Checkout</p>
+    </main>
+  </body>
+</html>

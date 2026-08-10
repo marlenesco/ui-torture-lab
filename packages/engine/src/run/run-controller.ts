@@ -16,6 +16,11 @@ import {
   detectTextClipping,
   type SerializedTextClippingFinding,
 } from "../detectors/text-clipping.js";
+import {
+  captureHorizontalContainmentOverflowBaseline,
+  detectHorizontalContainmentOverflow,
+  type SerializedHorizontalContainmentOverflowFinding,
+} from "../detectors/horizontal-containment-overflow.js";
 
 export type ScenarioId = "large-text" | "long-text" | "unbreakable-text";
 
@@ -47,10 +52,14 @@ export type SerializedRestoreResult = {
   readonly status: RestoreResult["status"];
 };
 
+export type SerializedFinding =
+  | SerializedTextClippingFinding
+  | SerializedHorizontalContainmentOverflowFinding;
+
 type SerializedRunResultBase = {
   readonly scenarioId: ScenarioId;
   readonly coverage: RunCoverage;
-  readonly findings: readonly SerializedTextClippingFinding[];
+  readonly findings: readonly SerializedFinding[];
   readonly inconclusiveReasons: readonly string[];
   readonly restore: SerializedRestoreResult;
   readonly summary: string;
@@ -69,7 +78,7 @@ export type RunSnapshot = {
   readonly phase: RunPhase;
   readonly scenarioId: ScenarioId | null;
   readonly coverage: RunCoverage;
-  readonly findings: readonly SerializedTextClippingFinding[];
+  readonly findings: readonly SerializedFinding[];
   readonly result: SerializedRunResult | null;
 };
 
@@ -136,7 +145,7 @@ export function createRunController(
   options: RunControllerOptions,
 ): RunController {
   const listeners = new Set<() => void>();
-  let activeFindings: readonly SerializedTextClippingFinding[] = [];
+  let activeFindings: readonly SerializedFinding[] = [];
   let activeInconclusiveReasons: readonly string[] = [];
   let journal: MutationJournal | null = null;
   let snapshot: RunSnapshot = Object.freeze({
@@ -158,7 +167,7 @@ export function createRunController(
     scenarioId: ScenarioId,
     coverage: RunCoverage,
     restore: RestoreResult,
-    findings: readonly SerializedTextClippingFinding[],
+    findings: readonly SerializedFinding[],
     inconclusiveReasons: readonly string[],
   ): SerializedRunResult =>
     Object.freeze({
@@ -234,6 +243,13 @@ export function createRunController(
               inconclusiveTargets: 0,
               snapshots: [],
             };
+      const horizontalContainmentBaseline =
+        scenarioId === "unbreakable-text"
+          ? await captureHorizontalContainmentOverflowBaseline({
+              document: options.document,
+              targets: textTargets,
+            })
+          : { inconclusiveReasons: [], inconclusiveTargets: 0, snapshots: [] };
       const activeJournal = createMutationJournal(options.document);
       journal = activeJournal;
       let mutatedTargets = 0;
@@ -311,6 +327,14 @@ export function createRunController(
               inconclusiveReasons: [],
               inconclusiveTargets: 0,
             };
+      const horizontalContainment =
+        scenarioId === "unbreakable-text"
+          ? await detectHorizontalContainmentOverflow({
+              baseline: horizontalContainmentBaseline,
+              document: options.document,
+              expectedAppliedValues: appliedTextValues,
+            })
+          : { findings: [], inconclusiveReasons: [], inconclusiveTargets: 0 };
       const coverage = freezeCoverage({
         excludedTargets: textClipping.excludedTargets,
         eligibleTargets: records.length,
@@ -318,10 +342,15 @@ export function createRunController(
         skippedTargets,
         ineffectiveTargets,
         inconclusiveTargets:
-          inconclusiveTargets + textClipping.inconclusiveTargets,
+          inconclusiveTargets +
+          textClipping.inconclusiveTargets +
+          horizontalContainment.inconclusiveTargets,
       });
-      activeFindings = textClipping.findings;
-      activeInconclusiveReasons = textClipping.inconclusiveReasons;
+      activeFindings = [...textClipping.findings, ...horizontalContainment.findings];
+      activeInconclusiveReasons = [
+        ...textClipping.inconclusiveReasons,
+        ...horizontalContainment.inconclusiveReasons,
+      ];
       publish({
         phase: "ready-for-inspection",
         scenarioId,

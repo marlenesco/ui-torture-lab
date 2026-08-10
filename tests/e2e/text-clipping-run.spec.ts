@@ -133,3 +133,45 @@ test("built extension groups the completed Finding under Text Clipping", async (
     await page.close();
   }
 });
+
+test("built extension shows Horizontal Containment Overflow from Unbreakable Text", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto("http://127.0.0.1:4173/horizontal-containment-run/");
+    await page.bringToFront();
+    await page.triggerExtensionAction(extension);
+    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await serviceWorker.evaluate(async () => {
+      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
+      const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
+      if (tab?.id === undefined) throw new Error("No active fixture tab was available");
+      await chromeApi.scripting.executeScript({
+        target: { tabId: tab.id, frameIds: [0] },
+        world: "ISOLATED",
+        func: async () => {
+          type Controller = { startScenario(scenarioId: "unbreakable-text"): Promise<void> };
+          const runtime = (globalThis as typeof globalThis & {
+            [key: symbol]: { readonly runController?: Controller } | undefined;
+          })[Symbol.for("ui-torture-lab/document-runtime")];
+          if (runtime?.runController === undefined) throw new Error("Run Controller was unavailable");
+          await runtime.runController.startScenario("unbreakable-text");
+        },
+      });
+    });
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector("[data-ui-torture-lab-root]")
+          ?.shadowRoot?.textContent?.includes("Unbreakable Text Scenario active") ===
+        true,
+      { timeout: 5_000 },
+    );
+    const panelText = await page.evaluate(
+      () => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent ?? "",
+    );
+    expect(panelText).toContain("Findings");
+    expect(panelText).toContain("Boundary div#containing-boundary");
+  } finally {
+    await page.close();
+  }
+});
