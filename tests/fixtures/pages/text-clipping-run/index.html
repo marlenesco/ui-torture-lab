@@ -8,6 +8,7 @@
       body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, sans-serif; }
       #clipping-boundary { overflow: hidden; width: 170px; white-space: nowrap; }
       #ellipsis-boundary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 170px; }
+      #preexisting-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 170px; }
       #preexisting-boundary { overflow: hidden; width: 36px; white-space: nowrap; }
       #unisolated-boundary { width: 170px; white-space: nowrap; }
       #aggregate-boundary { overflow: hidden; width: 170px; white-space: nowrap; }
@@ -18,19 +19,87 @@
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 1;
       }
+      #preexisting-line-clamp {
+        display: -webkit-box;
+        overflow: hidden;
+        width: 170px;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 1;
+      }
+      #inert-line-clamp {
+        display: flow-root;
+        overflow: hidden;
+        width: 170px;
+        height: 36px;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 1;
+      }
       #nested-outer { overflow: hidden; width: 160px; white-space: nowrap; }
       #nested-inner { overflow: hidden; width: 120px; }
+      #parent-boundary { overflow: hidden; width: 170px; white-space: nowrap; }
+      #parent-boundary > p, #distant-descendant, #wrapped-boundary { margin: 0; }
+      #distant-boundary { overflow: hidden; width: 170px; white-space: nowrap; }
+      #wrapped-boundary { overflow: hidden; width: 85px; height: 48px; }
+      #two-axis-boundary { overflow: hidden; width: 75px; height: 24px; }
+      #two-axis-boundary[data-expanded] { height: 12px; white-space: nowrap; }
+      #nested-independent-outer { overflow: hidden; width: 160px; height: 24px; }
+      #nested-independent-outer[data-expanded] { height: 12px; }
+      #nested-independent-inner { overflow: hidden; width: 120px; white-space: nowrap; margin: 0; }
+      #nested-same-axis-outer { overflow: hidden; width: 100px; }
+      #nested-same-axis-inner { overflow: hidden; width: 150px; white-space: nowrap; margin: 0; }
+      #nested-explicit-outer { overflow: hidden; width: 200px; }
+      #nested-explicit-inner { overflow: hidden; text-overflow: ellipsis; width: 160px; white-space: nowrap; margin: 0; }
+      #preexisting-nested-explicit-outer { overflow: hidden; width: 200px; }
+      #preexisting-nested-explicit-inner { overflow: hidden; text-overflow: ellipsis; width: 160px; white-space: nowrap; margin: 0; }
+      #dynamic-ellipsis { overflow: hidden; width: 170px; white-space: nowrap; }
+      #dynamic-ellipsis[data-expanded] { text-overflow: ellipsis; }
+      .anonymous-boundary { overflow: hidden; width: 170px; white-space: nowrap; }
+      #vertical-boundary { overflow: hidden; width: 70px; height: 24px; }
+      #clip-boundary { overflow: clip; width: 170px; white-space: nowrap; }
+      #visible-overflow { width: 170px; white-space: nowrap; }
+      #x-only-boundary { overflow-x: hidden; overflow-y: visible; width: 70px; height: 24px; }
+      #y-only-boundary { overflow-x: visible; overflow-y: hidden; width: 170px; height: 24px; white-space: nowrap; }
     </style>
   </head>
   <body>
     <main>
       <p id="clipping-boundary">Checkout</p>
       <p id="ellipsis-boundary">Checkout</p>
+      <p id="preexisting-ellipsis">This operational ellipsis is already clipping before the run</p>
       <p id="preexisting-boundary">This text is already clipped before the run</p>
       <p id="unisolated-boundary">Checkout</p>
       <p id="aggregate-boundary">Checkout <strong>today</strong></p>
       <p id="line-clamp-boundary">Checkout today</p>
+      <p id="preexisting-line-clamp">This operational line clamp is already clipping before the run</p>
+      <p id="inert-line-clamp">Checkout</p>
       <div id="nested-outer"><p id="nested-inner">Checkout</p></div>
+      <div id="parent-boundary"><p id="parent-descendant">Checkout</p></div>
+      <div id="distant-boundary"><section><p id="distant-descendant">Checkout</p></section></div>
+      <p id="wrapped-boundary">Checkout</p>
+      <p id="two-axis-boundary">Buy</p>
+      <div id="nested-independent-outer"><p id="nested-independent-inner">Checkout</p></div>
+      <div id="nested-same-axis-outer"><p id="nested-same-axis-inner">Checkout</p></div>
+      <div id="nested-explicit-outer"><p id="nested-explicit-inner">Checkout</p></div>
+      <div id="preexisting-nested-explicit-outer"><p id="preexisting-nested-explicit-inner">This operational ellipsis is already clipping before the run</p></div>
+      <p id="dynamic-ellipsis">Checkout</p>
+      <div class="anonymous-boundary">Checkout</div>
+      <div class="anonymous-boundary">Checkout</div>
+      <p id="vertical-boundary">Checkout</p>
+      <p id="clip-boundary">Checkout</p>
+      <p id="visible-overflow">Checkout</p>
+      <p id="x-only-boundary">Checkout</p>
+      <p id="y-only-boundary">Checkout</p>
     </main>
+    <script>
+      const twoAxisBoundary = document.querySelector("#two-axis-boundary");
+      new MutationObserver(() => twoAxisBoundary?.setAttribute("data-expanded", "true"))
+        .observe(twoAxisBoundary, { characterData: true, childList: true, subtree: true });
+      const nestedIndependentOuter = document.querySelector("#nested-independent-outer");
+      new MutationObserver(() => nestedIndependentOuter?.setAttribute("data-expanded", "true"))
+        .observe(nestedIndependentOuter, { characterData: true, childList: true, subtree: true });
+      const dynamicEllipsis = document.querySelector("#dynamic-ellipsis");
+      new MutationObserver(() => dynamicEllipsis?.setAttribute("data-expanded", "true"))
+        .observe(dynamicEllipsis, { characterData: true, childList: true, subtree: true });
+    </script>
   </body>
 </html>
