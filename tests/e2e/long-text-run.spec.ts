@@ -354,10 +354,10 @@ test("Long Text preserves supported nodes and excludes unsupported targets", asy
       "👩🏽‍💻 builds interfaces 👩🏽‍💻 builds interfaces 👩🏽‍💻 builds interfaces",
     );
     expect(observation.secondRunError).toBe("A Run is already active");
-    expect(observation.activeCoverage).toEqual({
+    expect(observation.activeCoverage).toMatchObject({
       excludedTargets: 0,
       eligibleTargets: 6,
-      inconclusiveTargets: 0,
+      inconclusiveTargets: 1,
       ineffectiveTargets: 0,
       mutatedTargets: 6,
       skippedTargets: 0,
@@ -373,7 +373,7 @@ test("Long Text preserves supported nodes and excludes unsupported targets", asy
       result: {
         coverage: {
           eligibleTargets: 6,
-          inconclusiveTargets: 0,
+          inconclusiveTargets: 1,
           ineffectiveTargets: 0,
           mutatedTargets: 6,
           skippedTargets: 0,

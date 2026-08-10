@@ -39,9 +39,13 @@ export type RunPhase =
   | "reload-required";
 
 export type RunCoverage = {
+  readonly comparableTargets: number;
+  readonly contributorTargets: number;
   readonly excludedTargets: number;
+  readonly findingCount: number;
   readonly eligibleTargets: number;
   readonly mutatedTargets: number;
+  readonly safeFailedTargets: number;
   readonly skippedTargets: number;
   readonly ineffectiveTargets: number;
   readonly inconclusiveTargets: number;
@@ -103,8 +107,12 @@ export type RunControllerOptions = {
 const zeroCoverage = (): RunCoverage =>
   Object.freeze({
     excludedTargets: 0,
+    comparableTargets: 0,
+    contributorTargets: 0,
+    findingCount: 0,
     eligibleTargets: 0,
     mutatedTargets: 0,
+    safeFailedTargets: 0,
     skippedTargets: 0,
     ineffectiveTargets: 0,
     inconclusiveTargets: 0,
@@ -144,6 +152,57 @@ const prepareScenarioMutations = (
       return Promise.resolve(prepareLongTextMutations(options));
     case "unbreakable-text":
       return Promise.resolve(prepareUnbreakableTextMutations(options));
+  }
+};
+
+const textTargetsForRecords = (records: readonly { readonly target: Node }[]) => {
+  const mutationTargets = new Map<Text, Node>();
+  for (const record of records) {
+    if (record.target instanceof Text) {
+      mutationTargets.set(record.target, record.target);
+      continue;
+    }
+    if (record.target instanceof HTMLElement) {
+      for (const child of record.target.childNodes) {
+        if (child instanceof Text) mutationTargets.set(child, record.target);
+      }
+    }
+  }
+  return mutationTargets;
+};
+
+const appliedTextValuesForRecord = (
+  record: { readonly appliedState: unknown; readonly target: Node },
+  values: Map<Text, string>,
+  checks: Map<Text, () => boolean>,
+): void => {
+  const typedRecord = record as MutationRecord<unknown>;
+  const isCurrent = (): boolean => {
+    try {
+      return (
+        typedRecord.target.isConnected &&
+        typedRecord.target.ownerDocument !== null &&
+        typedRecord.statesEqual(
+          typedRecord.readState(),
+          typedRecord.appliedState,
+        )
+      );
+    } catch {
+      return false;
+    }
+  };
+  if (record.target instanceof Text && typeof record.appliedState === "string") {
+    values.set(record.target, record.appliedState);
+    checks.set(record.target, isCurrent);
+    return;
+  }
+  if (record.target instanceof HTMLElement) {
+    for (const child of record.target.childNodes) {
+      if (child instanceof Text) {
+        values.set(child, child.data);
+        checks.set(child, isCurrent);
+      }
+    }
   }
 };
 
@@ -234,42 +293,58 @@ export function createRunController(
       activeInconclusiveReasons = [];
 
       const records = await prepareScenarioMutations(scenarioId, options);
-      const textTargets = records
-        .map((record) => record.target)
-        .filter((target): target is Text => target instanceof Text);
-      const textClippingBaseline =
-        scenarioId === "long-text"
-          ? await captureTextClippingBaseline({
-              document: options.document,
-              targets: textTargets,
-            })
-          : {
-              excludedTargets: 0,
-              inconclusiveReasons: [],
-              inconclusiveTargets: 0,
-              snapshots: [],
-            };
-      const horizontalContainmentBaseline =
-        scenarioId === "unbreakable-text"
-          ? await captureHorizontalContainmentOverflowBaseline({
-              document: options.document,
-              targets: textTargets,
-            })
-          : { inconclusiveReasons: [], inconclusiveTargets: 0, snapshots: [] };
-      const viewportOverflowBaseline =
-        scenarioId === "unbreakable-text"
-          ? await captureViewportOverflowBaseline({
-              document: options.document,
-              targets: textTargets,
-            })
-          : { geometry: null, inconclusiveReasons: [], inconclusiveTargets: 0, snapshots: [] };
+      const textTargets = textTargetsForRecords(records);
+      let textClippingBaseline;
+      try {
+        textClippingBaseline = await captureTextClippingBaseline({
+          document: options.document,
+          targets: [...textTargets.keys()],
+        });
+      } catch {
+        textClippingBaseline = {
+          excludedTargets: 0,
+          inconclusiveReasons: ["text-clipping-baseline-unavailable"],
+          inconclusiveTargets: 1,
+          snapshots: [],
+        };
+      }
+      let horizontalContainmentBaseline;
+      try {
+        horizontalContainmentBaseline =
+          await captureHorizontalContainmentOverflowBaseline({
+            document: options.document,
+            targets: [...textTargets.keys()],
+          });
+      } catch {
+        horizontalContainmentBaseline = {
+          inconclusiveReasons: ["horizontal-containment-baseline-unavailable"],
+          inconclusiveTargets: 1,
+          snapshots: [],
+        };
+      }
+      let viewportOverflowBaseline;
+      try {
+        viewportOverflowBaseline = await captureViewportOverflowBaseline({
+          document: options.document,
+          targets: [...textTargets.keys()],
+        });
+      } catch {
+        viewportOverflowBaseline = {
+          geometry: null,
+          inconclusiveReasons: ["viewport-overflow-baseline-unavailable"],
+          inconclusiveTargets: 1,
+          snapshots: [],
+        };
+      }
       const activeJournal = createMutationJournal(options.document);
       journal = activeJournal;
       let mutatedTargets = 0;
       let skippedTargets = 0;
       let ineffectiveTargets = 0;
       let inconclusiveTargets = 0;
+      let safeFailedTargets = 0;
       const appliedTextValues = new Map<Text, string>();
+      const appliedTextStateChecks = new Map<Text, () => boolean>();
 
       const recordOutcome = (outcome: MutationOutcome): void => {
         switch (outcome) {
@@ -282,6 +357,7 @@ export function createRunController(
             inconclusiveTargets += 1;
             break;
           case "safe-failure":
+            safeFailedTargets += 1;
             inconclusiveTargets += 1;
             break;
           case "skipped":
@@ -297,17 +373,23 @@ export function createRunController(
         const outcome = activeJournal.apply(record as MutationRecord<unknown>);
         recordOutcome(outcome);
         if (
-          outcome === "applied" &&
-          record.target instanceof Text &&
-          typeof record.appliedState === "string"
+          outcome === "applied"
         ) {
-          appliedTextValues.set(record.target, record.appliedState);
+          appliedTextValuesForRecord(
+            record,
+            appliedTextValues,
+            appliedTextStateChecks,
+          );
         }
         if (outcome === "unknown") {
           const coverage = freezeCoverage({
+            comparableTargets: 0,
+            contributorTargets: 0,
             excludedTargets: 0,
+            findingCount: 0,
             eligibleTargets: records.length,
             mutatedTargets,
+            safeFailedTargets,
             skippedTargets,
             ineffectiveTargets,
             inconclusiveTargets,
@@ -326,40 +408,49 @@ export function createRunController(
         }
       }
 
-      const textClipping =
-        scenarioId === "long-text"
-          ? await detectTextClipping({
-              baseline: textClippingBaseline,
-              document: options.document,
-              expectedAppliedValues: appliedTextValues,
-              targets: [...appliedTextValues.keys()],
-            })
-          : {
-              excludedTargets: 0,
-              findings: [],
-              inconclusiveReasons: [],
-              inconclusiveTargets: 0,
-            };
-      const horizontalContainment =
-        scenarioId === "unbreakable-text"
-          ? await detectHorizontalContainmentOverflow({
-              baseline: horizontalContainmentBaseline,
-              document: options.document,
-              expectedAppliedValues: appliedTextValues,
-            })
-          : { findings: [], inconclusiveReasons: [], inconclusiveTargets: 0 };
-      const viewportOverflow =
-        scenarioId === "unbreakable-text"
-          ? await detectViewportOverflow({
-              baseline: viewportOverflowBaseline,
-              document: options.document,
-              expectedAppliedValues: appliedTextValues,
-            })
-          : { findings: [], inconclusiveReasons: [], inconclusiveTargets: 0 };
+      const textClipping = await detectTextClipping({
+        baseline: textClippingBaseline,
+        document: options.document,
+        expectedAppliedValues: appliedTextValues,
+        isTargetMutationCurrent: (target) => appliedTextStateChecks.get(target)?.() === true,
+        scenarioId,
+        targets: [...appliedTextValues.keys()],
+      });
+      const horizontalContainment = await detectHorizontalContainmentOverflow({
+        baseline: horizontalContainmentBaseline,
+        document: options.document,
+        expectedAppliedValues: appliedTextValues,
+        isTargetMutationCurrent: (target) => appliedTextStateChecks.get(target)?.() === true,
+        scenarioId,
+      });
+      const viewportOverflow = await detectViewportOverflow({
+        baseline: viewportOverflowBaseline,
+        document: options.document,
+        expectedAppliedValues: appliedTextValues,
+        isTargetMutationCurrent: (target) => appliedTextStateChecks.get(target)?.() === true,
+        scenarioId,
+      });
+      activeFindings = [
+        ...textClipping.findings,
+        ...horizontalContainment.findings,
+        ...viewportOverflow.findings,
+      ];
       const coverage = freezeCoverage({
+        comparableTargets: new Set([
+          ...textClipping.comparableTargets,
+          ...horizontalContainment.comparableTargets,
+          ...viewportOverflow.comparableTargets,
+        ].flatMap((target) => textTargets.get(target) ?? [])).size,
+        contributorTargets: new Set([
+          ...textClipping.contributorTargets,
+          ...horizontalContainment.contributorTargets,
+          ...viewportOverflow.contributorTargets,
+        ].flatMap((target) => textTargets.get(target) ?? [])).size,
         excludedTargets: textClipping.excludedTargets,
+        findingCount: activeFindings.length,
         eligibleTargets: records.length,
         mutatedTargets,
+        safeFailedTargets,
         skippedTargets,
         ineffectiveTargets,
         inconclusiveTargets:
@@ -368,11 +459,6 @@ export function createRunController(
           horizontalContainment.inconclusiveTargets +
           viewportOverflow.inconclusiveTargets,
       });
-      activeFindings = [
-        ...textClipping.findings,
-        ...horizontalContainment.findings,
-        ...viewportOverflow.findings,
-      ];
       activeInconclusiveReasons = [
         ...textClipping.inconclusiveReasons,
         ...horizontalContainment.inconclusiveReasons,

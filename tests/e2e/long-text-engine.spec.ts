@@ -84,7 +84,7 @@ test("Engine public seam runs Long Text independently of extension adapters", as
     phase: "ready-for-inspection",
     coverage: {
       eligibleTargets: 7,
-      inconclusiveTargets: 0,
+      inconclusiveTargets: 1,
       ineffectiveTargets: 0,
       mutatedTargets: 7,
       skippedTargets: 0,

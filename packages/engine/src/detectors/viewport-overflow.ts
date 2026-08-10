@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import type { ScenarioId } from "../run/run-controller.js";
+import { nextMeasurementFrame } from "./measurement-window.js";
+
 type DocumentGeometry = {
   readonly extent: number;
   readonly viewportWidth: number;
@@ -48,7 +51,7 @@ export type SerializedViewportOverflowFinding = {
     readonly locator: string;
     readonly mutated: ElementGeometry;
   };
-  readonly scenarioId: "unbreakable-text";
+  readonly scenarioId: ScenarioId;
 };
 
 export type ViewportOverflowBaseline = {
@@ -59,6 +62,8 @@ export type ViewportOverflowBaseline = {
 };
 
 export type ViewportOverflowDetection = {
+  readonly comparableTargets: readonly Text[];
+  readonly contributorTargets: readonly Text[];
   readonly findings: readonly SerializedViewportOverflowFinding[];
   readonly inconclusiveReasons: readonly string[];
   readonly inconclusiveTargets: number;
@@ -66,8 +71,12 @@ export type ViewportOverflowDetection = {
 
 const epsilon = 0.5;
 const documentExtentTolerance = 1;
-const nextFrame = (view: Window): Promise<void> =>
-  new Promise((resolve) => view.requestAnimationFrame(() => resolve()));
+const scenarioLabel = (scenarioId: ScenarioId): string =>
+  scenarioId === "large-text"
+    ? "Large Text"
+    : scenarioId === "long-text"
+      ? "Long Text"
+      : "Unbreakable Text";
 
 const locatorFor = (element: Element): string => {
   const id = element.getAttribute("id");
@@ -199,7 +208,9 @@ export async function captureViewportOverflowBaseline(options: {
   if (view === null || !isTopLevel(view)) {
     return { geometry: null, inconclusiveReasons: ["viewport-overflow-view-unavailable"], inconclusiveTargets: 1, snapshots: [] };
   }
-  await nextFrame(view);
+  if (!(await nextMeasurementFrame(view))) {
+    return { geometry: null, inconclusiveReasons: ["viewport-overflow-sampling-timeout"], inconclusiveTargets: 1, snapshots: [] };
+  }
   const geometry = documentGeometry(options.document);
   const seen = new Set<HTMLElement>();
   const candidates = options.targets.flatMap((target) => {
@@ -208,7 +219,9 @@ export async function captureViewportOverflowBaseline(options: {
     seen.add(element);
     return [{ direction: directionFor(element, view), element, geometry: elementGeometry(element, view), target }];
   });
-  await nextFrame(view);
+  if (!(await nextMeasurementFrame(view))) {
+    return { geometry: null, inconclusiveReasons: ["viewport-overflow-sampling-timeout"], inconclusiveTargets: 1, snapshots: [] };
+  }
   const stableDocument = stable(geometry, documentGeometry(options.document));
   const unstableTargets = new Set<Text>();
   for (const candidate of candidates) {
@@ -239,23 +252,33 @@ export async function detectViewportOverflow(options: {
   readonly baseline: ViewportOverflowBaseline;
   readonly document: Document;
   readonly expectedAppliedValues: ReadonlyMap<Text, string>;
+  readonly isTargetMutationCurrent: (target: Text) => boolean;
+  readonly scenarioId: ScenarioId;
 }): Promise<ViewportOverflowDetection> {
   const view = options.document.defaultView;
   if (view === null || !isTopLevel(view) || options.baseline.geometry === null) {
     return {
+      comparableTargets: [],
+      contributorTargets: [],
       findings: [],
       inconclusiveReasons: view === null ? ["viewport-overflow-view-unavailable"] : options.baseline.inconclusiveReasons,
       inconclusiveTargets: options.baseline.inconclusiveTargets + (view === null ? 1 : 0),
     };
   }
   const baselineGeometry = options.baseline.geometry;
-  await nextFrame(view);
+  if (!(await nextMeasurementFrame(view))) {
+    return { comparableTargets: [], contributorTargets: [], findings: [], inconclusiveReasons: ["viewport-overflow-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
+  }
   const geometry = documentGeometry(options.document);
   const candidates = options.baseline.snapshots.map((snapshot) => ({ snapshot, geometry: elementGeometry(snapshot.element, view) }));
-  await nextFrame(view);
+  if (!(await nextMeasurementFrame(view))) {
+    return { comparableTargets: [], contributorTargets: [], findings: [], inconclusiveReasons: ["viewport-overflow-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
+  }
   const stableDocument = stable(geometry, documentGeometry(options.document));
   if (!stableDocument) {
     return {
+      comparableTargets: [],
+      contributorTargets: [],
       findings: [],
       inconclusiveReasons: [...options.baseline.inconclusiveReasons, "viewport-overflow-mutated-geometry-unstable"],
       inconclusiveTargets: options.baseline.inconclusiveTargets + 1,
@@ -263,15 +286,14 @@ export async function detectViewportOverflow(options: {
   }
   const baselineExcess = excess(baselineGeometry);
   const mutatedExcess = excess(geometry);
-  if (mutatedExcess <= epsilon || mutatedExcess - baselineExcess <= epsilon) {
-    return { findings: [], inconclusiveReasons: options.baseline.inconclusiveReasons, inconclusiveTargets: options.baseline.inconclusiveTargets };
-  }
   const ineligibleTargets = new Set<Text>();
+  const comparableTargets = new Set<Text>();
   const contributors = candidates.flatMap(({ snapshot, geometry: mutated }) => {
     const expected = options.expectedAppliedValues.get(snapshot.target);
     if (
       expected === undefined ||
       snapshot.target.data !== expected ||
+      !options.isTargetMutationCurrent(snapshot.target) ||
       !snapshot.target.isConnected ||
       snapshot.target.parentElement !== snapshot.element ||
       !snapshot.element.isConnected ||
@@ -285,6 +307,7 @@ export async function detectViewportOverflow(options: {
     }
     const baseline = elementExcess(snapshot.geometry, baselineGeometry.viewportWidth, snapshot.direction);
     const mutatedExcess = elementExcess(mutated, geometry.viewportWidth, snapshot.direction);
+    comparableTargets.add(snapshot.target);
     const worsening = Math.max(0, mutatedExcess.maximum - baseline.maximum);
     return mutatedExcess.maximum > epsilon && worsening > epsilon
       ? [{ baseline, contribution: mutatedExcess.maximum, locator: locatorFor(snapshot.element), mutated, mutatedExcess, snapshot, worsening }]
@@ -294,8 +317,19 @@ export async function detectViewportOverflow(options: {
     ? [...options.baseline.inconclusiveReasons, "viewport-overflow-contributor-geometry-unsupported"]
     : options.baseline.inconclusiveReasons;
   const inconclusiveTargets = options.baseline.inconclusiveTargets + ineligibleTargets.size;
+  if (mutatedExcess <= epsilon || mutatedExcess - baselineExcess <= epsilon) {
+    return {
+      comparableTargets: [...comparableTargets],
+      contributorTargets: [],
+      findings: [],
+      inconclusiveReasons,
+      inconclusiveTargets,
+    };
+  }
   if (contributors.length === 0) {
     return {
+      comparableTargets: [...comparableTargets],
+      contributorTargets: [],
       findings: [],
       inconclusiveReasons: [...inconclusiveReasons, "viewport-contributor-not-isolated"],
       inconclusiveTargets: inconclusiveTargets + 1,
@@ -325,6 +359,8 @@ export async function detectViewportOverflow(options: {
   const primary = ordered[0];
   if (primary === undefined || !ordered.some((candidate) => explainsDocumentExtent(candidate, geometry))) {
     return {
+      comparableTargets: [...comparableTargets],
+      contributorTargets: [],
       findings: [],
       inconclusiveReasons: [...inconclusiveReasons, "viewport-contributor-not-isolated"],
       inconclusiveTargets: inconclusiveTargets + 1,
@@ -348,14 +384,20 @@ export async function detectViewportOverflow(options: {
     locator: "target-page",
     measuredDelta: mutatedExcess - baselineExcess,
     mutated: { documentExtent: geometry.extent, excess: mutatedExcess, viewportWidth: geometry.viewportWidth },
-    possibleCause: `${primary.locator} extends the Target Page beyond its layout viewport after Unbreakable Text.`,
+    possibleCause: `${primary.locator} extends the Target Page beyond its layout viewport after ${scenarioLabel(options.scenarioId)}.`,
     primaryContributor: {
       baseline: primary.snapshot.geometry,
       contribution: primary.contribution,
       locator: primary.locator,
       mutated: primary.mutated,
     },
-    scenarioId: "unbreakable-text",
+    scenarioId: options.scenarioId,
   };
-  return { findings: [finding], inconclusiveReasons, inconclusiveTargets };
+  return {
+    comparableTargets: [...comparableTargets],
+    contributorTargets: [...new Set(ordered.map((candidate) => candidate.snapshot.target))],
+    findings: [finding],
+    inconclusiveReasons,
+    inconclusiveTargets,
+  };
 }

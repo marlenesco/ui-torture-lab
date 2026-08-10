@@ -151,24 +151,50 @@ function FindingSummary({
   if (findings.length === 0) {
     return <p>No Findings were produced.</p>;
   }
-  const heading = findings.every((finding) => finding.detectorId === "text-clipping")
-    ? "Text Clipping"
-    : "Findings";
   return (
-    <section aria-label={`${heading} Findings`}>
-      <strong>{heading}</strong>
-      <ul>
-        {findings.map((finding) => (
-          <li key={`${finding.locator}-${finding.measuredDelta}`}>
-            {finding.detectorId === "viewport-overflow" ? (
-              <>Target Page · baseline {finding.baseline.documentExtent.toFixed(1)}px/{finding.baseline.viewportWidth.toFixed(1)}px · mutated {finding.mutated.documentExtent.toFixed(1)}px/{finding.mutated.viewportWidth.toFixed(1)}px · delta {finding.measuredDelta.toFixed(1)}px · {finding.contributionSide} via {finding.primaryContributor.locator} ({finding.primaryContributor.baseline.left.toFixed(1)}–{finding.primaryContributor.baseline.right.toFixed(1)}px → {finding.primaryContributor.mutated.left.toFixed(1)}–{finding.primaryContributor.mutated.right.toFixed(1)}px; contribution {finding.primaryContributor.contribution.toFixed(1)}px). Contributors: {finding.contributors.map((contributor) => `${contributor.contributionSide} ${contributor.locator} ${contributor.contribution.toFixed(1)}px`).join("; ")}. {finding.possibleCause}</>
-            ) : <>Boundary {finding.locator} · {finding.detectorId === "text-clipping"
-              ? `hidden extent ${finding.mutated.hiddenExtent.toFixed(1)}px`
-              : `maximum excess ${finding.mutated.maximumExcess.toFixed(1)}px`}</>}
-          </li>
+    <section aria-label="Findings">
+      {(["text-clipping", "horizontal-containment-overflow", "viewport-overflow"] as const)
+        .map((detectorId) => ({
+          detectorId,
+          findings: findings.filter((finding) => finding.detectorId === detectorId),
+        }))
+        .filter((group) => group.findings.length > 0)
+        .map((group) => (
+          <section aria-label={`${detectorLabel(group.detectorId)} Findings`} key={group.detectorId}>
+            <strong>{detectorLabel(group.detectorId)}</strong>
+            <ul>
+              {group.findings.map((finding) => <FindingItem finding={finding} key={`${finding.locator}-${finding.measuredDelta}`} />)}
+            </ul>
+          </section>
         ))}
-      </ul>
     </section>
+  );
+}
+
+function detectorLabel(detectorId: ReturnType<RunController["getSnapshot"]>["findings"][number]["detectorId"]): string {
+  switch (detectorId) {
+    case "text-clipping":
+      return "Text Clipping";
+    case "horizontal-containment-overflow":
+      return "Horizontal Containment Overflow";
+    case "viewport-overflow":
+      return "Viewport Overflow";
+  }
+}
+
+function FindingItem({
+  finding,
+}: {
+  readonly finding: ReturnType<RunController["getSnapshot"]>["findings"][number];
+}) {
+  return (
+    <li>
+      {finding.detectorId === "viewport-overflow" ? (
+        <>Target Page · baseline {finding.baseline.documentExtent.toFixed(1)}px/{finding.baseline.viewportWidth.toFixed(1)}px · mutated {finding.mutated.documentExtent.toFixed(1)}px/{finding.mutated.viewportWidth.toFixed(1)}px · delta {finding.measuredDelta.toFixed(1)}px · {finding.contributionSide} via {finding.primaryContributor.locator} ({finding.primaryContributor.baseline.left.toFixed(1)}–{finding.primaryContributor.baseline.right.toFixed(1)}px → {finding.primaryContributor.mutated.left.toFixed(1)}–{finding.primaryContributor.mutated.right.toFixed(1)}px; contribution {finding.primaryContributor.contribution.toFixed(1)}px). Contributors: {finding.contributors.map((contributor) => `${contributor.contributionSide} ${contributor.locator} ${contributor.contribution.toFixed(1)}px`).join("; ")}. {finding.possibleCause}</>
+      ) : <>Boundary {finding.locator} · {finding.detectorId === "text-clipping"
+        ? `hidden extent ${finding.mutated.hiddenExtent.toFixed(1)}px`
+        : `maximum excess ${finding.mutated.maximumExcess.toFixed(1)}px`}</>}
+    </li>
   );
 }
 
@@ -253,8 +279,10 @@ function CoverageSummary({
     <p>
       {coverage.eligibleTargets} eligible · {coverage.mutatedTargets} mutated ·{" "}
       {coverage.excludedTargets} excluded ·{" "}
-      {coverage.skippedTargets} skipped · {coverage.ineffectiveTargets} ineffective
-      · {coverage.inconclusiveTargets} inconclusive
+      {coverage.skippedTargets} skipped · {coverage.safeFailedTargets} safe-failed ·{" "}
+      {coverage.ineffectiveTargets} ineffective · {coverage.comparableTargets} comparable
+      · {coverage.inconclusiveTargets} inconclusive · {coverage.contributorTargets} contributors
+      · {coverage.findingCount} Findings
     </p>
   );
 }

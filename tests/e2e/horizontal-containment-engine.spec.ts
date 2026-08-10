@@ -185,7 +185,7 @@ test("Engine Run keeps independently measurable nested and clipping containment 
 test("Engine Run orders containment magnitude deterministically in CSS pixels", async ({ page }) => {
   await page.goto("/horizontal-containment-run/");
   const findings = await page.evaluate(async () => {
-    type Finding = { readonly locator: string; readonly measuredDelta: number };
+    type Finding = { readonly detectorId: string; readonly locator: string; readonly measuredDelta: number };
     const moduleUrl = "/__engine__/index.js";
     const engine = (await import(moduleUrl)) as {
       createRunController(options: {
@@ -201,7 +201,7 @@ test("Engine Run orders containment magnitude deterministically in CSS pixels", 
     await controller.startScenario("unbreakable-text");
     const result = controller.getSnapshot().findings;
     controller.restore();
-    return result;
+    return result.filter((finding) => finding.detectorId === "horizontal-containment-overflow");
   });
 
   expect(findings).toEqual(

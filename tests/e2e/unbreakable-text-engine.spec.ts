@@ -232,7 +232,7 @@ test("Unbreakable Text reports an applied-ineffective target through the public 
     phase: "ready-for-inspection",
     coverage: {
       eligibleTargets: 1,
-      inconclusiveTargets: 1,
+      inconclusiveTargets: 2,
       ineffectiveTargets: 1,
       mutatedTargets: 1,
     },
