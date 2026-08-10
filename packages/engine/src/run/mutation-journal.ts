@@ -322,6 +322,7 @@ const styleStatesEqual = (a: StyleState, b: StyleState): boolean =>
 export function createStyleMutationRecord(options: {
   readonly appliedPriority: string;
   readonly appliedValue: string;
+  readonly isEffective?: () => boolean;
   readonly property: string;
   readonly target: HTMLElement;
 }): MutationRecord<StyleState> {
@@ -346,10 +347,12 @@ export function createStyleMutationRecord(options: {
       options.target.style.setProperty(options.property, value, priority);
     },
     statesEqual: styleStatesEqual,
-    isEffective: () =>
-      styleStatesEqual(readState(), {
-        value: options.appliedValue,
-        priority: options.appliedPriority,
-      }),
+    isEffective:
+      options.isEffective ??
+      (() =>
+        styleStatesEqual(readState(), {
+          value: options.appliedValue,
+          priority: options.appliedPriority,
+        })),
   };
 }

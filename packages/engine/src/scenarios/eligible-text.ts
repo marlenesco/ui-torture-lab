@@ -95,23 +95,20 @@ const isRenderedNormalText = (
   return range.getClientRects().length > 0;
 };
 
-export function prepareEligibleTextMutations(
+const visitEligibleTextNodes = (
   options: TextScenarioPreparationOptions,
-  rules: {
-    readonly minimumMeaningfulGraphemes: number;
-    readonly transform: (parts: TextValueParts) => string;
-  },
-): MutationRecord<string>[] {
+  minimumMeaningfulGraphemes: number,
+  visit: (target: Text, parts: TextValueParts) => void,
+): void => {
   const root = options.document.body ?? options.document.documentElement;
   const walker = options.document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const records: MutationRecord<string>[] = [];
   let current = walker.nextNode();
 
   while (current !== null) {
     const target = current as Text;
     const parts = splitEligibleTextValue(
       target.data,
-      rules.minimumMeaningfulGraphemes,
+      minimumMeaningfulGraphemes,
     );
     if (
       parts !== null &&
@@ -121,15 +118,51 @@ export function prepareEligibleTextMutations(
       hasSupportedTextOwner(target) &&
       isRenderedNormalText(target, options.document)
     ) {
+      visit(target, parts);
+    }
+    current = walker.nextNode();
+  }
+};
+
+export function collectEligibleTextOwners(
+  options: TextScenarioPreparationOptions,
+  minimumMeaningfulGraphemes: number,
+): HTMLElement[] {
+  const owners = new Set<HTMLElement>();
+  visitEligibleTextNodes(
+    options,
+    minimumMeaningfulGraphemes,
+    (target) => {
+    const owner = target.parentElement;
+      if (owner instanceof HTMLElement) {
+        owners.add(owner);
+      }
+    },
+  );
+
+  return [...owners];
+}
+
+export function prepareEligibleTextMutations(
+  options: TextScenarioPreparationOptions,
+  rules: {
+    readonly minimumMeaningfulGraphemes: number;
+    readonly transform: (parts: TextValueParts) => string;
+  },
+): MutationRecord<string>[] {
+  const records: MutationRecord<string>[] = [];
+  visitEligibleTextNodes(
+    options,
+    rules.minimumMeaningfulGraphemes,
+    (target, parts) => {
       records.push(
         createTextMutationRecord({
           target,
           appliedValue: rules.transform(parts),
         }),
       );
-    }
-    current = walker.nextNode();
-  }
+    },
+  );
 
   return records;
 }
