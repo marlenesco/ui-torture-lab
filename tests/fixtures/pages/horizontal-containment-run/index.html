@@ -21,6 +21,38 @@
       #ambiguous-boundary { transform: translateX(0); }
       #rtl-boundary { direction: rtl; width: 180px; }
       #rtl-child { margin: 0; }
+      #hidden-boundary, #clip-boundary { width: 180px; }
+      #hidden-boundary { overflow-x: hidden; }
+      #clip-boundary { overflow-x: clip; }
+      #hidden-child, #clip-child { margin: 0; }
+      #equal-width-wrapper { width: 180px; }
+      #equal-width-hidden, #equal-width-clip { width: 100%; }
+      #equal-width-hidden { overflow-x: hidden; }
+      #equal-width-clip { overflow-x: clip; }
+      #equal-width-hidden p, #equal-width-clip p { margin: 0; }
+      #nested-outer { width: 120px; }
+      #nested-inner { width: 180px; }
+      #nested-child, #nested-outer-child { margin: 0; }
+      #viewport-boundary { margin-left: 900px; width: 180px; }
+      #viewport-child { display: inline-block; margin: 0; width: max-content; }
+      #ticker-boundary, #drag-boundary, #virtual-boundary { width: 180px; }
+      #ticker-boundary { animation: horizontal-shift 1s linear infinite; }
+      #drag-boundary { cursor: grab; }
+      #virtual-boundary { contain: content; }
+      #ticker-child, #drag-child, #virtual-child { margin: 0; }
+      @keyframes horizontal-shift { from { transform: translateX(0); } to { transform: translateX(1px); } }
+      #equal-outer { width: 180px; }
+      #equal-inner { width: 100%; }
+      #equal-inner p { margin: 0; }
+      #absolute-boundary, #fixed-boundary, #negative-boundary, #marquee-boundary { width: 180px; }
+      #absolute-child { margin: 0; position: absolute; }
+      #fixed-child { margin: 0; position: fixed; }
+      #negative-child { margin-left: -1px; margin-right: 0; }
+      #padded-outer, #scroll-boundary, #subpixel-boundary { width: 180px; }
+      #padded-boundary { box-sizing: border-box; padding-inline: 20px; width: 100%; }
+      #padded-boundary p, #scroll-boundary p, #subpixel-boundary p { margin: 0; }
+      #scroll-boundary { overflow-x: scroll; }
+      #subpixel-boundary { width: 180.25px; }
     </style>
   </head>
   <body>
@@ -33,6 +65,22 @@
       <div id="scrolling-boundary"><p id="scrolling-child">Checkout</p></div>
       <div id="ambiguous-boundary"><p id="ambiguous-child">Checkout</p></div>
       <div id="rtl-boundary"><p id="rtl-child">Checkout</p></div>
+      <div id="hidden-boundary"><p id="hidden-child">Checkout</p></div>
+      <div id="clip-boundary"><p id="clip-child">Checkout</p></div>
+      <div id="equal-width-wrapper"><div id="equal-width-hidden"><p>Checkout</p></div><div id="equal-width-clip"><p>Checkout</p></div></div>
+      <div id="nested-outer"><p id="nested-outer-child">Checkout</p><div id="nested-inner"><p id="nested-child">Checkout</p></div></div>
+      <div id="viewport-boundary"><p id="viewport-child">Checkout</p></div>
+      <div id="ticker-boundary"><p id="ticker-child">Checkout</p></div>
+      <div id="drag-boundary"><p id="drag-child">Checkout</p></div>
+      <div id="virtual-boundary"><p id="virtual-child">Checkout</p></div>
+      <div id="equal-outer"><div id="equal-inner"><p>Checkout</p></div></div>
+      <div id="absolute-boundary"><p id="absolute-child">Checkout</p></div>
+      <div id="fixed-boundary"><p id="fixed-child">Checkout</p></div>
+      <div id="negative-boundary"><p id="negative-child">Checkout</p></div>
+      <div id="marquee-boundary"><marquee>Checkout</marquee></div>
+      <div id="padded-outer"><div id="padded-boundary"><p>Checkout</p></div></div>
+      <div id="scroll-boundary"><p>Checkout</p></div>
+      <div id="subpixel-boundary"><p>Checkout</p></div>
       <p id="unisolated">Checkout</p>
     </main>
   </body>
