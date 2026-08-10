@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Text Clipping Run fixture</title>
+    <style>
+      body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, sans-serif; }
+      #clipping-boundary { overflow: hidden; width: 170px; white-space: nowrap; }
+      #ellipsis-boundary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 170px; }
+      #preexisting-boundary { overflow: hidden; width: 36px; white-space: nowrap; }
+      #unisolated-boundary { width: 170px; white-space: nowrap; }
+      #aggregate-boundary { overflow: hidden; width: 170px; white-space: nowrap; }
+      #line-clamp-boundary {
+        display: -webkit-box;
+        overflow: hidden;
+        width: 170px;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 1;
+      }
+      #nested-outer { overflow: hidden; width: 160px; white-space: nowrap; }
+      #nested-inner { overflow: hidden; width: 120px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p id="clipping-boundary">Checkout</p>
+      <p id="ellipsis-boundary">Checkout</p>
+      <p id="preexisting-boundary">This text is already clipped before the run</p>
+      <p id="unisolated-boundary">Checkout</p>
+      <p id="aggregate-boundary">Checkout <strong>today</strong></p>
+      <p id="line-clamp-boundary">Checkout today</p>
+      <div id="nested-outer"><p id="nested-inner">Checkout</p></div>
+    </main>
+  </body>
+</html>
