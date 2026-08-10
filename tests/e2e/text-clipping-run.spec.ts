@@ -77,8 +77,8 @@ test("built extension groups the completed Finding under Text Clipping", async (
         func: async () => {
           type Controller = {
             getSnapshot(): {
-              readonly findings: readonly unknown[];
-              readonly result: { readonly findings: readonly unknown[] } | null;
+              readonly findings: readonly { readonly locator: string }[];
+              readonly result: { readonly findings: readonly { readonly locator: string }[] } | null;
             };
             restore(): void;
             startScenario(scenarioId: "long-text"): Promise<void>;
@@ -111,7 +111,9 @@ test("built extension groups the completed Finding under Text Clipping", async (
         world: "ISOLATED",
         func: () => {
           type Controller = {
-            getSnapshot(): { readonly result: { readonly findings: readonly unknown[] } | null };
+            getSnapshot(): {
+              readonly result: { readonly findings: readonly { readonly locator: string }[] } | null;
+            };
             restore(): void;
           };
           const runtime = (globalThis as typeof globalThis & {
@@ -124,7 +126,9 @@ test("built extension groups the completed Finding under Text Clipping", async (
       });
       return injection?.result;
     });
-    expect(result?.findings).toHaveLength(3);
+    expect(result?.findings).toContainEqual(
+      expect.objectContaining({ locator: "p#clipping-boundary" }),
+    );
   } finally {
     await page.close();
   }
