@@ -143,6 +143,8 @@ function RunControls({
 
 const scenarioLabel = (scenarioId: ScenarioId | null): string => {
   switch (scenarioId) {
+    case "large-text":
+      return "Large Text";
     case "long-text":
       return "Long Text";
     case "unbreakable-text":
@@ -159,6 +161,13 @@ function ScenarioButtons({
 }) {
   return (
     <>
+      <button
+        className="panel-action"
+        onClick={() => onStartScenario("large-text")}
+        type="button"
+      >
+        Apply Large Text
+      </button>
       <button
         className="panel-action"
         onClick={() => onStartScenario("long-text")}

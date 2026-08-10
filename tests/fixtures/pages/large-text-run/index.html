@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Large Text Run fixture</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        font: 16px/1.5 system-ui, sans-serif;
+      }
+
+      #fixed-container {
+        width: 220px;
+        height: 54px;
+        overflow: hidden;
+      }
+
+      #primary-target {
+        margin: 0;
+        font-size: 20px !important;
+        line-height: 1.2;
+      }
+
+      #nested-parent {
+        font-size: 18px;
+      }
+
+      #vertical-target {
+        writing-mode: vertical-rl;
+      }
+
+      #icon-font-target {
+        font-family: "Font Awesome 6 Free", sans-serif;
+      }
+
+      #private-use-icon-target {
+        font-family: Dashicons, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div id="fixed-container">
+        <p id="primary-target">Checkout now before your basket expires</p>
+      </div>
+      <p id="nested-parent">Parent <span id="nested-target">nested</span> text</p>
+      <p id="inline-target" style="font-size: 15px">Inline baseline</p>
+      <p id="vertical-target">Vertical text</p>
+      <p id="hidden-target" hidden>Hidden text</p>
+      <code id="code-target">const answer = 42;</code>
+      <p id="icon-font-target">search</p>
+      <p id="private-use-icon-target">&#xf101;</p>
+      <svg aria-label="Diagram"><text id="svg-target">Vector text</text></svg>
+      <p id="extension-owned-probe">Extension-owned probe</p>
+    </main>
+  </body>
+</html>

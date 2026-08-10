@@ -4,13 +4,15 @@ import {
   createMutationJournal,
   type MutationJournal,
   type MutationOutcome,
+  type MutationRecord,
   type RestoreConflictReason,
   type RestoreResult,
 } from "./mutation-journal.js";
 import { prepareLongTextMutations } from "../scenarios/long-text.js";
 import { prepareUnbreakableTextMutations } from "../scenarios/unbreakable-text.js";
+import { prepareLargeTextMutations } from "../scenarios/large-text.js";
 
-export type ScenarioId = "long-text" | "unbreakable-text";
+export type ScenarioId = "large-text" | "long-text" | "unbreakable-text";
 
 export type RunPhase =
   | "idle"
@@ -112,10 +114,12 @@ const prepareScenarioMutations = (
   options: RunControllerOptions,
 ) => {
   switch (scenarioId) {
+    case "large-text":
+      return prepareLargeTextMutations(options);
     case "long-text":
-      return prepareLongTextMutations(options);
+      return Promise.resolve(prepareLongTextMutations(options));
     case "unbreakable-text":
-      return prepareUnbreakableTextMutations(options);
+      return Promise.resolve(prepareUnbreakableTextMutations(options));
   }
 };
 
@@ -195,7 +199,7 @@ export function createRunController(
         result: null,
       });
 
-      const records = prepareScenarioMutations(scenarioId, options);
+      const records = await prepareScenarioMutations(scenarioId, options);
       const activeJournal = createMutationJournal(options.document);
       journal = activeJournal;
       let mutatedTargets = 0;
@@ -226,7 +230,7 @@ export function createRunController(
       };
 
       for (const record of records) {
-        const outcome = activeJournal.apply(record);
+        const outcome = activeJournal.apply(record as MutationRecord<unknown>);
         recordOutcome(outcome);
         if (outcome === "unknown") {
           const coverage = freezeCoverage({
