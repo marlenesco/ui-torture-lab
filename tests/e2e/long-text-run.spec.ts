@@ -580,6 +580,11 @@ test("an unverified cleanup is distinct from an external Restore conflict", asyn
     await page.waitForFunction(
       () => document.querySelector("#minimum-target")?.textContent === "OK OK OK",
     );
+    await page.waitForFunction(
+      () =>
+        document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
+          ?.textContent?.includes("Scenario active") === true,
+    );
 
     await serviceWorker.evaluate(async () => {
       const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
