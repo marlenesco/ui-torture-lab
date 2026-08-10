@@ -134,7 +134,7 @@ test("built extension groups the completed Finding under Text Clipping", async (
   }
 });
 
-test("built extension shows Horizontal Containment Overflow from Unbreakable Text", async () => {
+test("built extension shows containment and Viewport Overflow from Unbreakable Text", async () => {
   const page = await browser.newPage();
   try {
     await page.goto("http://127.0.0.1:4173/horizontal-containment-run/");
@@ -171,6 +171,11 @@ test("built extension shows Horizontal Containment Overflow from Unbreakable Tex
     );
     expect(panelText).toContain("Findings");
     expect(panelText).toContain("Boundary div#containing-boundary");
+    expect(panelText).toContain("Target Page");
+    expect(panelText).toContain("via p#viewport-child");
+    expect(panelText).toContain("baseline");
+    expect(panelText).toContain("delta");
+    expect(panelText).toContain("extends the Target Page beyond its layout viewport");
   } finally {
     await page.close();
   }
