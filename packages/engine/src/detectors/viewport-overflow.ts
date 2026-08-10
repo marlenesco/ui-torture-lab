@@ -10,15 +10,33 @@ type ElementGeometry = {
   readonly right: number;
 };
 
+type ContributionSide = "inline-start" | "inline-end" | "both";
+
+type ElementExcess = {
+  readonly inlineEnd: number;
+  readonly inlineStart: number;
+  readonly maximum: number;
+  readonly side: ContributionSide;
+};
+
 type Snapshot = {
   readonly element: HTMLElement;
+  readonly direction: "ltr" | "rtl";
   readonly geometry: ElementGeometry;
   readonly target: Text;
 };
 
 export type SerializedViewportOverflowFinding = {
   readonly baseline: { readonly documentExtent: number; readonly excess: number; readonly viewportWidth: number };
-  readonly contributionSide: "inline-end";
+  readonly contributionSide: ContributionSide;
+  readonly contributors: readonly {
+    readonly baseline: { readonly excess: number };
+    readonly contribution: number;
+    readonly contributionSide: ContributionSide;
+    readonly locator: string;
+    readonly measuredDelta: number;
+    readonly mutated: { readonly excess: number };
+  }[];
   readonly detectorId: "viewport-overflow";
   readonly locator: "target-page";
   readonly measuredDelta: number;
@@ -66,6 +84,10 @@ const isTopLevel = (view: Window): boolean => {
 
 const isEligibleGeometry = (element: HTMLElement, view: Window): boolean => {
   const style = view.getComputedStyle(element);
+  const hasGeneratedContent = ["::before", "::after"].some((pseudo) => {
+    const content = view.getComputedStyle(element, pseudo).content;
+    return content !== "none" && content !== "normal" && content !== "";
+  });
   return (
     style.position === "static" &&
     style.transform === "none" &&
@@ -74,8 +96,9 @@ const isEligibleGeometry = (element: HTMLElement, view: Window): boolean => {
     style.contentVisibility === "visible" &&
     style.overflowX === "visible" &&
     style.willChange === "auto" &&
-    Number.parseFloat(style.marginLeft) >= 0 &&
-    Number.parseFloat(style.marginRight) >= 0
+    !hasGeneratedContent &&
+    Number.isFinite(Number.parseFloat(style.marginLeft)) &&
+    Number.isFinite(Number.parseFloat(style.marginRight))
   );
 };
 
@@ -120,6 +143,54 @@ const stable = <Geometry extends object>(before: Geometry, after: Geometry): boo
 const excess = (geometry: DocumentGeometry): number =>
   Math.max(0, geometry.extent - geometry.viewportWidth);
 
+const directionFor = (element: HTMLElement, view: Window): "ltr" | "rtl" =>
+  view.getComputedStyle(element).direction === "rtl" ? "rtl" : "ltr";
+
+const elementExcess = (
+  geometry: ElementGeometry,
+  viewportWidth: number,
+  direction: "ltr" | "rtl",
+): ElementExcess => {
+  const physicalStart = Math.max(0, -geometry.left);
+  const physicalEnd = Math.max(0, geometry.right - viewportWidth);
+  const inlineStart = direction === "ltr" ? physicalStart : physicalEnd;
+  const inlineEnd = direction === "ltr" ? physicalEnd : physicalStart;
+  return {
+    inlineEnd,
+    inlineStart,
+    maximum: Math.max(inlineStart, inlineEnd),
+    side: inlineStart > epsilon && inlineEnd > epsilon
+      ? "both"
+      : inlineStart > epsilon
+        ? "inline-start"
+        : "inline-end",
+  };
+};
+
+const sameContributionBoundary = (
+  candidate: { readonly mutated: ElementGeometry; readonly mutatedExcess: ElementExcess; readonly snapshot: Snapshot },
+  other: { readonly mutated: ElementGeometry; readonly mutatedExcess: ElementExcess; readonly snapshot: Snapshot },
+): boolean => {
+  const compareInlineStart = candidate.mutatedExcess.side === "inline-start" || candidate.mutatedExcess.side === "both";
+  const compareInlineEnd = candidate.mutatedExcess.side === "inline-end" || candidate.mutatedExcess.side === "both";
+  const inlineStartMatches = candidate.snapshot.direction === "ltr"
+    ? Math.abs(candidate.mutated.left - other.mutated.left) <= epsilon
+    : Math.abs(candidate.mutated.right - other.mutated.right) <= epsilon;
+  const inlineEndMatches = candidate.snapshot.direction === "ltr"
+    ? Math.abs(candidate.mutated.right - other.mutated.right) <= epsilon
+    : Math.abs(candidate.mutated.left - other.mutated.left) <= epsilon;
+  return (!compareInlineStart || inlineStartMatches) && (!compareInlineEnd || inlineEndMatches);
+};
+
+const explainsDocumentExtent = (
+  candidate: { readonly mutated: ElementGeometry },
+  geometry: DocumentGeometry,
+): boolean => {
+  const pageExcess = excess(geometry);
+  return candidate.mutated.right >= geometry.extent - documentExtentTolerance ||
+    -candidate.mutated.left >= pageExcess - documentExtentTolerance;
+};
+
 export async function captureViewportOverflowBaseline(options: {
   readonly document: Document;
   readonly targets: readonly Text[];
@@ -135,7 +206,7 @@ export async function captureViewportOverflowBaseline(options: {
     const element = target.parentElement;
     if (element === null || !target.isConnected || seen.has(element) || !pathIsEligible(element, options.document, view)) return [];
     seen.add(element);
-    return [{ element, geometry: elementGeometry(element, view), target }];
+    return [{ direction: directionFor(element, view), element, geometry: elementGeometry(element, view), target }];
   });
   await nextFrame(view);
   const stableDocument = stable(geometry, documentGeometry(options.document));
@@ -146,6 +217,7 @@ export async function captureViewportOverflowBaseline(options: {
       candidate.target.parentElement !== candidate.element ||
       !candidate.element.isConnected ||
       candidate.element.ownerDocument !== options.document ||
+      candidate.direction !== directionFor(candidate.element, view) ||
       !pathIsEligible(candidate.element, options.document, view) ||
       !stable(candidate.geometry, elementGeometry(candidate.element, view))
     ) {
@@ -176,6 +248,7 @@ export async function detectViewportOverflow(options: {
       inconclusiveTargets: options.baseline.inconclusiveTargets + (view === null ? 1 : 0),
     };
   }
+  const baselineGeometry = options.baseline.geometry;
   await nextFrame(view);
   const geometry = documentGeometry(options.document);
   const candidates = options.baseline.snapshots.map((snapshot) => ({ snapshot, geometry: elementGeometry(snapshot.element, view) }));
@@ -188,7 +261,7 @@ export async function detectViewportOverflow(options: {
       inconclusiveTargets: options.baseline.inconclusiveTargets + 1,
     };
   }
-  const baselineExcess = excess(options.baseline.geometry);
+  const baselineExcess = excess(baselineGeometry);
   const mutatedExcess = excess(geometry);
   if (mutatedExcess <= epsilon || mutatedExcess - baselineExcess <= epsilon) {
     return { findings: [], inconclusiveReasons: options.baseline.inconclusiveReasons, inconclusiveTargets: options.baseline.inconclusiveTargets };
@@ -203,32 +276,29 @@ export async function detectViewportOverflow(options: {
       snapshot.target.parentElement !== snapshot.element ||
       !snapshot.element.isConnected ||
       snapshot.element.ownerDocument !== options.document ||
+      snapshot.direction !== directionFor(snapshot.element, view) ||
       !pathIsEligible(snapshot.element, options.document, view) ||
       !stable(mutated, elementGeometry(snapshot.element, view))
     ) {
       ineligibleTargets.add(snapshot.target);
       return [];
     }
-    const contribution = Math.max(0, mutated.right - geometry.viewportWidth);
-    const worsening = Math.max(0, mutated.right - snapshot.geometry.right);
-    return contribution > epsilon &&
-      worsening > epsilon &&
-      mutated.right >= geometry.extent - documentExtentTolerance
-      ? [{ contribution, locator: locatorFor(snapshot.element), mutated, snapshot, worsening }]
+    const baseline = elementExcess(snapshot.geometry, baselineGeometry.viewportWidth, snapshot.direction);
+    const mutatedExcess = elementExcess(mutated, geometry.viewportWidth, snapshot.direction);
+    const worsening = Math.max(0, mutatedExcess.maximum - baseline.maximum);
+    return mutatedExcess.maximum > epsilon && worsening > epsilon
+      ? [{ baseline, contribution: mutatedExcess.maximum, locator: locatorFor(snapshot.element), mutated, mutatedExcess, snapshot, worsening }]
       : [];
   });
-  if (ineligibleTargets.size > 0) {
-    return {
-      findings: [],
-      inconclusiveReasons: [...options.baseline.inconclusiveReasons, "viewport-overflow-contributor-geometry-unsupported"],
-      inconclusiveTargets: options.baseline.inconclusiveTargets + ineligibleTargets.size,
-    };
-  }
+  const inconclusiveReasons = ineligibleTargets.size > 0
+    ? [...options.baseline.inconclusiveReasons, "viewport-overflow-contributor-geometry-unsupported"]
+    : options.baseline.inconclusiveReasons;
+  const inconclusiveTargets = options.baseline.inconclusiveTargets + ineligibleTargets.size;
   if (contributors.length === 0) {
     return {
       findings: [],
-      inconclusiveReasons: [...options.baseline.inconclusiveReasons, "viewport-overflow-direct-contributor-unisolated"],
-      inconclusiveTargets: options.baseline.inconclusiveTargets + 1,
+      inconclusiveReasons: [...inconclusiveReasons, "viewport-contributor-not-isolated"],
+      inconclusiveTargets: inconclusiveTargets + 1,
     };
   }
   const deduplicated = contributors.filter(
@@ -237,10 +307,12 @@ export async function detectViewportOverflow(options: {
         (other) =>
           other !== candidate &&
           candidate.snapshot.element.contains(other.snapshot.element) &&
-          Math.abs(candidate.mutated.right - other.mutated.right) <= epsilon,
+          candidate.snapshot.direction === other.snapshot.direction &&
+          candidate.mutatedExcess.side === other.mutatedExcess.side &&
+          sameContributionBoundary(candidate, other),
       ),
   );
-  const primary = [...deduplicated].sort((left, right) => {
+  const ordered = [...deduplicated].sort((left, right) => {
     const contributionOrder = right.contribution - left.contribution;
     if (contributionOrder !== 0) return contributionOrder;
     const worseningOrder = right.worsening - left.worsening;
@@ -249,17 +321,29 @@ export async function detectViewportOverflow(options: {
       Node.DOCUMENT_POSITION_FOLLOWING
       ? -1
       : 1;
-  })[0];
-  if (primary === undefined) {
+  });
+  const primary = ordered[0];
+  if (primary === undefined || !ordered.some((candidate) => explainsDocumentExtent(candidate, geometry))) {
     return {
       findings: [],
-      inconclusiveReasons: [...options.baseline.inconclusiveReasons, "viewport-overflow-direct-contributor-unisolated"],
-      inconclusiveTargets: options.baseline.inconclusiveTargets + 1,
+      inconclusiveReasons: [...inconclusiveReasons, "viewport-contributor-not-isolated"],
+      inconclusiveTargets: inconclusiveTargets + 1,
     };
   }
   const finding: SerializedViewportOverflowFinding = {
-    baseline: { documentExtent: options.baseline.geometry.extent, excess: baselineExcess, viewportWidth: options.baseline.geometry.viewportWidth },
-    contributionSide: "inline-end",
+    baseline: { documentExtent: baselineGeometry.extent, excess: baselineExcess, viewportWidth: baselineGeometry.viewportWidth },
+    contributionSide: ordered.some((candidate) => candidate.mutatedExcess.side === "inline-start") &&
+      ordered.some((candidate) => candidate.mutatedExcess.side === "inline-end")
+      ? "both"
+      : primary.mutatedExcess.side,
+    contributors: ordered.map((candidate) => ({
+      baseline: { excess: candidate.baseline.maximum },
+      contribution: candidate.contribution,
+      contributionSide: candidate.mutatedExcess.side,
+      locator: candidate.locator,
+      measuredDelta: candidate.worsening,
+      mutated: { excess: candidate.mutatedExcess.maximum },
+    })),
     detectorId: "viewport-overflow",
     locator: "target-page",
     measuredDelta: mutatedExcess - baselineExcess,
@@ -273,5 +357,5 @@ export async function detectViewportOverflow(options: {
     },
     scenarioId: "unbreakable-text",
   };
-  return { findings: [finding], inconclusiveReasons: options.baseline.inconclusiveReasons, inconclusiveTargets: options.baseline.inconclusiveTargets };
+  return { findings: [finding], inconclusiveReasons, inconclusiveTargets };
 }
