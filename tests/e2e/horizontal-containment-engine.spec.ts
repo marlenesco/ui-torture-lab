@@ -87,6 +87,15 @@ test("Engine Run leaves clipping, scrolling, ambiguous, and unisolated layouts i
   expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "div#clipped-child-boundary" }));
   expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "div#scrolling-boundary" }));
   expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "div#ambiguous-boundary" }));
+  expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "div#ticker-boundary" }));
+  expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "div#drag-boundary" }));
+  expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "div#virtual-boundary" }));
+  expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "div#equal-outer" }));
+  expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "div#absolute-boundary" }));
+  expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "div#fixed-boundary" }));
+  expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "div#negative-boundary" }));
+  expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "div#marquee-boundary" }));
+  expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "div#scroll-boundary" }));
   expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "main" }));
   expect(result.coverage.inconclusiveTargets).toBeGreaterThan(0);
 });
@@ -134,4 +143,72 @@ test("Engine Run marks a reparented overflowing element inconclusive instead of 
 
   expect(result.findings).not.toContainEqual(expect.objectContaining({ locator: "div#containing-boundary" }));
   expect(result.coverage.inconclusiveTargets).toBeGreaterThan(0);
+});
+
+test("Engine Run keeps independently measurable nested and clipping containment Evidence", async ({ page }) => {
+  await page.goto("/horizontal-containment-run/");
+  const result = await page.evaluate(async () => {
+    type Controller = {
+      getSnapshot(): { readonly findings: readonly { readonly locator: string }[] };
+      restore(): void;
+      startScenario(scenarioId: "unbreakable-text"): Promise<void>;
+    };
+    const moduleUrl = "/__engine__/index.js";
+    const engine = (await import(moduleUrl)) as {
+      createRunController(options: {
+        readonly document: Document;
+        readonly isExtensionOwnedNode: (node: Node) => boolean;
+      }): Controller;
+    };
+    const controller = engine.createRunController({ document, isExtensionOwnedNode: () => false });
+    await controller.startScenario("unbreakable-text");
+    const snapshot = {
+      findings: controller.getSnapshot().findings,
+      hasViewportOverflow: document.documentElement.scrollWidth > window.innerWidth,
+    };
+    controller.restore();
+    return snapshot;
+  });
+
+  expect(result.findings).toContainEqual(expect.objectContaining({ locator: "div#hidden-boundary" }));
+  expect(result.findings).toContainEqual(expect.objectContaining({ locator: "div#clip-boundary" }));
+  expect(result.findings).toContainEqual(expect.objectContaining({ locator: "div#equal-width-hidden" }));
+  expect(result.findings).toContainEqual(expect.objectContaining({ locator: "div#equal-width-clip" }));
+  expect(result.findings).toContainEqual(expect.objectContaining({ locator: "div#nested-inner" }));
+  expect(result.findings).toContainEqual(expect.objectContaining({ locator: "div#nested-outer" }));
+  expect(result.findings).toContainEqual(expect.objectContaining({ locator: "div#viewport-boundary" }));
+  expect(result.findings).toContainEqual(expect.objectContaining({ locator: "div#padded-boundary" }));
+  expect(result.findings).toContainEqual(expect.objectContaining({ locator: "div#subpixel-boundary" }));
+  expect(result.hasViewportOverflow).toBe(true);
+});
+
+test("Engine Run orders containment magnitude deterministically in CSS pixels", async ({ page }) => {
+  await page.goto("/horizontal-containment-run/");
+  const findings = await page.evaluate(async () => {
+    type Finding = { readonly locator: string; readonly measuredDelta: number };
+    const moduleUrl = "/__engine__/index.js";
+    const engine = (await import(moduleUrl)) as {
+      createRunController(options: {
+        readonly document: Document;
+        readonly isExtensionOwnedNode: (node: Node) => boolean;
+      }): {
+        getSnapshot(): { readonly findings: readonly Finding[] };
+        restore(): void;
+        startScenario(scenarioId: "unbreakable-text"): Promise<void>;
+      };
+    };
+    const controller = engine.createRunController({ document, isExtensionOwnedNode: () => false });
+    await controller.startScenario("unbreakable-text");
+    const result = controller.getSnapshot().findings;
+    controller.restore();
+    return result;
+  });
+
+  expect(findings).toEqual(
+    [...findings].sort(
+      (left, right) =>
+        right.measuredDelta - left.measuredDelta || left.locator.localeCompare(right.locator),
+    ),
+  );
+  expect(findings.every((finding) => finding.measuredDelta > 0)).toBe(true);
 });

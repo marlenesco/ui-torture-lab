@@ -40,6 +40,7 @@ type Excess = {
 type Snapshot = {
   readonly baseline: Excess;
   readonly boundary: HTMLElement;
+  readonly boundaryClipsOverflow: boolean;
   readonly direction: "ltr" | "rtl";
   readonly element: HTMLElement;
   readonly geometry: Geometry;
@@ -86,8 +87,20 @@ const isOperationalHorizontalScroll = (
 const isAmbiguousLayout = (style: CSSStyleDeclaration): boolean =>
   (style.position !== "static" && style.position !== "relative") ||
   style.transform !== "none" ||
+  style.animationName !== "none" ||
+  style.willChange.includes("transform") ||
+  style.cursor === "grab" ||
+  style.cursor === "grabbing" ||
+  style.contain !== "none" ||
+  style.contentVisibility !== "visible" ||
   Number.parseFloat(style.marginLeft) < 0 ||
   Number.parseFloat(style.marginRight) < 0;
+
+const isAmbiguousElement = (
+  element: HTMLElement,
+  style: CSSStyleDeclaration,
+): boolean =>
+  isAmbiguousLayout(style) || element.closest("canvas, marquee") !== null;
 
 const isRelevantLayoutBoundary = (
   element: HTMLElement,
@@ -96,14 +109,31 @@ const isRelevantLayoutBoundary = (
   element.clientWidth > epsilon &&
   style.display !== "contents" &&
   style.display !== "inline" &&
-  (style.display === "flex" ||
+  (isClippingOverflow(style.overflowX) ||
+    Number.parseFloat(style.paddingLeft) > epsilon ||
+    Number.parseFloat(style.paddingRight) > epsilon ||
+    style.display === "flex" ||
     style.display === "grid" ||
     (element.parentElement !== null &&
-      element.clientWidth + epsilon < element.parentElement.clientWidth));
+      Math.abs(element.clientWidth - element.parentElement.clientWidth) > epsilon));
+
+const isUnisolatableEqualWidthBoundary = (
+  element: HTMLElement,
+  style: CSSStyleDeclaration,
+): boolean =>
+  element.clientWidth > epsilon &&
+  style.display !== "contents" &&
+  style.display !== "inline" &&
+  !isClippingOverflow(style.overflowX) &&
+  Number.parseFloat(style.paddingLeft) <= epsilon &&
+  Number.parseFloat(style.paddingRight) <= epsilon &&
+  element.parentElement !== null &&
+  Math.abs(element.clientWidth - element.parentElement.clientWidth) <= epsilon;
 
 const pathIsEligible = (
   element: HTMLElement,
   boundary: HTMLElement,
+  boundaryClipsOverflow: boolean,
   document: Document,
 ): boolean => {
   const view = document.defaultView;
@@ -119,8 +149,9 @@ const pathIsEligible = (
   while (current !== null) {
     const style = view.getComputedStyle(current);
     if (
-      isAmbiguousLayout(style) ||
-      isClippingOverflow(style.overflowX) ||
+      isAmbiguousElement(current, style) ||
+      (isClippingOverflow(style.overflowX) &&
+        (current !== boundary || !boundaryClipsOverflow)) ||
       isOperationalHorizontalScroll(current, style)
     ) {
       return false;
@@ -143,13 +174,15 @@ const resolveBoundaries = (
   while (current !== null && current !== document.body) {
     const style = view.getComputedStyle(current);
     if (
-      isAmbiguousLayout(style) ||
-      isClippingOverflow(style.overflowX) ||
-      isOperationalHorizontalScroll(current, style)
+      isAmbiguousElement(current, style) || isOperationalHorizontalScroll(current, style)
     ) {
       return null;
     }
+    if (isUnisolatableEqualWidthBoundary(current, style)) return null;
     if (isRelevantLayoutBoundary(current, style)) boundaries.push(current);
+    if (isClippingOverflow(style.overflowX)) {
+      return boundaries.length > 0 ? boundaries : null;
+    }
     current = current.parentElement;
   }
   return boundaries;
@@ -158,13 +191,17 @@ const resolveBoundaries = (
 const isEligibleElement = (element: HTMLElement, view: Window): boolean => {
   const style = view.getComputedStyle(element);
   return (
-    !isAmbiguousLayout(style) &&
+    !isAmbiguousElement(element, style) &&
     !isClippingOverflow(style.overflowX) &&
     !isOperationalHorizontalScroll(element, style)
   );
 };
 
-const geometryFor = (element: HTMLElement, boundary: HTMLElement, direction: "ltr" | "rtl"): Geometry => {
+const geometryFor = (
+  element: HTMLElement,
+  boundary: HTMLElement,
+  direction: "ltr" | "rtl",
+): Geometry => {
   const elementRect = element.getBoundingClientRect();
   const boundaryRect = boundary.getBoundingClientRect();
   const elementWidth = Math.max(elementRect.width, element.scrollWidth);
@@ -236,10 +273,18 @@ export async function captureHorizontalContainmentOverflowBaseline(options: {
     }
     for (const boundary of boundaries) {
       const direction = view.getComputedStyle(boundary).direction === "rtl" ? "rtl" : "ltr";
-      const geometry = geometryFor(element, boundary, direction);
+      const boundaryClipsOverflow = isClippingOverflow(
+        view.getComputedStyle(boundary).overflowX,
+      );
+      const geometry = geometryFor(
+        element,
+        boundary,
+        direction,
+      );
       candidates.push({
         baseline: excessFor(geometry, direction),
         boundary,
+        boundaryClipsOverflow,
         direction,
         element,
         geometry,
@@ -256,9 +301,21 @@ export async function captureHorizontalContainmentOverflowBaseline(options: {
         candidate.target.parentElement !== candidate.element ||
         !candidate.element.isConnected ||
         !candidate.boundary.isConnected ||
-        !pathIsEligible(candidate.element, candidate.boundary, options.document) ||
+        !pathIsEligible(
+          candidate.element,
+          candidate.boundary,
+          candidate.boundaryClipsOverflow,
+          options.document,
+        ) ||
       candidate.direction !== direction ||
-      !geometryStable(candidate.geometry, geometryFor(candidate.element, candidate.boundary, direction))
+      !geometryStable(
+        candidate.geometry,
+        geometryFor(
+          candidate.element,
+          candidate.boundary,
+          direction,
+        ),
+      )
     ) {
       unstableTargets.add(candidate.target);
     }
@@ -291,7 +348,11 @@ export async function detectHorizontalContainmentOverflow(options: {
   await nextFrame(view);
   const first = options.baseline.snapshots.map((snapshot) => ({
     snapshot,
-    geometry: geometryFor(snapshot.element, snapshot.boundary, snapshot.direction),
+    geometry: geometryFor(
+      snapshot.element,
+      snapshot.boundary,
+      snapshot.direction,
+    ),
   }));
   await nextFrame(view);
   const findings = new Map<HTMLElement, SerializedHorizontalContainmentOverflowFinding>();
@@ -311,7 +372,7 @@ export async function detectHorizontalContainmentOverflow(options: {
       appendReason(inconclusiveReasons, "horizontal-containment-target-replaced-or-changed");
       continue;
     }
-    let resolved = false;
+    const foundGrowth = { inlineEnd: 0, inlineStart: 0 };
     for (const { snapshot, geometry } of candidates) {
       const style = view.getComputedStyle(snapshot.boundary);
       const direction = style.direction === "rtl" ? "rtl" : "ltr";
@@ -320,18 +381,41 @@ export async function detectHorizontalContainmentOverflow(options: {
         target.parentElement !== snapshot.element ||
         !snapshot.element.isConnected ||
         !snapshot.boundary.isConnected ||
-        !pathIsEligible(snapshot.element, snapshot.boundary, options.document) ||
+        !pathIsEligible(
+          snapshot.element,
+          snapshot.boundary,
+          snapshot.boundaryClipsOverflow,
+          options.document,
+        ) ||
         snapshot.direction !== direction ||
-        !geometryStable(geometry, geometryFor(snapshot.element, snapshot.boundary, direction))
+        snapshot.boundaryClipsOverflow !== isClippingOverflow(style.overflowX) ||
+        !geometryStable(
+          geometry,
+          geometryFor(
+            snapshot.element,
+            snapshot.boundary,
+            direction,
+          ),
+        )
       ) {
         inconclusiveTargets.add(target);
         appendReason(inconclusiveReasons, "horizontal-containment-mutated-geometry-ambiguous");
-        resolved = true;
         break;
       }
       const mutated = excessFor(geometry, direction);
       const measuredDelta = mutated.maximum - snapshot.baseline.maximum;
-      if (measuredDelta <= epsilon || mutated.maximum <= epsilon) continue;
+      const inlineStartGrowth = Math.max(0, mutated.inlineStart - snapshot.baseline.inlineStart);
+      const inlineEndGrowth = Math.max(0, mutated.inlineEnd - snapshot.baseline.inlineEnd);
+      if (
+        measuredDelta <= epsilon ||
+        mutated.maximum <= epsilon ||
+        Math.max(
+          inlineStartGrowth - foundGrowth.inlineStart,
+          inlineEndGrowth - foundGrowth.inlineEnd,
+        ) <= epsilon
+      ) {
+        continue;
+      }
       const existing = findings.get(snapshot.boundary);
       const evidence: ElementEvidence = {
         baseline: { excess: snapshot.baseline.maximum },
@@ -365,10 +449,9 @@ export async function detectHorizontalContainmentOverflow(options: {
           scenarioId: "unbreakable-text",
         });
       }
-      resolved = true;
-      break;
+      foundGrowth.inlineStart = Math.max(foundGrowth.inlineStart, inlineStartGrowth);
+      foundGrowth.inlineEnd = Math.max(foundGrowth.inlineEnd, inlineEndGrowth);
     }
-    if (!resolved) continue;
   }
   return {
     findings: [...findings.values()].sort(
