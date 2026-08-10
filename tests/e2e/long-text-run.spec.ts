@@ -355,6 +355,7 @@ test("Long Text preserves supported nodes and excludes unsupported targets", asy
     );
     expect(observation.secondRunError).toBe("A Run is already active");
     expect(observation.activeCoverage).toEqual({
+      excludedTargets: 0,
       eligibleTargets: 6,
       inconclusiveTargets: 0,
       ineffectiveTargets: 0,
@@ -402,6 +403,13 @@ test("the built panel exposes Apply, active inspection, Restore, and result", as
       () =>
         document.querySelector("#primary-target")?.textContent !==
         "  Checkout now!  ",
+    );
+    await page.waitForFunction(
+      () =>
+        [...(
+          document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
+            ?.querySelectorAll("button") ?? []
+        )].some((button) => button.textContent?.trim() === "Restore"),
     );
     expect(await readPanelText(page)).toContain("Scenario active");
     expect(await readPanelText(page)).toContain("7 mutated");

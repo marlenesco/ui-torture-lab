@@ -94,6 +94,7 @@ function RunControls({
       <div className="run-controls">
         <p role="status">{scenarioLabel(snapshot.scenarioId)} Scenario active</p>
         <CoverageSummary coverage={snapshot.coverage} />
+        <FindingSummary findings={snapshot.findings} />
         <button className="panel-action" onClick={onRestore} type="button">
           Restore
         </button>
@@ -134,10 +135,33 @@ function RunControls({
     <div className="run-controls">
       <p role="status">{scenarioLabel(snapshot.scenarioId)} Run completed</p>
       <CoverageSummary coverage={snapshot.coverage} />
+      <FindingSummary findings={snapshot.findings} />
       <RestoreSummary result={snapshot.result} />
       <p>{snapshot.result?.summary}</p>
       <ScenarioButtons onStartScenario={onStartScenario} />
     </div>
+  );
+}
+
+function FindingSummary({
+  findings,
+}: {
+  readonly findings: ReturnType<RunController["getSnapshot"]>["findings"];
+}) {
+  if (findings.length === 0) {
+    return <p>No Findings were produced.</p>;
+  }
+  return (
+    <section aria-label="Text Clipping Findings">
+      <strong>Text Clipping</strong>
+      <ul>
+        {findings.map((finding) => (
+          <li key={`${finding.locator}-${finding.measuredDelta}`}>
+            Boundary {finding.locator} · hidden extent {finding.mutated.hiddenExtent.toFixed(1)}px
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -221,6 +245,7 @@ function CoverageSummary({
   return (
     <p>
       {coverage.eligibleTargets} eligible · {coverage.mutatedTargets} mutated ·{" "}
+      {coverage.excludedTargets} excluded ·{" "}
       {coverage.skippedTargets} skipped · {coverage.ineffectiveTargets} ineffective
       · {coverage.inconclusiveTargets} inconclusive
     </p>

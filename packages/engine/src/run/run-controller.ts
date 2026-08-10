@@ -11,6 +11,11 @@ import {
 import { prepareLongTextMutations } from "../scenarios/long-text.js";
 import { prepareUnbreakableTextMutations } from "../scenarios/unbreakable-text.js";
 import { prepareLargeTextMutations } from "../scenarios/large-text.js";
+import {
+  captureTextClippingBaseline,
+  detectTextClipping,
+  type SerializedTextClippingFinding,
+} from "../detectors/text-clipping.js";
 
 export type ScenarioId = "large-text" | "long-text" | "unbreakable-text";
 
@@ -24,6 +29,7 @@ export type RunPhase =
   | "reload-required";
 
 export type RunCoverage = {
+  readonly excludedTargets: number;
   readonly eligibleTargets: number;
   readonly mutatedTargets: number;
   readonly skippedTargets: number;
@@ -44,7 +50,8 @@ export type SerializedRestoreResult = {
 type SerializedRunResultBase = {
   readonly scenarioId: ScenarioId;
   readonly coverage: RunCoverage;
-  readonly findings: readonly never[];
+  readonly findings: readonly SerializedTextClippingFinding[];
+  readonly inconclusiveReasons: readonly string[];
   readonly restore: SerializedRestoreResult;
   readonly summary: string;
 };
@@ -62,6 +69,7 @@ export type RunSnapshot = {
   readonly phase: RunPhase;
   readonly scenarioId: ScenarioId | null;
   readonly coverage: RunCoverage;
+  readonly findings: readonly SerializedTextClippingFinding[];
   readonly result: SerializedRunResult | null;
 };
 
@@ -79,6 +87,7 @@ export type RunControllerOptions = {
 
 const zeroCoverage = (): RunCoverage =>
   Object.freeze({
+    excludedTargets: 0,
     eligibleTargets: 0,
     mutatedTargets: 0,
     skippedTargets: 0,
@@ -127,11 +136,14 @@ export function createRunController(
   options: RunControllerOptions,
 ): RunController {
   const listeners = new Set<() => void>();
+  let activeFindings: readonly SerializedTextClippingFinding[] = [];
+  let activeInconclusiveReasons: readonly string[] = [];
   let journal: MutationJournal | null = null;
   let snapshot: RunSnapshot = Object.freeze({
     phase: "idle",
     scenarioId: null,
     coverage: zeroCoverage(),
+    findings: Object.freeze([]),
     result: null,
   });
 
@@ -146,12 +158,15 @@ export function createRunController(
     scenarioId: ScenarioId,
     coverage: RunCoverage,
     restore: RestoreResult,
+    findings: readonly SerializedTextClippingFinding[],
+    inconclusiveReasons: readonly string[],
   ): SerializedRunResult =>
     Object.freeze({
       scenarioId,
       status: "completed",
       coverage,
-      findings: Object.freeze([]),
+      findings: Object.freeze(findings),
+      inconclusiveReasons: Object.freeze(inconclusiveReasons),
       restore: serializeRestore(restore),
       summary: summaryForRestore(restore),
     });
@@ -167,6 +182,7 @@ export function createRunController(
       terminationReason: "unknown-mutation-state",
       coverage,
       findings: Object.freeze([]),
+      inconclusiveReasons: Object.freeze([]),
       restore: serializeRestore(restore),
       summary:
         restore.status === "restored"
@@ -196,16 +212,35 @@ export function createRunController(
         phase: "applying-mutations",
         scenarioId,
         coverage: zeroCoverage(),
+        findings: Object.freeze([]),
         result: null,
       });
+      activeFindings = [];
+      activeInconclusiveReasons = [];
 
       const records = await prepareScenarioMutations(scenarioId, options);
+      const textTargets = records
+        .map((record) => record.target)
+        .filter((target): target is Text => target instanceof Text);
+      const textClippingBaseline =
+        scenarioId === "long-text"
+          ? await captureTextClippingBaseline({
+              document: options.document,
+              targets: textTargets,
+            })
+          : {
+              excludedTargets: 0,
+              inconclusiveReasons: [],
+              inconclusiveTargets: 0,
+              snapshots: [],
+            };
       const activeJournal = createMutationJournal(options.document);
       journal = activeJournal;
       let mutatedTargets = 0;
       let skippedTargets = 0;
       let ineffectiveTargets = 0;
       let inconclusiveTargets = 0;
+      const appliedTextValues = new Map<Text, string>();
 
       const recordOutcome = (outcome: MutationOutcome): void => {
         switch (outcome) {
@@ -232,8 +267,16 @@ export function createRunController(
       for (const record of records) {
         const outcome = activeJournal.apply(record as MutationRecord<unknown>);
         recordOutcome(outcome);
+        if (
+          outcome === "applied" &&
+          record.target instanceof Text &&
+          typeof record.appliedState === "string"
+        ) {
+          appliedTextValues.set(record.target, record.appliedState);
+        }
         if (outcome === "unknown") {
           const coverage = freezeCoverage({
+            excludedTargets: 0,
             eligibleTargets: records.length,
             mutatedTargets,
             skippedTargets,
@@ -247,22 +290,43 @@ export function createRunController(
               restore.status === "restored" ? "aborted" : "reload-required",
             scenarioId,
             coverage,
+            findings: Object.freeze([]),
             result: abortedResult(scenarioId, coverage, restore),
           });
           return;
         }
       }
 
+      const textClipping =
+        scenarioId === "long-text"
+          ? await detectTextClipping({
+              baseline: textClippingBaseline,
+              document: options.document,
+              expectedAppliedValues: appliedTextValues,
+              targets: [...appliedTextValues.keys()],
+            })
+          : {
+              excludedTargets: 0,
+              findings: [],
+              inconclusiveReasons: [],
+              inconclusiveTargets: 0,
+            };
+      const coverage = freezeCoverage({
+        excludedTargets: textClipping.excludedTargets,
+        eligibleTargets: records.length,
+        mutatedTargets,
+        skippedTargets,
+        ineffectiveTargets,
+        inconclusiveTargets:
+          inconclusiveTargets + textClipping.inconclusiveTargets,
+      });
+      activeFindings = textClipping.findings;
+      activeInconclusiveReasons = textClipping.inconclusiveReasons;
       publish({
         phase: "ready-for-inspection",
         scenarioId,
-        coverage: freezeCoverage({
-          eligibleTargets: records.length,
-          mutatedTargets,
-          skippedTargets,
-          ineffectiveTargets,
-          inconclusiveTargets,
-        }),
+        coverage,
+        findings: Object.freeze(activeFindings),
         result: null,
       });
     },
@@ -278,11 +342,20 @@ export function createRunController(
 
       const restore = journal.restore();
       journal = null;
-      const result = completedResult(scenarioId, snapshot.coverage, restore);
+      const result = completedResult(
+        scenarioId,
+        snapshot.coverage,
+        restore,
+        activeFindings,
+        activeInconclusiveReasons,
+      );
+      activeFindings = [];
+      activeInconclusiveReasons = [];
       publish({
         phase: restore.status === "restored" ? "completed" : "reload-required",
         scenarioId,
         coverage: snapshot.coverage,
+        findings: snapshot.findings,
         result,
       });
     },
