@@ -21,6 +21,11 @@ import {
   detectHorizontalContainmentOverflow,
   type SerializedHorizontalContainmentOverflowFinding,
 } from "../detectors/horizontal-containment-overflow.js";
+import {
+  captureViewportOverflowBaseline,
+  detectViewportOverflow,
+  type SerializedViewportOverflowFinding,
+} from "../detectors/viewport-overflow.js";
 
 export type ScenarioId = "large-text" | "long-text" | "unbreakable-text";
 
@@ -54,7 +59,8 @@ export type SerializedRestoreResult = {
 
 export type SerializedFinding =
   | SerializedTextClippingFinding
-  | SerializedHorizontalContainmentOverflowFinding;
+  | SerializedHorizontalContainmentOverflowFinding
+  | SerializedViewportOverflowFinding;
 
 type SerializedRunResultBase = {
   readonly scenarioId: ScenarioId;
@@ -250,6 +256,13 @@ export function createRunController(
               targets: textTargets,
             })
           : { inconclusiveReasons: [], inconclusiveTargets: 0, snapshots: [] };
+      const viewportOverflowBaseline =
+        scenarioId === "unbreakable-text"
+          ? await captureViewportOverflowBaseline({
+              document: options.document,
+              targets: textTargets,
+            })
+          : { geometry: null, inconclusiveReasons: [], inconclusiveTargets: 0, snapshots: [] };
       const activeJournal = createMutationJournal(options.document);
       journal = activeJournal;
       let mutatedTargets = 0;
@@ -335,6 +348,14 @@ export function createRunController(
               expectedAppliedValues: appliedTextValues,
             })
           : { findings: [], inconclusiveReasons: [], inconclusiveTargets: 0 };
+      const viewportOverflow =
+        scenarioId === "unbreakable-text"
+          ? await detectViewportOverflow({
+              baseline: viewportOverflowBaseline,
+              document: options.document,
+              expectedAppliedValues: appliedTextValues,
+            })
+          : { findings: [], inconclusiveReasons: [], inconclusiveTargets: 0 };
       const coverage = freezeCoverage({
         excludedTargets: textClipping.excludedTargets,
         eligibleTargets: records.length,
@@ -344,12 +365,18 @@ export function createRunController(
         inconclusiveTargets:
           inconclusiveTargets +
           textClipping.inconclusiveTargets +
-          horizontalContainment.inconclusiveTargets,
+          horizontalContainment.inconclusiveTargets +
+          viewportOverflow.inconclusiveTargets,
       });
-      activeFindings = [...textClipping.findings, ...horizontalContainment.findings];
+      activeFindings = [
+        ...textClipping.findings,
+        ...horizontalContainment.findings,
+        ...viewportOverflow.findings,
+      ];
       activeInconclusiveReasons = [
         ...textClipping.inconclusiveReasons,
         ...horizontalContainment.inconclusiveReasons,
+        ...viewportOverflow.inconclusiveReasons,
       ];
       publish({
         phase: "ready-for-inspection",

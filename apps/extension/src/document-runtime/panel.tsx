@@ -160,9 +160,11 @@ function FindingSummary({
       <ul>
         {findings.map((finding) => (
           <li key={`${finding.locator}-${finding.measuredDelta}`}>
-            Boundary {finding.locator} · {finding.detectorId === "text-clipping"
+            {finding.detectorId === "viewport-overflow" ? (
+              <>Target Page · baseline {finding.baseline.documentExtent.toFixed(1)}px/{finding.baseline.viewportWidth.toFixed(1)}px · mutated {finding.mutated.documentExtent.toFixed(1)}px/{finding.mutated.viewportWidth.toFixed(1)}px · delta {finding.measuredDelta.toFixed(1)}px · {finding.contributionSide} via {finding.primaryContributor.locator} ({finding.primaryContributor.baseline.left.toFixed(1)}–{finding.primaryContributor.baseline.right.toFixed(1)}px → {finding.primaryContributor.mutated.left.toFixed(1)}–{finding.primaryContributor.mutated.right.toFixed(1)}px; contribution {finding.primaryContributor.contribution.toFixed(1)}px). {finding.possibleCause}</>
+            ) : <>Boundary {finding.locator} · {finding.detectorId === "text-clipping"
               ? `hidden extent ${finding.mutated.hiddenExtent.toFixed(1)}px`
-              : `maximum excess ${finding.mutated.maximumExcess.toFixed(1)}px`}
+              : `maximum excess ${finding.mutated.maximumExcess.toFixed(1)}px`}</>}
           </li>
         ))}
       </ul>
