@@ -563,6 +563,54 @@ test("a replacement Document creates a fresh runtime only after a new toolbar ac
   }
 });
 
+test("a completed Run survives reload only as a non-live Previous Target Snapshot", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment");
+    await triggerToolbarAction(page);
+    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await page.evaluate(() => {
+      const start = [...(
+        document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
+          ?.querySelectorAll("button") ?? []
+      )].find((button) => button.textContent?.trim() === "Apply Long Text");
+      if (!(start instanceof HTMLButtonElement)) throw new Error("Long Text control was unavailable");
+      start.click();
+    });
+    await page.waitForFunction(
+      () => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent?.includes("Restore") === true,
+    );
+    await page.evaluate(() => {
+      const restore = [...(
+        document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
+          ?.querySelectorAll("button") ?? []
+      )].find((button) => button.textContent?.trim() === "Restore");
+      if (!(restore instanceof HTMLButtonElement)) throw new Error("Restore control was unavailable");
+      restore.click();
+    });
+    await page.waitForFunction(
+      () => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent?.includes("Run completed") === true,
+    );
+
+    await page.reload();
+    await triggerToolbarAction(page);
+    await page.waitForFunction(
+      () => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent?.includes("Previous Target Snapshot") === true,
+    );
+    const snapshot = await page.$eval(
+      "[data-ui-torture-lab-root]",
+      (host) => host.shadowRoot?.textContent,
+    );
+    expect(snapshot).toContain("http://127.0.0.1:4173/text-clipping-run/");
+    expect(snapshot).not.toContain("private=query");
+    expect(snapshot).not.toContain("fragment");
+    expect(snapshot).not.toContain("Highlight subject");
+    expect(snapshot).not.toContain("Navigate");
+  } finally {
+    await page.close();
+  }
+});
+
 test("floating UI remains inside a small viewport without document overflow", async () => {
   const page = await browser.newPage();
   try {

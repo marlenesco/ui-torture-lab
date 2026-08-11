@@ -50,6 +50,38 @@ test("Engine Run reports Long Text clipping against its nearest proven boundary"
   );
 });
 
+test("Engine Run redacts obvious secrets from retained Text Clipping previews", async ({ page }) => {
+  await page.goto("/text-clipping-run/");
+  await page.locator("main").evaluate((main) => {
+    const element = document.createElement("p");
+    element.id = "secret-boundary";
+    element.style.cssText = "font-size: 1px; overflow: hidden; white-space: nowrap; width: 60px";
+    element.textContent = "password=hunter2 Bearer eyJhbGciOiJIUzI1NiJ9.secret";
+    main.append(element);
+  });
+
+  const result = await page.evaluate(async () => {
+    type Controller = {
+      getSnapshot(): { readonly result: { readonly findings: readonly { readonly affectedRange?: { readonly preview: string }; readonly locator: string }[] } | null };
+      restore(): void;
+      startScenario(scenarioId: "long-text"): Promise<void>;
+    };
+    const moduleUrl = "/__engine__/index.js";
+    const engine = (await import(moduleUrl)) as {
+      createRunController(options: { readonly document: Document; readonly isExtensionOwnedNode: (node: Node) => boolean }): Controller;
+    };
+    const controller = engine.createRunController({ document, isExtensionOwnedNode: () => false });
+    await controller.startScenario("long-text");
+    controller.restore();
+    return controller.getSnapshot().result;
+  });
+
+  const preview = result?.findings.find((finding) => finding.locator === "p#secret-boundary")?.affectedRange?.preview;
+  expect(preview).toContain("[redacted-secret]");
+  expect(preview).not.toContain("hunter2");
+  expect(preview).not.toContain("eyJhbGciOiJIUzI1NiJ9.secret");
+});
+
 test("Engine Run excludes intentional and pre-existing clipping", async ({ page }) => {
   await page.goto("/text-clipping-run/");
 

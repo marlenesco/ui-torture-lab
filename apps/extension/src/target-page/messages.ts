@@ -1,14 +1,32 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import {
+  isPageMetadata,
+  isSerializedRunResult,
+} from "./current-run-result";
+
 export const bootstrapResponseType = "target-bootstrap-response" as const;
 export const probeResponseType = "target-probe-response" as const;
 export const authorizationResponseType = "target-authorization-response" as const;
 export const runActivityMessageType = "run-activity-changed" as const;
+export const storeRunResultMessageType = "store-current-run-result" as const;
+export const readRunResultMessageType = "read-current-run-result" as const;
+export const clearRunResultMessageType = "clear-current-run-result" as const;
 
 export type RunActivityMessage = {
   readonly active: boolean;
   readonly type: typeof runActivityMessageType;
 };
+
+export type StoreRunResultMessage = {
+  readonly page: import("./current-run-result").PageMetadata;
+  readonly result: import("@ui-torture-lab/engine").SerializedRunResult;
+  readonly type: typeof storeRunResultMessageType;
+};
+
+export type ReadRunResultMessage = { readonly type: typeof readRunResultMessageType };
+
+export type ClearRunResultMessage = { readonly type: typeof clearRunResultMessageType };
 
 export type SupportedTargetProtocol = "http:" | "https:";
 
@@ -85,6 +103,29 @@ export const isRunActivityMessage = (
   hasExactKeys(value, ["active", "type"]) &&
   value.type === runActivityMessageType &&
   typeof value.active === "boolean";
+
+export const isStoreRunResultMessage = (
+  value: unknown,
+): value is StoreRunResultMessage =>
+  isRecord(value) &&
+  hasExactKeys(value, ["page", "result", "type"]) &&
+  value.type === storeRunResultMessageType &&
+  isPageMetadata(value.page) &&
+  isSerializedRunResult(value.result);
+
+export const isReadRunResultMessage = (
+  value: unknown,
+): value is ReadRunResultMessage =>
+  isRecord(value) &&
+  hasExactKeys(value, ["type"]) &&
+  value.type === readRunResultMessageType;
+
+export const isClearRunResultMessage = (
+  value: unknown,
+): value is ClearRunResultMessage =>
+  isRecord(value) &&
+  hasExactKeys(value, ["type"]) &&
+  value.type === clearRunResultMessageType;
 
 const hasExactKeys = (
   value: Record<string, unknown>,
