@@ -2,10 +2,13 @@
 
 import { useSyncExternalStore } from "react";
 import type { RunController, ScenarioId } from "@ui-torture-lab/engine";
+import type { StoredRunResult } from "../target-page/current-run-result";
 
 type ExtensionPanelProps = {
   readonly collapsed: boolean;
+  readonly onClearPreviousRunResult: () => void;
   readonly liveFindingMessage: string | null;
+  readonly previousRunResult: StoredRunResult | null;
   readonly onCollapse: () => void;
   readonly onExpand: () => void;
   readonly onInspectFinding: (
@@ -22,7 +25,9 @@ type ExtensionPanelProps = {
 
 export function ExtensionPanel({
   collapsed,
+  onClearPreviousRunResult,
   liveFindingMessage,
+  previousRunResult,
   onCollapse,
   onExpand,
   onInspectFinding,
@@ -69,9 +74,11 @@ export function ExtensionPanel({
       {liveFindingMessage === null ? null : <p role="status">{liveFindingMessage}</p>}
       <RunControls
         onRestore={onRestore}
+        onClearPreviousRunResult={onClearPreviousRunResult}
         onInspectFinding={onInspectFinding}
         isFindingActionEnabled={isFindingActionEnabled}
         onStartScenario={onStartScenario}
+        previousRunResult={previousRunResult}
         snapshot={snapshot}
       />
     </section>
@@ -80,21 +87,44 @@ export function ExtensionPanel({
 
 type RunControlsProps = Pick<
   ExtensionPanelProps,
-  "isFindingActionEnabled" | "onInspectFinding" | "onRestore" | "onStartScenario"
+  | "isFindingActionEnabled"
+  | "onInspectFinding"
+  | "onRestore"
+  | "onStartScenario"
 > & {
+  readonly onClearPreviousRunResult: ExtensionPanelProps["onClearPreviousRunResult"];
+  readonly previousRunResult: ExtensionPanelProps["previousRunResult"];
   readonly snapshot: ReturnType<RunController["getSnapshot"]>;
 };
 
 function RunControls({
   onInspectFinding,
+  onClearPreviousRunResult,
   isFindingActionEnabled,
   onRestore,
   onStartScenario,
+  previousRunResult,
   snapshot,
 }: RunControlsProps) {
   if (snapshot.phase === "idle") {
     return (
       <div className="run-controls">
+        {previousRunResult === null ? null : (
+          <section aria-label="Previous Target Snapshot">
+            <p role="status">Previous Target Snapshot · {previousRunResult.page.origin}{previousRunResult.page.pathname}</p>
+            <CoverageSummary coverage={previousRunResult.result.coverage} />
+            <FindingSummary
+              findings={previousRunResult.result.findings}
+              isFindingActionEnabled={undefined}
+              onInspectFinding={undefined}
+            />
+            <RestoreSummary result={previousRunResult.result} />
+            <p>{previousRunResult.result.summary}</p>
+            <button className="panel-toggle" onClick={onClearPreviousRunResult} type="button">
+              Clear saved result
+            </button>
+          </section>
+        )}
         <p>Apply one Scenario to the current Target Page.</p>
         <ScenarioButtons onStartScenario={onStartScenario} />
       </div>

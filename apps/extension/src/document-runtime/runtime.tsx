@@ -4,7 +4,17 @@ import { createRoot, type Root } from "react-dom/client";
 import { createRunController, type RunController } from "@ui-torture-lab/engine";
 import { browser } from "wxt/browser";
 import { ExtensionPanel } from "./panel";
-import { runActivityMessageType } from "../target-page/messages";
+import {
+  isStoredRunResult,
+  pageMetadataFor,
+  type StoredRunResult,
+} from "../target-page/current-run-result";
+import {
+  clearRunResultMessageType,
+  readRunResultMessageType,
+  runActivityMessageType,
+  storeRunResultMessageType,
+} from "../target-page/messages";
 
 const runtimeKey = Symbol.for("ui-torture-lab/document-runtime");
 
@@ -291,6 +301,8 @@ class DocumentRuntime {
   private readonly invalidLiveFindings = new Set<
     ReturnType<RunController["getSnapshot"]>["findings"][number]
   >();
+  private storedResult: ReturnType<RunController["getSnapshot"]>["result"] = null;
+  private previousRunResult: StoredRunResult | null = null;
   private reportedRunActivity: boolean | null = null;
   private liveFindingMessage: string | null = null;
   private overlay: MountedOverlay | undefined;
@@ -302,8 +314,13 @@ class DocumentRuntime {
       isExtensionOwnedNode: (node) => this.isExtensionOwnedNode(node),
     });
     this.runController.subscribe(() => {
-      if (this.runController.getSnapshot().phase !== "ready-for-inspection") {
+      const snapshot = this.runController.getSnapshot();
+      if (snapshot.phase !== "ready-for-inspection") {
         this.invalidLiveFindings.clear();
+      }
+      if (snapshot.result !== null && snapshot.result !== this.storedResult) {
+        this.storedResult = snapshot.result;
+        this.storeCurrentRunResult(snapshot.result);
       }
       this.reportRunActivity();
     });
@@ -324,6 +341,7 @@ class DocumentRuntime {
     this.panel = this.mountPanel();
     this.ensureOverlay();
     this.reportRunActivity();
+    this.loadPreviousRunResult();
   }
 
   isExtensionOwnedNode(node: Node): boolean {
@@ -474,6 +492,7 @@ class DocumentRuntime {
       root.render(
         <ExtensionPanel
           collapsed={collapsed}
+          onClearPreviousRunResult={() => this.clearPreviousRunResult()}
           onCollapse={() => render(true)}
           onExpand={() => render(false)}
           onInspectFinding={(finding, action) => this.inspectFinding(finding, action)}
@@ -486,6 +505,7 @@ class DocumentRuntime {
           }}
           runController={this.runController}
           liveFindingMessage={this.liveFindingMessage}
+          previousRunResult={this.previousRunResult}
         />,
       );
     };
@@ -528,6 +548,39 @@ class DocumentRuntime {
     range.selectNodeContents(locatorElement);
     selection.removeAllRanges();
     selection.addRange(range);
+  }
+
+  private storeCurrentRunResult(
+    result: NonNullable<ReturnType<RunController["getSnapshot"]>["result"]>,
+  ): void {
+    const location = this.document.defaultView?.location;
+    if (location === undefined) return;
+    void browser.runtime
+      .sendMessage({
+        page: pageMetadataFor(location),
+        result,
+        type: storeRunResultMessageType,
+      })
+      .catch(() => undefined);
+  }
+
+  private loadPreviousRunResult(): void {
+    void browser.runtime
+      .sendMessage({ type: readRunResultMessageType })
+      .then((response) => {
+        if (!isStoredRunResult(response)) return;
+        this.previousRunResult = response;
+        this.panel?.render(false);
+      })
+      .catch(() => undefined);
+  }
+
+  private clearPreviousRunResult(): void {
+    this.previousRunResult = null;
+    this.panel?.render(false);
+    void browser.runtime
+      .sendMessage({ type: clearRunResultMessageType })
+      .catch(() => undefined);
   }
 
   private reportRunActivity(): void {

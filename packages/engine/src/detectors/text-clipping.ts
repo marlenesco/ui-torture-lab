@@ -84,6 +84,10 @@ const locatorFor = (element: Element): string => {
 
 const redactPreview = (value: string): string =>
   value
+    .replace(
+      /\b(?:api[-_ ]?key|authorization|bearer|pass(?:word)?|secret|token)\b\s*(?:=|:|\s)\s*[^\s,;]+/giu,
+      "[redacted-secret]",
+    )
     .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/gu, "[redacted-email]")
     .replace(/\d/gu, "•")
     .slice(0, 48);
