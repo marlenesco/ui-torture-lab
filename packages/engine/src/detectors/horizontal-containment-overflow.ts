@@ -276,6 +276,7 @@ const combinedSide = (current: OverflowSide, next: OverflowSide): OverflowSide =
 
 export async function captureHorizontalContainmentOverflowBaseline(options: {
   readonly document: Document;
+  readonly signal?: AbortSignal;
   readonly targets: readonly Text[];
 }): Promise<HorizontalContainmentOverflowBaseline> {
   const view = options.document.defaultView;
@@ -286,7 +287,7 @@ export async function captureHorizontalContainmentOverflowBaseline(options: {
       snapshots: [],
     };
   }
-  if (!(await nextMeasurementFrame(view))) {
+  if (!(await nextMeasurementFrame(view, options.signal))) {
     return { inconclusiveReasons: ["horizontal-containment-sampling-timeout"], inconclusiveTargets: 1, snapshots: [] };
   }
   const seenElements = new Set<HTMLElement>();
@@ -330,7 +331,7 @@ export async function captureHorizontalContainmentOverflowBaseline(options: {
       });
     }
   }
-  if (!(await nextMeasurementFrame(view))) {
+  if (!(await nextMeasurementFrame(view, options.signal))) {
     return { inconclusiveReasons: ["horizontal-containment-sampling-timeout"], inconclusiveTargets: 1, snapshots: [] };
   }
   const unstableTargets = new Set<Text>();
@@ -375,6 +376,7 @@ export async function captureHorizontalContainmentOverflowBaseline(options: {
 export async function detectHorizontalContainmentOverflow(options: {
   readonly baseline: HorizontalContainmentOverflowBaseline;
   readonly document: Document;
+  readonly signal?: AbortSignal;
   readonly expectedAppliedValues: ReadonlyMap<Text, string>;
   readonly isTargetMutationCurrent: (target: Text) => boolean;
   readonly scenarioId: ScenarioId;
@@ -390,7 +392,7 @@ export async function detectHorizontalContainmentOverflow(options: {
       inconclusiveTargets: 1,
     };
   }
-  if (!(await nextMeasurementFrame(view))) {
+  if (!(await nextMeasurementFrame(view, options.signal))) {
     return { comparableTargets: [], contributorTargets: [], findings: [], liveReferences: new Map(), inconclusiveReasons: ["horizontal-containment-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
   }
   const first = options.baseline.snapshots.map((snapshot) => ({
@@ -401,7 +403,7 @@ export async function detectHorizontalContainmentOverflow(options: {
       snapshot.direction,
     ),
   }));
-  if (!(await nextMeasurementFrame(view))) {
+  if (!(await nextMeasurementFrame(view, options.signal))) {
     return { comparableTargets: [], contributorTargets: [], findings: [], liveReferences: new Map(), inconclusiveReasons: ["horizontal-containment-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
   }
   const findings = new Map<HTMLElement, SerializedHorizontalContainmentOverflowFinding>();

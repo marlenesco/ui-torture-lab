@@ -125,6 +125,10 @@ export function createMutationJournal(document: Document): MutationJournal {
         return entry.outcome;
       }
 
+      if (!writable) {
+        entry.outcome = "skipped";
+        return entry.outcome;
+      }
       let writeThrew = false;
       try {
         record.writeState(record.appliedState);
@@ -191,10 +195,13 @@ export function createMutationJournal(document: Document): MutationJournal {
         if (
           outcome !== "applied" &&
           outcome !== "applied-ineffective" &&
-          outcome !== "unknown"
+          outcome !== "unknown" &&
+          outcome !== "pending"
         ) {
           continue;
         }
+        // Reentrant navigation during a write cannot establish a verified cleanup.
+        cleanupUnverified ||= outcome === "pending";
         if (!record.target.isConnected) {
           cleanupUnverified ||= outcome === "unknown";
           conflicts.push({

@@ -47,6 +47,12 @@ pnpm dev:fixtures
 The repository intentionally has no generic shared package, per-Scenario
 package, per-Detector package, backend, analytics service, or Turborepo setup.
 
+## Navigation safety
+
+Observed top-level History, fragment, Navigation API, and back/forward entry changes end the current Target Page authorization. The extension attempts conflict-aware Restore, retains only a non-live Previous-Target Snapshot, and requires another toolbar action. Conflicts or unverified cleanup require a true reload. Navigation is never intercepted or prevented.
+
+Stable-route SPAs remain supported. Private router transitions with no observable history entry change are outside this guarantee: Restore before those transitions. When Navigation API entries are unavailable, the UI warns that observation is incomplete; Restore before changing SPA routes. See the [Chrome observation benchmark](tests/benchmarks/same-document-navigation.md).
+
 ## Contributing and support
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change. Public bug

@@ -105,8 +105,8 @@ const exerciseMeasurementSafeRuntime = async (): Promise<{
   readonly after: RuntimeDiagnostics;
   readonly before: RuntimeDiagnostics;
   readonly during: RuntimeDiagnostics;
-}> =>
-  serviceWorker.evaluate(async () => {
+}> => {
+  await serviceWorker.evaluate(async () => {
     const chromeApi = (globalThis as unknown as { chrome: ExtensionChromeApi })
       .chrome;
     const [tab] = await chromeApi.tabs.query({
@@ -120,7 +120,7 @@ const exerciseMeasurementSafeRuntime = async (): Promise<{
     const [injection] = await chromeApi.scripting.executeScript({
       target: { tabId: tab.id, frameIds: [0] },
       world: "ISOLATED",
-      func: async () => {
+      func: () => {
         type RuntimeProbe = {
           clearDiagnosticHighlights(): void;
           getDiagnostics(): RuntimeDiagnostics;
@@ -148,20 +148,38 @@ const exerciseMeasurementSafeRuntime = async (): Promise<{
           height: 40,
         });
         const before = runtime.getDiagnostics();
-        const during = await runtime.withMeasurementSafeUi(() =>
-          runtime.getDiagnostics(),
-        );
-        const after = runtime.getDiagnostics();
-        runtime.clearDiagnosticHighlights();
-        return { before, during, after };
+        const probe = globalThis as typeof globalThis & { measurementProbe?: { before: RuntimeDiagnostics; during: RuntimeDiagnostics; after: RuntimeDiagnostics } };
+        delete probe.measurementProbe;
+        void runtime.withMeasurementSafeUi(() => runtime.getDiagnostics()).then((during) => {
+          const after = runtime.getDiagnostics();
+          runtime.clearDiagnosticHighlights();
+          probe.measurementProbe = { before, during, after };
+        });
+        return true;
       },
     });
 
     if (injection?.result === undefined) {
       throw new Error("Document Runtime probe returned no result");
     }
-    return injection.result;
   });
+  let observed: { before: RuntimeDiagnostics; during: RuntimeDiagnostics; after: RuntimeDiagnostics } | null = null;
+  await expect.poll(async () => {
+    observed = await serviceWorker.evaluate(async () => {
+      const api = (globalThis as unknown as { chrome: ExtensionChromeApi }).chrome;
+      const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+      if (tab?.id === undefined) throw new Error("No active fixture tab");
+      const [injection] = await api.scripting.executeScript({
+        target: { tabId: tab.id, frameIds: [0] }, world: "ISOLATED",
+        func: () => (globalThis as typeof globalThis & { measurementProbe?: { before: RuntimeDiagnostics; during: RuntimeDiagnostics; after: RuntimeDiagnostics } }).measurementProbe ?? null,
+      });
+      return injection?.result ?? null;
+    });
+    return observed;
+  }).not.toBeNull();
+  if (observed === null) throw new Error("Measurement-safe UI probe did not complete");
+  return observed;
+};
 
 test.beforeAll(async () => {
   browser = await puppeteer.launch({

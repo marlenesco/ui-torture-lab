@@ -2,6 +2,7 @@
 
 import { expect, test } from "@playwright/test";
 import path from "node:path";
+import { executeAsyncInIsolated } from "../support/extension-script";
 import puppeteer, {
   type Browser,
   type Extension,
@@ -65,16 +66,7 @@ test("built extension groups the completed Finding under Text Clipping", async (
     await page.bringToFront();
     await page.triggerExtensionAction(extension);
     await page.waitForSelector("[data-ui-torture-lab-root]");
-    await serviceWorker.evaluate(async () => {
-      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id === undefined) {
-        throw new Error("No active fixture tab was available");
-      }
-      const [injection] = await chromeApi.scripting.executeScript({
-        target: { tabId: tab.id, frameIds: [0] },
-        world: "ISOLATED",
-        func: async () => {
+    await executeAsyncInIsolated(serviceWorker, async () => {
           type Controller = {
             getSnapshot(): {
               readonly findings: readonly { readonly locator: string }[];
@@ -91,10 +83,7 @@ test("built extension groups the completed Finding under Text Clipping", async (
           }
           await runtime.runController.startScenario("long-text");
           return runtime.runController.getSnapshot().findings;
-        },
-      });
-      return injection?.result;
-    });
+        });
     const activePanelText = await page.evaluate(
       () =>
         document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
@@ -270,23 +259,14 @@ test("built extension shows containment and Viewport Overflow from Unbreakable T
     await page.bringToFront();
     await page.triggerExtensionAction(extension);
     await page.waitForSelector("[data-ui-torture-lab-root]");
-    await serviceWorker.evaluate(async () => {
-      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id === undefined) throw new Error("No active fixture tab was available");
-      await chromeApi.scripting.executeScript({
-        target: { tabId: tab.id, frameIds: [0] },
-        world: "ISOLATED",
-        func: async () => {
+    await executeAsyncInIsolated(serviceWorker, async () => {
           type Controller = { startScenario(scenarioId: "unbreakable-text"): Promise<void> };
           const runtime = (globalThis as typeof globalThis & {
             [key: symbol]: { readonly runController?: Controller } | undefined;
           })[Symbol.for("ui-torture-lab/document-runtime")];
           if (runtime?.runController === undefined) throw new Error("Run Controller was unavailable");
           await runtime.runController.startScenario("unbreakable-text");
-        },
-      });
-    });
+        });
     await page.waitForFunction(
       () =>
         document

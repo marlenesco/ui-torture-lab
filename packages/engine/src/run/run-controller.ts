@@ -27,6 +27,8 @@ import {
   type SerializedViewportOverflowFinding,
 } from "../detectors/viewport-overflow.js";
 
+export type TargetEndReason = "same-document-navigation" | "page-exit";
+
 export type ScenarioId = "large-text" | "long-text" | "unbreakable-text";
 
 export type RunPhase =
@@ -84,10 +86,11 @@ type SerializedRunResultBase = {
 export type SerializedRunResult =
   | (SerializedRunResultBase & {
       readonly status: "completed";
+      readonly terminationReason?: TargetEndReason;
     })
   | (SerializedRunResultBase & {
       readonly status: "aborted";
-      readonly terminationReason: "unknown-mutation-state";
+      readonly terminationReason: "unknown-mutation-state" | TargetEndReason;
     });
 
 export type RunSnapshot = {
@@ -99,6 +102,7 @@ export type RunSnapshot = {
 };
 
 export type RunController = {
+  endTarget(reason: TargetEndReason): SerializedRunResult | null;
   getLiveFindingReference(
     finding: SerializedFinding,
   ): LiveFindingReference | null;
@@ -155,7 +159,7 @@ const summaryForRestore = (restore: RestoreResult, findingCount: number): string
 
 const prepareScenarioMutations = (
   scenarioId: ScenarioId,
-  options: RunControllerOptions,
+  options: RunControllerOptions & { readonly signal?: AbortSignal },
 ) => {
   switch (scenarioId) {
     case "large-text":
@@ -226,6 +230,9 @@ export function createRunController(
   let activeInconclusiveReasons: readonly string[] = [];
   let liveFindingReferences = new Map<SerializedFinding, LiveFindingReference>();
   let journal: MutationJournal | null = null;
+  let targetEnded = false;
+  let operation = new AbortController();
+  let progressCoverage = zeroCoverage();
   let snapshot: RunSnapshot = Object.freeze({
     phase: "idle",
     scenarioId: null,
@@ -278,6 +285,35 @@ export function createRunController(
     });
 
   const controller: RunController = {
+    endTarget: (reason) => {
+      if (targetEnded) return snapshot.result;
+      targetEnded = true;
+      operation.abort();
+      const restore = journal?.restore() ?? { conflicts: [], restoredTargets: 0, status: "restored" as const };
+      journal = null;
+      liveFindingReferences.clear();
+      const completedReasons = activeInconclusiveReasons;
+      activeFindings = [];
+      activeInconclusiveReasons = [];
+      if (snapshot.scenarioId === null) return null;
+      const result: SerializedRunResult = snapshot.result === null
+        ? Object.freeze({
+            scenarioId: snapshot.scenarioId,
+            status: snapshot.phase === "ready-for-inspection" ? "completed" as const : "aborted" as const,
+            terminationReason: reason,
+            coverage: snapshot.phase === "ready-for-inspection" ? snapshot.coverage : progressCoverage,
+            findings: snapshot.phase === "ready-for-inspection" ? snapshot.findings : [],
+            inconclusiveReasons: snapshot.phase === "ready-for-inspection" ? completedReasons : [],
+            restore: serializeRestore(restore),
+            summary: "The Target Page context ended. Only completed Evidence is retained. Reload is required if Restore was not verified.",
+          })
+        : snapshot.result.status === "aborted" ? snapshot.result : Object.freeze({ ...snapshot.result, terminationReason: reason });
+      publish({
+        phase: result.restore.status === "restored" ? (result.status === "completed" ? "completed" : "aborted") : "reload-required",
+        scenarioId: result.scenarioId, coverage: result.coverage, findings: result.findings, result,
+      });
+      return result;
+    },
     getSnapshot: () => snapshot,
     getLiveFindingReference: (finding) =>
       snapshot.phase === "ready-for-inspection"
@@ -288,6 +324,7 @@ export function createRunController(
       return () => listeners.delete(listener);
     },
     startScenario: async (scenarioId) => {
+      if (targetEnded) throw new Error("The Target Page requires a new toolbar authorization");
       if (snapshot.phase === "reload-required") {
         throw new Error("The Document requires reload before another Run");
       }
@@ -299,6 +336,9 @@ export function createRunController(
         throw new Error("A Run is already active");
       }
 
+      operation = new AbortController();
+      const signal = operation.signal;
+      progressCoverage = zeroCoverage();
       publish({
         phase: "applying-mutations",
         scenarioId,
@@ -306,16 +346,20 @@ export function createRunController(
         findings: Object.freeze([]),
         result: null,
       });
+      if (signal.aborted) return;
       activeFindings = [];
       activeInconclusiveReasons = [];
       liveFindingReferences = new Map();
 
-      const records = await prepareScenarioMutations(scenarioId, options);
+      const records = await prepareScenarioMutations(scenarioId, { ...options, signal });
+      if (signal.aborted) return;
+      progressCoverage = freezeCoverage({ ...progressCoverage, eligibleTargets: records.length });
       const textTargets = textTargetsForRecords(records);
       let textClippingBaseline;
       try {
         textClippingBaseline = await captureTextClippingBaseline({
           document: options.document,
+          signal,
           targets: [...textTargets.keys()],
         });
       } catch {
@@ -326,11 +370,13 @@ export function createRunController(
           snapshots: [],
         };
       }
+      if (signal.aborted) return;
       let horizontalContainmentBaseline;
       try {
         horizontalContainmentBaseline =
           await captureHorizontalContainmentOverflowBaseline({
             document: options.document,
+          signal,
             targets: [...textTargets.keys()],
           });
       } catch {
@@ -340,10 +386,12 @@ export function createRunController(
           snapshots: [],
         };
       }
+      if (signal.aborted) return;
       let viewportOverflowBaseline;
       try {
         viewportOverflowBaseline = await captureViewportOverflowBaseline({
           document: options.document,
+          signal,
           targets: [...textTargets.keys()],
         });
       } catch {
@@ -354,6 +402,7 @@ export function createRunController(
           snapshots: [],
         };
       }
+      if (signal.aborted) return;
       const activeJournal = createMutationJournal(options.document);
       journal = activeJournal;
       let mutatedTargets = 0;
@@ -390,6 +439,12 @@ export function createRunController(
       for (const record of records) {
         const outcome = activeJournal.apply(record as MutationRecord<unknown>);
         recordOutcome(outcome);
+        progressCoverage = freezeCoverage({ ...progressCoverage, mutatedTargets, skippedTargets, ineffectiveTargets, inconclusiveTargets, safeFailedTargets });
+        if (signal.aborted) {
+          // An in-progress write can synchronously trigger a navigation callback.
+          activeJournal.restore();
+          return;
+        }
         if (
           outcome === "applied"
         ) {
@@ -430,25 +485,31 @@ export function createRunController(
       const textClipping = await detectTextClipping({
         baseline: textClippingBaseline,
         document: options.document,
+          signal,
         expectedAppliedValues: appliedTextValues,
         isTargetMutationCurrent: (target) => appliedTextStateChecks.get(target)?.() === true,
         scenarioId,
         targets: [...appliedTextValues.keys()],
       });
+      if (signal.aborted) return;
       const horizontalContainment = await detectHorizontalContainmentOverflow({
         baseline: horizontalContainmentBaseline,
         document: options.document,
+          signal,
         expectedAppliedValues: appliedTextValues,
         isTargetMutationCurrent: (target) => appliedTextStateChecks.get(target)?.() === true,
         scenarioId,
       });
+      if (signal.aborted) return;
       const viewportOverflow = await detectViewportOverflow({
         baseline: viewportOverflowBaseline,
         document: options.document,
+          signal,
         expectedAppliedValues: appliedTextValues,
         isTargetMutationCurrent: (target) => appliedTextStateChecks.get(target)?.() === true,
         scenarioId,
       });
+      if (signal.aborted) return;
       activeFindings = [
         ...textClipping.findings,
         ...horizontalContainment.findings,
@@ -528,6 +589,7 @@ export function createRunController(
       publish({ ...snapshot, phase: "restoring" });
 
       const restore = journal.restore();
+      if (targetEnded) return;
       journal = null;
       const result = completedResult(
         scenarioId,

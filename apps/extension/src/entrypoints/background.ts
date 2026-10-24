@@ -16,10 +16,12 @@ import {
 } from "../target-page/current-run-result";
 import { showAuthorizationFeedback, showRunActivity } from "../target-page/feedback";
 import {
+  isInvalidateGrantMessage,
   isClearRunResultMessage,
   isReadRunResultMessage,
   isRunActivityMessage,
   isStoreRunResultMessage,
+  storePreviousRunResultMessageType,
 } from "../target-page/messages";
 
 const readTabSession = async (tabId: number): Promise<TabSession | null> => {
@@ -29,7 +31,7 @@ const readTabSession = async (tabId: number): Promise<TabSession | null> => {
     typeof (session as TabSession).id === "string" &&
     ((session as TabSession).documentId === null ||
       typeof (session as TabSession).documentId === "string")
-    ? session as TabSession
+    ? { ...(session as TabSession), grantId: typeof (session as TabSession).grantId === "string" ? (session as TabSession).grantId : null }
     : null;
 };
 
@@ -39,7 +41,7 @@ const writeTabSession = (tabId: number, session: TabSession): Promise<void> =>
 const ensureTabSession = async (tabId: number): Promise<TabSession> => {
   const existing = await readTabSession(tabId);
   if (existing !== null) return existing;
-  const session = { documentId: null, id: crypto.randomUUID() } as const;
+  const session = { documentId: null, grantId: null, id: crypto.randomUUID() } as const;
   await writeTabSession(tabId, session);
   return session;
 };
@@ -120,7 +122,7 @@ export default defineBackground(() => {
     void enqueueTab(addedTabId, () => resetTabSession(addedTabId));
   });
 
-  const authorizedSender = async (sender: unknown) => {
+  const authorizedSender = async (sender: unknown, grantId: string, allowEnded = false) => {
     await reconciled;
     const candidate = sender as {
       readonly documentId?: unknown;
@@ -133,18 +135,36 @@ export default defineBackground(() => {
       typeof candidate.documentId !== "string"
     ) return null;
     const session = await readTabSession(candidate.tab.id);
-    return session?.documentId === candidate.documentId
+    return session !== null && (session.documentId === candidate.documentId || allowEnded && session.documentId === null) && session.grantId === grantId
       ? { documentId: candidate.documentId, session, tabId: candidate.tab.id }
       : null;
   };
 
   browser.runtime.onMessage.addListener((message, sender) => {
+    if (isInvalidateGrantMessage(message)) {
+      return authorizedSender(sender, message.grantId).then(async (authorized) => {
+        if (authorized === null) return;
+        await enqueueTab(authorized.tabId, async () => {
+          const session = await readTabSession(authorized.tabId);
+          if (session?.id !== authorized.session.id || session.grantId !== message.grantId) return;
+          if (message.result !== null) {
+            const previous: StoredRunResult = { documentId: authorized.documentId, page: message.page, result: message.result, state: "previous", tabSessionId: session.id };
+            await browser.storage.session.set({ [runResultStorageKey(session.id)]: previous });
+          } else {
+            const result = await readRunResult(session.id);
+            if (result !== null) await browser.storage.session.set({ [runResultStorageKey(session.id)]: { ...result, state: "previous" } });
+          }
+          await writeTabSession(authorized.tabId, { ...session, documentId: null });
+          await showRunActivity(authorized.tabId, false);
+        });
+      });
+    }
     if (isRunActivityMessage(message)) {
-      void authorizedSender(sender).then((authorized) => {
+      void authorizedSender(sender, message.grantId).then((authorized) => {
         if (authorized !== null) {
           return enqueueTab(authorized.tabId, async () => {
             const session = await readTabSession(authorized.tabId);
-            if (session?.id !== authorized.session.id) return;
+            if (session?.id !== authorized.session.id || session.grantId !== message.grantId) return;
             await showRunActivity(authorized.tabId, message.active);
           });
         }
@@ -152,33 +172,35 @@ export default defineBackground(() => {
       return;
     }
     if (isStoreRunResultMessage(message)) {
-      void authorizedSender(sender).then(async (authorized) => {
+      return authorizedSender(sender, message.grantId).then(async (authorized) => {
         if (authorized === null) return;
+        let saved = false;
         await enqueueTab(authorized.tabId, async () => {
           const session = await readTabSession(authorized.tabId);
           if (
             session?.id !== authorized.session.id ||
-            session.documentId !== authorized.documentId
+            session.documentId !== authorized.documentId || session.grantId !== message.grantId
           ) return;
           const result: StoredRunResult = {
             documentId: authorized.documentId,
             page: message.page,
             result: message.result,
-            state: "current",
+            state: message.type === storePreviousRunResultMessageType ? "previous" : "current",
             tabSessionId: authorized.session.id,
           };
           await browser.storage.session.set({ [runResultStorageKey(authorized.session.id)]: result });
+          saved = true;
         });
+        return saved;
       });
-      return;
     }
     if (isReadRunResultMessage(message)) {
-      return authorizedSender(sender).then(async (authorized) => {
+      return authorizedSender(sender, message.grantId, true).then(async (authorized) => {
         if (authorized === null) return null;
         let previous: StoredRunResult | null = null;
         await enqueueTab(authorized.tabId, async () => {
           const session = await readTabSession(authorized.tabId);
-          if (session?.id !== authorized.session.id) return;
+          if (session?.id !== authorized.session.id || session.grantId !== message.grantId) return;
           const result = await readRunResult(authorized.session.id);
           previous = result?.state === "previous" ? result : null;
         });
@@ -186,11 +208,11 @@ export default defineBackground(() => {
       });
     }
     if (isClearRunResultMessage(message)) {
-      void authorizedSender(sender).then((authorized) => {
+      void authorizedSender(sender, message.grantId, true).then((authorized) => {
         if (authorized !== null) {
           return enqueueTab(authorized.tabId, async () => {
             const session = await readTabSession(authorized.tabId);
-            if (session?.id === authorized.session.id) {
+            if (session?.id === authorized.session.id && session.grantId === message.grantId) {
               await browser.storage.session.remove(runResultStorageKey(authorized.session.id));
             }
           });
@@ -202,22 +224,24 @@ export default defineBackground(() => {
   browser.action.onClicked.addListener(async (tab) => {
     await reconciled;
     let response = await authorizeTargetPage(tab);
+    let grantId: string | null = null;
     if (response.status === "authorized" && tab.id !== undefined) {
       const session = await ensureTabSession(tab.id);
       const result = await readRunResult(session.id);
-      if (result !== null && result.documentId !== response.documentId) {
+      if (result !== null && (result.documentId !== response.documentId || session.documentId === null)) {
         await browser.storage.session.set({
           [runResultStorageKey(session.id)]: { ...result, state: "previous" },
         });
       }
-      await writeTabSession(tab.id, { ...session, documentId: response.documentId });
+      grantId = crypto.randomUUID();
+      await writeTabSession(tab.id, { ...session, documentId: response.documentId, grantId });
     }
-    if (
-      response.status === "authorized" &&
-      tab.id !== undefined &&
-      !(await mountTargetPageControlShell(tab.id, response.documentId))
-    ) response = rejectTargetAuthorization("ui-mount-failed");
+    if (response.status === "authorized" && tab.id !== undefined && grantId !== null) {
+      const mounted = await mountTargetPageControlShell(tab.id, response.documentId, grantId);
+      if (mounted !== "mounted") response = rejectTargetAuthorization(mounted === "reload-required" ? "reload-required" : "ui-mount-failed");
+    }
     if (tab.id !== undefined) {
+      if (grantId !== null && (await readTabSession(tab.id))?.grantId !== grantId) return;
       if (response.status !== "authorized") {
         const session = await readTabSession(tab.id);
         if (session !== null) await writeTabSession(tab.id, { ...session, documentId: null });

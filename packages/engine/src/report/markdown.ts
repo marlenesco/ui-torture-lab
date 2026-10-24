@@ -94,7 +94,7 @@ export function formatMarkdownReport({ page, result, state }: MarkdownReportInpu
     `- Page path: ${text(page.pathname)}`,
     `- Restore status: ${result.restore.status}`,
     `- Reload required: ${result.restore.status === "restored" ? "no" : "yes"}`,
-    ...(result.status === "aborted" ? [`- Termination reason: ${text(result.terminationReason)}`] : []),
+    ...(result.terminationReason !== undefined ? [`- Termination reason: ${text(result.terminationReason)}`] : []),
     "",
     text(result.summary),
     "",

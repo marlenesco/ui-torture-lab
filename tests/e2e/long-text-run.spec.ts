@@ -2,6 +2,7 @@
 
 import { expect, test } from "@playwright/test";
 import path from "node:path";
+import { executeAsyncInIsolated } from "../support/extension-script";
 import puppeteer, {
   type Browser,
   type Extension,
@@ -101,20 +102,7 @@ test("Long Text remains active until exact Restore", async () => {
     await page.goto("http://127.0.0.1:4173/long-text-run/");
     await triggerToolbarAction(page);
 
-    const observation = await serviceWorker.evaluate(async () => {
-      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      const [tab] = await chromeApi.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (tab?.id === undefined) {
-        throw new Error("No active fixture tab was available");
-      }
-
-      const [injection] = await chromeApi.scripting.executeScript({
-        target: { tabId: tab.id, frameIds: [0] },
-        world: "ISOLATED",
-        func: async () => {
+    const observation = await executeAsyncInIsolated(serviceWorker, async () => {
           type Snapshot = {
             readonly coverage: {
               readonly eligibleTargets: number;
@@ -162,13 +150,7 @@ test("Long Text remains active until exact Restore", async () => {
               document.querySelector("#primary-target")?.firstChild === target,
             sameNodeWhileActive,
           };
-        },
-      });
-      if (injection?.result === undefined) {
-        throw new Error("Long Text observation returned no result");
-      }
-      return injection.result;
-    });
+        });
 
     expect(observation.original).toBe("  Checkout now!  ");
     expect(observation.expanded).toBe(
@@ -198,20 +180,7 @@ test("Long Text preserves supported nodes and excludes unsupported targets", asy
     await page.goto("http://127.0.0.1:4173/long-text-run/");
     await triggerToolbarAction(page);
 
-    const observation = await serviceWorker.evaluate(async () => {
-      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      const [tab] = await chromeApi.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (tab?.id === undefined) {
-        throw new Error("No active fixture tab was available");
-      }
-
-      const [injection] = await chromeApi.scripting.executeScript({
-        target: { tabId: tab.id, frameIds: [0] },
-        world: "ISOLATED",
-        func: async () => {
+    const observation = await executeAsyncInIsolated(serviceWorker, async () => {
           type Controller = {
             getSnapshot(): {
               readonly coverage: Record<string, number>;
@@ -329,13 +298,7 @@ test("Long Text preserves supported nodes and excludes unsupported targets", asy
             originalPrimary,
             secondRunError,
           };
-        },
-      });
-      if (injection?.result === undefined) {
-        throw new Error("Long Text eligibility observation returned no result");
-      }
-      return injection.result;
-    });
+        });
 
     expect(observation.excludedWhileActive).toEqual([
       true,
@@ -462,19 +425,7 @@ test("Restore conflict leaves external text untouched and blocks another Run", a
       await page.$eval("#minimum-target", (target) => target.textContent),
     ).toBe("OK");
 
-    const blockedMessage = await serviceWorker.evaluate(async () => {
-      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      const [tab] = await chromeApi.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (tab?.id === undefined) {
-        throw new Error("No active fixture tab was available");
-      }
-      const [injection] = await chromeApi.scripting.executeScript({
-        target: { tabId: tab.id, frameIds: [0] },
-        world: "ISOLATED",
-        func: async () => {
+    const blockedMessage = await executeAsyncInIsolated(serviceWorker, async () => {
           type Controller = {
             startScenario(scenarioId: "long-text"): Promise<void>;
           };
@@ -487,10 +438,7 @@ test("Restore conflict leaves external text untouched and blocks another Run", a
           } catch (error) {
             return error instanceof Error ? error.message : "unknown";
           }
-        },
-      });
-      return injection?.result;
-    });
+        });
     expect(blockedMessage).toContain("requires reload");
   } finally {
     await page.close();

@@ -4,6 +4,7 @@ export { createRunController } from "./run/run-controller.js";
 export { formatMarkdownReport } from "./report/markdown.js";
 export type { MarkdownReportInput } from "./report/markdown.js";
 export type {
+  TargetEndReason,
   RunController,
   RunControllerOptions,
   RunCoverage,

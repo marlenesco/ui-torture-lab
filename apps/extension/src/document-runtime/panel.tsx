@@ -2,15 +2,16 @@
 
 import { useSyncExternalStore } from "react";
 import type { MarkdownReportInput, RunController, ScenarioId } from "@ui-torture-lab/engine";
-import type { StoredRunResult } from "../target-page/current-run-result";
 import { MarkdownReport } from "./markdown-report";
 
 type ExtensionPanelProps = {
   readonly collapsed: boolean;
+  readonly authorized: boolean;
+  readonly navigationComplete: boolean;
   readonly currentRunReport: MarkdownReportInput | null;
   readonly onClearPreviousRunResult: () => void;
   readonly liveFindingMessage: string | null;
-  readonly previousRunResult: StoredRunResult | null;
+  readonly previousRunResult: MarkdownReportInput | null;
   readonly onCollapse: () => void;
   readonly onExpand: () => void;
   readonly onInspectFinding: (
@@ -27,6 +28,8 @@ type ExtensionPanelProps = {
 
 export function ExtensionPanel({
   collapsed,
+  authorized,
+  navigationComplete,
   currentRunReport,
   onClearPreviousRunResult,
   liveFindingMessage,
@@ -63,7 +66,7 @@ export function ExtensionPanel({
       <header className="panel-header">
         <div>
           <strong>UI Torture Lab</strong>
-          <span>Target Page authorized</span>
+          <span>{authorized ? "Target Page authorized" : "Target Page authorization ended"}</span>
         </div>
         <button
           aria-label="Collapse UI Torture Lab"
@@ -75,7 +78,9 @@ export function ExtensionPanel({
         </button>
       </header>
       {liveFindingMessage === null ? null : <p role="status">{liveFindingMessage}</p>}
+      {!navigationComplete ? <p role="status">Navigation observation is incomplete. Restore before changing SPA routes.</p> : null}
       <RunControls
+        authorized={authorized}
         onRestore={onRestore}
         onClearPreviousRunResult={onClearPreviousRunResult}
         onInspectFinding={onInspectFinding}
@@ -101,9 +106,11 @@ type RunControlsProps = Pick<
   readonly onClearPreviousRunResult: ExtensionPanelProps["onClearPreviousRunResult"];
   readonly previousRunResult: ExtensionPanelProps["previousRunResult"];
   readonly snapshot: ReturnType<RunController["getSnapshot"]>;
+  readonly authorized: boolean;
 };
 
 function RunControls({
+  authorized,
   onInspectFinding,
   onClearPreviousRunResult,
   isFindingActionEnabled,
@@ -112,7 +119,7 @@ function RunControls({
   previousRunResult,
   snapshot,
 }: RunControlsProps) {
-  if (snapshot.phase === "idle") {
+  if (snapshot.phase === "idle" || !authorized) {
     return (
       <div className="run-controls">
         {previousRunResult === null ? null : (
@@ -132,8 +139,10 @@ function RunControls({
             </button>
           </section>
         )}
-        <p>Apply one Scenario to the current Target Page.</p>
-        <ScenarioButtons onStartScenario={onStartScenario} />
+        {authorized ? <>
+          <p>Apply one Scenario to the current Target Page.</p>
+          <ScenarioButtons onStartScenario={onStartScenario} />
+        </> : <p role="alert">{snapshot.phase === "reload-required" ? "Reload required. Previous Mutations could not be safely restored." : "Click the toolbar action again to authorize the new Target Page."}</p>}
       </div>
     );
   }

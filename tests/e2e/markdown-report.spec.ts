@@ -71,6 +71,11 @@ const preview = (page: Page): Promise<string> => page.$eval(
   '[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]',
   (element) => (element as HTMLTextAreaElement).value,
 );
+const waitForPreview = (page: Page): Promise<void> => expect.poll(() => page.evaluate(() =>
+  document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
+    ?.querySelector('[aria-label="Markdown preview"]') instanceof HTMLTextAreaElement
+)).toBe(true);
+
 const panelText = (page: Page): Promise<string | null> => page.$eval(
   "[data-ui-torture-lab-root]", (host) => host.shadowRoot?.textContent ?? null,
 );
@@ -84,7 +89,7 @@ async function completedRun(page: Page): Promise<void> {
   await click(page, "Apply Long Text");
   await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
   await click(page, "Restore");
-  await page.waitForSelector('[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]');
+  await waitForPreview(page);
 }
 
 test("built extension copies the exact visible Markdown only on a user click after Restore", async () => {
@@ -98,7 +103,7 @@ test("built extension copies the exact visible Markdown only on a user click aft
     await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
     expect((await clipboardProbe("success")).writes).toEqual([]);
     await click(page, "Restore");
-    await page.waitForSelector('[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]');
+    await waitForPreview(page);
     const markdown = await preview(page);
     expect(markdown).toContain("### Text Clipping");
     expect(markdown).toContain("Restore status: restored");
@@ -150,16 +155,19 @@ test("Previous-Target Snapshot remains copyable after reload with no live Findin
   try {
     await completedRun(page);
     const current = await preview(page);
-    // Establish that the asynchronous session write completed before replacing its Document.
+    // Wait for this tab's result, rather than a result still being removed for a closed tab.
     await expect.poll(() => worker.evaluate(async () => {
       const api = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      return Object.keys(await api.storage.session.get(null))
-        .filter((key) => key.startsWith("ui-torture-lab:current-run-result:")).length;
-    })).toBe(1);
+      const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+      const stored = await api.storage.session.get(null);
+      const session = stored[`ui-torture-lab:tab-session:${tab?.id}`] as { id?: string } | undefined;
+      const result = stored[`ui-torture-lab:current-run-result:${session?.id}`] as { state?: string } | undefined;
+      return result?.state;
+    })).toBe("current");
     await page.reload();
     await page.triggerExtensionAction(extension);
     await page.waitForSelector("[data-ui-torture-lab-root]");
-    await page.waitForSelector('[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]', { timeout: 5000 });
+    await waitForPreview(page);
     const markdown = await preview(page);
     expect(markdown).toBe(current.replace("Lifecycle: Current Run Result", "Lifecycle: Previous-Target Snapshot") + "This Previous-Target Snapshot has no live DOM actions; elements are not rematched.\n");
     expect(await panelText(page)).not.toContain("Highlight subject");
@@ -195,7 +203,7 @@ test("Restore conflicts keep the reload-required result available for copying", 
     await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
     await page.$eval("#clipping-boundary", (element) => { element.textContent = "External change"; });
     await click(page, "Restore");
-    await page.waitForSelector('[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]');
+    await waitForPreview(page);
     const markdown = await preview(page);
     expect(markdown).toContain("Restore status: conflict");
     expect(markdown).toContain("Reload required: yes");

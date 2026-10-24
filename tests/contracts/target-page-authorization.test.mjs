@@ -54,6 +54,9 @@ const loadBackground = async ({
     scripting: {
       async executeScript(details) {
         scriptCalls.push(details);
+        if (details.args?.[0]?.startsWith("tab-session-")) {
+          return [{ documentId: details.target.documentIds[0], frameId: 0, result: "mounted" }];
+        }
         return executeScript(details);
       },
     },
@@ -134,6 +137,9 @@ const loadBackground = async ({
     },
     invokeToolbar: toolbarListeners[0],
     invokeMessage: messageListeners[0],
+    invokeGrantedMessage(message, sender) {
+      return messageListeners[0]({ ...message, grantId: session.get(`ui-torture-lab:tab-session:${sender.tab?.id}`)?.grantId }, sender);
+    },
     invokeTabCreated: tabCreatedListeners[0],
     invokeTabRemoved: tabRemovedListeners[0],
     invokeTabReplaced: tabReplacedListeners[0],
@@ -198,14 +204,12 @@ const authorizedBackground = async ({
   liveTabs,
   session,
 } = {}) => {
-  let injectionNumber = 0;
   const background = await loadBackground({
-    executeScript: async () => {
-      injectionNumber += 1;
+    executeScript: async (details) => {
       return [{
         documentId,
         frameId: 0,
-        result: injectionNumber % 2 === 1
+        result: details.target.frameIds !== undefined
           ? { type: "target-probe-response", status: "matched", protocol: "https:" }
           : { type: "target-bootstrap-response", status: "bootstrapped", protocol: "https:", contentType: "text/html", topLevel: true },
       }];
@@ -252,7 +256,7 @@ test("toolbar authorizes one supported top-level Document in ISOLATED world", as
     url: "http://127.0.0.1:4173/smoke/",
   });
 
-  assert.equal(background.scriptCalls.length, 3);
+  assert.equal(background.scriptCalls.length, 4);
   const probe = background.scriptCalls[0];
   assert.deepEqual(JSON.parse(JSON.stringify(probe.target)), {
     frameIds: [0],
@@ -318,7 +322,7 @@ test("Run activity survives a service-worker restart for its authorized Document
     },
     session: initialWorker.session,
   });
-  restartedWorker.invokeMessage(
+  restartedWorker.invokeGrantedMessage(
     { active: true, type: "run-activity-changed" },
     { documentId: "document-1", frameId: 0, tab: { id: 42 } },
   );
@@ -347,13 +351,13 @@ test("Run activity only accepts the currently authorized Document", async () => 
 
   await background.invokeToolbar({ id: 42, url: "https://fixture.test/" });
   const feedbackBeforeStaleMessage = background.feedback.length;
-  background.invokeMessage(
+  background.invokeGrantedMessage(
     { active: true, type: "run-activity-changed" },
     { documentId: "document-previous", frameId: 0, tab: { id: 42 } },
   );
   assert.equal(background.feedback.length, feedbackBeforeStaleMessage);
 
-  background.invokeMessage(
+  background.invokeGrantedMessage(
     { active: true, type: "run-activity-changed" },
     { documentId: "document-1", frameId: 0, tab: { id: 42 } },
   );
@@ -562,7 +566,7 @@ test("worker keeps one validated current result and clear removes it", async () 
   const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
   const page = { origin: "https://fixture.test", pathname: "/path" };
 
-  background.invokeMessage(
+  background.invokeGrantedMessage(
     { page, result: completedResult("first"), type: "store-current-run-result" },
     sender,
   );
@@ -571,7 +575,7 @@ test("worker keeps one validated current result and clear removes it", async () 
   assert.ok(resultKey, "completion stores one result under tab-session identity");
   assert.equal(background.session.get(resultKey).result.summary, "first");
 
-  background.invokeMessage(
+  background.invokeGrantedMessage(
     { page, result: completedResult("replacement"), type: "store-current-run-result" },
     sender,
   );
@@ -579,7 +583,7 @@ test("worker keeps one validated current result and clear removes it", async () 
   assert.equal(currentResultKey(background.session), resultKey);
   assert.equal(background.session.get(resultKey).result.summary, "replacement");
 
-  background.invokeMessage({ type: "clear-current-run-result" }, sender);
+  background.invokeGrantedMessage({ type: "clear-current-run-result" }, sender);
   await settled();
   assert.equal(currentResultKey(background.session), undefined);
 });
@@ -596,7 +600,7 @@ test("worker rejects forbidden fields and unredacted or unbounded valid-schema t
   ];
 
   for (const result of rejectedResults) {
-    background.invokeMessage(
+    background.invokeGrantedMessage(
       {
         page: { origin: "https://fixture.test", pathname: "/path" },
         result,
@@ -608,16 +612,13 @@ test("worker rejects forbidden fields and unredacted or unbounded valid-schema t
   }
 
   assert.equal(currentResultKey(background.session), undefined);
-  assert.deepEqual(
-    [...background.session.values()].map((value) => JSON.parse(JSON.stringify(value))),
-    [{ documentId: "document-1", id: "tab-session-" + nextSessionId }],
-  );
+  assert.equal(background.session.size, 1, "only the tab's authorization metadata is retained");
 });
 
 test("close after worker suspension clears session state before tab identifier reuse", async () => {
   const initialWorker = await authorizedBackground();
   const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
-  initialWorker.invokeMessage(
+  initialWorker.invokeGrantedMessage(
     {
       page: { origin: "https://fixture.test", pathname: "/path" },
       result: completedResult(),
@@ -649,7 +650,7 @@ test("close after worker suspension clears session state before tab identifier r
 test("replacement after worker suspension discards removed-tab state and gives added tab a new session", async () => {
   const initialWorker = await authorizedBackground();
   const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
-  initialWorker.invokeMessage(
+  initialWorker.invokeGrantedMessage(
     {
       page: { origin: "https://fixture.test", pathname: "/path" },
       result: completedResult(),
@@ -731,11 +732,11 @@ test("concurrent completions in separate tabs retain both session-scoped results
   await background.invokeToolbar({ id: 42, url: "https://fixture.test/one" });
   await background.invokeToolbar({ id: 43, url: "https://fixture.test/two" });
 
-  background.invokeMessage(
+  background.invokeGrantedMessage(
     { page: { origin: "https://fixture.test", pathname: "/one" }, result: completedResult("one"), type: "store-current-run-result" },
     { documentId: "document-42", frameId: 0, tab: { id: 42 } },
   );
-  background.invokeMessage(
+  background.invokeGrantedMessage(
     { page: { origin: "https://fixture.test", pathname: "/two" }, result: completedResult("two"), type: "store-current-run-result" },
     { documentId: "document-43", frameId: 0, tab: { id: 43 } },
   );
@@ -746,4 +747,58 @@ test("concurrent completions in separate tabs retain both session-scoped results
     .map(([, value]) => value.result.summary)
     .sort();
   assert.deepEqual(results, ["one", "two"]);
+});
+
+test("navigation invalidates the live grant and retains one non-live result atomically", async () => {
+  const background = await authorizedBackground();
+  const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
+  const grantId = background.session.get("ui-torture-lab:tab-session:42").grantId;
+  const result = { ...completedResult(), terminationReason: "same-document-navigation" };
+  await background.invokeMessage({ type: "invalidate-page-grant", grantId, page: { origin: "https://fixture.test", pathname: "/path" }, result }, sender);
+  const session = background.session.get("ui-torture-lab:tab-session:42");
+  assert.equal(session.documentId, null);
+  assert.equal(background.session.get(currentResultKey(background.session)).state, "previous");
+  const feedbackCount = background.feedback.length;
+  background.invokeMessage({ type: "run-activity-changed", grantId, active: true }, sender);
+  await settled();
+  assert.equal(background.feedback.length, feedbackCount, "expired live activity must not restore the toolbar Run indicator");
+  background.invokeMessage({ type: "clear-current-run-result", grantId }, sender);
+  await settled();
+  assert.equal(currentResultKey(background.session), undefined, "manual clear remains available on the ended context");
+});
+
+test("old logical-context messages cannot overwrite or revoke a reauthorized same Document", async () => {
+  const background = await authorizedBackground();
+  const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
+  const oldGrant = background.session.get("ui-torture-lab:tab-session:42").grantId;
+  const page = { origin: "https://fixture.test", pathname: "/path" };
+  await background.invokeMessage({ type: "invalidate-page-grant", grantId: oldGrant, page, result: completedResult("previous") }, sender);
+  await background.invokeToolbar({ id: 42, url: "https://fixture.test/new-route" });
+  const newGrant = background.session.get("ui-torture-lab:tab-session:42").grantId;
+  assert.notEqual(newGrant, oldGrant);
+  background.invokeMessage({ type: "store-current-run-result", grantId: newGrant, page, result: completedResult("new") }, sender);
+  await settled();
+  for (const message of [
+    { type: "invalidate-page-grant", page, result: completedResult("stale") },
+    { type: "store-current-run-result", page, result: completedResult("stale") },
+    { type: "clear-current-run-result" },
+    { type: "run-activity-changed", active: true },
+  ]) {
+    await background.invokeMessage({ ...message, grantId: oldGrant }, sender);
+  }
+  await settled();
+  assert.equal(background.session.get("ui-torture-lab:tab-session:42").grantId, newGrant);
+  assert.equal(background.session.get("ui-torture-lab:tab-session:42").documentId, "document-1");
+  assert.equal(background.session.get(currentResultKey(background.session)).result.summary, "new");
+});
+
+test("live messages require their exact toolbar grant token", async () => {
+  const background = await authorizedBackground();
+  const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
+  const count = background.feedback.length;
+  for (const grantId of [undefined, "", "wrong-grant"]) {
+    background.invokeMessage({ type: "run-activity-changed", grantId, active: true }, sender);
+  }
+  await settled();
+  assert.equal(background.feedback.length, count);
 });

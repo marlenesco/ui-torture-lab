@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createRoot, type Root } from "react-dom/client";
-import { createRunController, type MarkdownReportInput, type RunController } from "@ui-torture-lab/engine";
+import { createRunController, type MarkdownReportInput, type TargetEndReason, type RunController } from "@ui-torture-lab/engine";
 import { browser } from "wxt/browser";
 import { ExtensionPanel } from "./panel";
 import {
   isStoredRunResult,
   pageMetadataFor,
-  type StoredRunResult,
 } from "../target-page/current-run-result";
+import { observeSameDocumentNavigation } from "../target-page/navigation";
 import {
+  invalidateGrantMessageType,
   clearRunResultMessageType,
   readRunResultMessageType,
   runActivityMessageType,
   storeRunResultMessageType,
+  storePreviousRunResultMessageType,
 } from "../target-page/messages";
 
 const runtimeKey = Symbol.for("ui-torture-lab/document-runtime");
@@ -318,7 +320,7 @@ type DocumentRuntimeGlobal = typeof globalThis & {
 class DocumentRuntime {
   readonly document = document;
   readonly runtimeId = crypto.randomUUID();
-  readonly runController: RunController;
+  runController: RunController;
   private readonly ownership = new ExtensionDomOwnership();
   private readonly diagnosticHighlights = new Set<HTMLElement>();
   private readonly invalidLiveFindings = new Set<
@@ -326,32 +328,91 @@ class DocumentRuntime {
   >();
   private storedResult: ReturnType<RunController["getSnapshot"]>["result"] = null;
   private currentRunReport: MarkdownReportInput | null = null;
-  private previousRunResult: StoredRunResult | null = null;
+  private previousRunResult: MarkdownReportInput | null = null;
+  private grantId: string | null = null;
+  private authorized = false;
+  private targetEnded = false;
+  private ending = false;
+  private page = pageMetadataFor(window.location);
+  private unsubscribeEngine: () => void = () => undefined;
+  private readonly navigationObserver: ReturnType<typeof observeSameDocumentNavigation>;
   private reportedRunActivity: boolean | null = null;
   private liveFindingMessage: string | null = null;
   private overlay: MountedOverlay | undefined;
   private panel: MountedPanel | undefined;
 
   constructor() {
-    this.runController = createRunController({
+    this.runController = this.createController();
+    this.navigationObserver = observeSameDocumentNavigation(window, () => this.endTarget("same-document-navigation"));
+    this.document.defaultView?.addEventListener("pagehide", () =>
+      this.clearRunActivity(),
+    );
+  }
+
+  private createController(): RunController {
+    const controller = createRunController({
       document: this.document,
       isExtensionOwnedNode: (node) => this.isExtensionOwnedNode(node),
     });
-    this.runController.subscribe(() => {
-      const snapshot = this.runController.getSnapshot();
+    this.unsubscribeEngine = controller.subscribe(() => {
+      const snapshot = controller.getSnapshot();
       if (snapshot.phase !== "ready-for-inspection") {
         this.invalidLiveFindings.clear();
       }
-      if (snapshot.result !== null && snapshot.result !== this.storedResult) {
+      if (!this.ending && this.authorized && snapshot.result !== null && snapshot.result !== this.storedResult) {
         this.storedResult = snapshot.result;
         this.storeCurrentRunResult(snapshot.result);
         this.panel?.render(this.panel.host.dataset.uiTortureLabCollapsed === "true");
       }
       this.reportRunActivity();
     });
-    this.document.defaultView?.addEventListener("pagehide", () =>
-      this.clearRunActivity(),
-    );
+    return controller;
+  }
+
+  async authorize(grantId: string): Promise<"mounted" | "reload-required" | "failed"> {
+    this.grantId = grantId;
+    if (this.targetEnded && this.previousRunResult !== null) {
+      const saved = await browser.runtime.sendMessage({ type: storePreviousRunResultMessageType, grantId, page: this.previousRunResult.page, result: this.previousRunResult.result }).catch(() => false);
+      if (saved !== true || this.grantId !== grantId) return "failed";
+    }
+    if (this.runController.getSnapshot().phase === "reload-required") {
+      this.mountOrReveal();
+      return "reload-required";
+    }
+    if (this.targetEnded) {
+      this.unsubscribeEngine();
+      this.runController = this.createController();
+      this.storedResult = null;
+      this.currentRunReport = null;
+      this.reportedRunActivity = null;
+    }
+    if (!this.authorized) this.page = pageMetadataFor(window.location);
+    this.grantId = grantId;
+    this.authorized = true;
+    this.targetEnded = false;
+    this.liveFindingMessage = null;
+    this.mountOrReveal();
+    return "mounted";
+  }
+
+  private endTarget(reason: TargetEndReason): void {
+    if (this.targetEnded) return;
+    this.targetEnded = true;
+    this.authorized = false;
+    this.ending = true;
+    const result = this.runController.endTarget(reason);
+    this.ending = false;
+    this.storedResult = result;
+    if (result !== null) this.previousRunResult = { page: this.page, result, state: "previous" };
+    this.currentRunReport = null;
+    this.clearDiagnosticHighlights();
+    this.invalidLiveFindings.clear();
+    this.liveFindingMessage = "Target Page authorization ended. Click the toolbar action again after verified Restore.";
+    this.reportedRunActivity = false;
+    this.panel?.render(this.panel.host.dataset.uiTortureLabCollapsed === "true");
+    if (this.grantId !== null) {
+      void browser.runtime.sendMessage({ type: invalidateGrantMessageType, grantId: this.grantId, page: this.page, result }).catch(() => undefined);
+    }
   }
 
   mountOrReveal(): void {
@@ -402,6 +463,7 @@ class DocumentRuntime {
     finding: ReturnType<RunController["getSnapshot"]>["findings"][number],
     action: FindingAction,
   ): void {
+    if (!this.authorized) return;
     if (action === "copy-locator") {
       this.selectDiagnosticLocator(finding.locator);
       return;
@@ -517,14 +579,17 @@ class DocumentRuntime {
       root.render(
         <ExtensionPanel
           collapsed={collapsed}
+          authorized={this.authorized}
+          navigationComplete={this.navigationObserver.complete}
           currentRunReport={this.currentRunReport}
           onClearPreviousRunResult={() => this.clearPreviousRunResult()}
           onCollapse={() => render(true)}
           onExpand={() => render(false)}
           onInspectFinding={(finding, action) => this.inspectFinding(finding, action)}
           isFindingActionEnabled={(finding) => !this.invalidLiveFindings.has(finding)}
-          onRestore={() => this.runController.restore()}
+          onRestore={() => { if (this.authorized) this.runController.restore(); }}
           onStartScenario={(scenarioId) => {
+            if (!this.authorized) return;
             void this.withMeasurementSafeUi(() =>
               this.runController.startScenario(scenarioId)
             );
@@ -579,24 +644,26 @@ class DocumentRuntime {
   private storeCurrentRunResult(
     result: NonNullable<ReturnType<RunController["getSnapshot"]>["result"]>,
   ): void {
-    const location = this.document.defaultView?.location;
-    if (location === undefined) return;
-    const page = pageMetadataFor(location);
+    if (!this.authorized || this.grantId === null) return;
+    const page = this.page;
     this.currentRunReport = { page, result, state: "current" };
     void browser.runtime
       .sendMessage({
         page,
         result,
         type: storeRunResultMessageType,
+        grantId: this.grantId,
       })
       .catch(() => undefined);
   }
 
   private loadPreviousRunResult(): void {
+    if (this.grantId === null) return;
+    const grantId = this.grantId;
     void browser.runtime
-      .sendMessage({ type: readRunResultMessageType })
+      .sendMessage({ type: readRunResultMessageType, grantId })
       .then((response) => {
-        if (!isStoredRunResult(response)) return;
+        if (!this.authorized || this.grantId !== grantId || !isStoredRunResult(response)) return;
         this.previousRunResult = response;
         this.panel?.render(false);
       })
@@ -607,11 +674,12 @@ class DocumentRuntime {
     this.previousRunResult = null;
     this.panel?.render(false);
     void browser.runtime
-      .sendMessage({ type: clearRunResultMessageType })
+      .sendMessage({ type: clearRunResultMessageType, grantId: this.grantId })
       .catch(() => undefined);
   }
 
   private reportRunActivity(): void {
+    if (!this.authorized || this.grantId === null || this.ending) return;
     const phase = this.runController.getSnapshot().phase;
     const active =
       phase === "applying-mutations" ||
@@ -621,7 +689,7 @@ class DocumentRuntime {
     if (this.reportedRunActivity === active) return;
     this.reportedRunActivity = active;
     void browser.runtime
-      .sendMessage({ active, type: runActivityMessageType })
+      .sendMessage({ active, type: runActivityMessageType, grantId: this.grantId })
       .catch(() => undefined);
   }
 
@@ -629,7 +697,7 @@ class DocumentRuntime {
     if (this.reportedRunActivity !== true) return;
     this.reportedRunActivity = false;
     void browser.runtime
-      .sendMessage({ active: false, type: runActivityMessageType })
+      .sendMessage({ active: false, type: runActivityMessageType, grantId: this.grantId })
       .catch(() => undefined);
   }
 
@@ -666,16 +734,14 @@ class DocumentRuntime {
   }
 }
 
-export function mountOrRevealDocumentRuntime(): void {
+export function prepareDocumentRuntime(): void {
   const runtimeGlobal = globalThis as DocumentRuntimeGlobal;
   const existingRuntime = runtimeGlobal[runtimeKey];
 
   if (existingRuntime?.document === document) {
-    existingRuntime.mountOrReveal();
     return;
   }
 
   const runtime = new DocumentRuntime();
   runtimeGlobal[runtimeKey] = runtime;
-  runtime.mountOrReveal();
 }
