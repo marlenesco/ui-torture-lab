@@ -447,6 +447,30 @@ test("toolbar rejects unsupported targets before injection", async () => {
   }
 });
 
+test("toolbar rejects a redacted target URL without injecting or requesting permissions", async () => {
+  const background = await loadBackground({
+    executeScript: async () => { throw new Error("An unavailable URL must not be injected"); },
+  });
+  await background.invokeToolbar({ id: 42 });
+  assert.equal(background.scriptCalls.length, 0);
+  assert.ok(background.feedback.some(([kind, details]) =>
+    kind === "title" && details.tabId === 42 &&
+    details.title === "This page is not supported. UI Torture Lab runs only on HTTP or HTTPS HTML pages. Serve local files through localhost.",
+  ));
+  assert.ok(background.feedback.some(([kind, details]) =>
+    kind === "badge" && details.tabId === 42 && details.text === "!",
+  ));
+});
+
+test("toolbar keeps a missing tab distinct from a redacted URL", async () => {
+  const background = await loadBackground({
+    executeScript: async () => { throw new Error("A missing tab must not be injected"); },
+  });
+  await background.invokeToolbar({ url: "https://fixture.test/" });
+  assert.equal(background.scriptCalls.length, 0);
+  assert.equal(background.feedback.length, 0);
+});
+
 test("toolbar rejects a same-URL Document replacement between probe and bootstrap", async () => {
   let injectionNumber = 0;
   const background = await loadBackground({

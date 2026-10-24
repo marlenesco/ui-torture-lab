@@ -687,6 +687,7 @@ test("toolbar rejects an unsupported top-level protocol without injection", asyn
       title:
         "This page is not supported. UI Torture Lab runs only on HTTP or HTTPS HTML pages. Serve local files through localhost.",
     });
+    expect(await page.$$("[data-ui-torture-lab-root], [data-ui-torture-lab-overlay-root]")).toHaveLength(0);
   } finally {
     await page.close();
   }
