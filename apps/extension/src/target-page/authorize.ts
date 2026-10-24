@@ -44,7 +44,8 @@ const validateTargetUrl = (
   url: string | undefined,
 ): { readonly supported: true; readonly url: string } | TargetAuthorizationResponse => {
   if (url === undefined) {
-    return rejectTargetAuthorization("missing-target");
+    // Chrome can omit the URL of an unsupported page even after a toolbar click.
+    return rejectTargetAuthorization("unsupported-protocol");
   }
 
   let parsedUrl: URL;

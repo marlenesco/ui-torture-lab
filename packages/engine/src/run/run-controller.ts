@@ -140,8 +140,11 @@ const serializeRestore = (restore: RestoreResult): SerializedRestoreResult =>
     ),
   });
 
-const summaryForRestore = (restore: RestoreResult): string => {
+const summaryForRestore = (restore: RestoreResult, findingCount: number): string => {
   if (restore.status === "restored") {
+    if (findingCount > 0) {
+      return `${findingCount} supported Finding(s) were produced. Applied values were restored.`;
+    }
     return "No supported Finding was produced. This does not claim the Target Page has no layout problems.";
   }
   if (restore.status === "conflict") {
@@ -252,7 +255,7 @@ export function createRunController(
       findings: Object.freeze(findings),
       inconclusiveReasons: Object.freeze(inconclusiveReasons),
       restore: serializeRestore(restore),
-      summary: summaryForRestore(restore),
+      summary: summaryForRestore(restore, findings.length),
     });
 
   const abortedResult = (

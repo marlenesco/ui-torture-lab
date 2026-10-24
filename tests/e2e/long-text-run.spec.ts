@@ -502,8 +502,9 @@ test("an Engine safety abort is distinct from Restore conflict in the built UI",
   try {
     await page.goto("http://127.0.0.1:4173/long-text-run/");
     await triggerToolbarAction(page);
+    const originalText = await page.$eval("#primary-target", (target) => target.textContent);
 
-    await serviceWorker.evaluate(async () => {
+    const installed = await serviceWorker.evaluate(async () => {
       const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
       const [tab] = await chromeApi.tabs.query({
         active: true,
@@ -512,23 +513,16 @@ test("an Engine safety abort is distinct from Restore conflict in the built UI",
       if (tab?.id === undefined) {
         throw new Error("No active fixture tab was available");
       }
-      await chromeApi.scripting.executeScript({
+      const [injection] = await chromeApi.scripting.executeScript({
         target: { tabId: tab.id, frameIds: [0] },
         world: "ISOLATED",
-        func: async () => {
-          type Controller = {
-            startScenario(scenarioId: "long-text"): Promise<void>;
-          };
-          const runtime = (globalThis as typeof globalThis & {
-            [key: symbol]: { readonly runController?: Controller } | undefined;
-          })[Symbol.for("ui-torture-lab/document-runtime")];
+        func: () => {
           const target = document.querySelector("#primary-target")?.firstChild;
           const descriptor = Object.getOwnPropertyDescriptor(
             CharacterData.prototype,
             "data",
           );
           if (
-            runtime?.runController === undefined ||
             !(target instanceof Text) ||
             descriptor?.get === undefined ||
             descriptor.set === undefined
@@ -551,21 +545,22 @@ test("an Engine safety abort is distinct from Restore conflict in the built UI",
               }
             },
           });
-          await runtime.runController.startScenario("long-text");
+          return "fault-installed";
         },
       });
+      return injection?.result;
     });
+    expect(installed).toBe("fault-installed");
 
-    await page.waitForFunction(
-      () =>
-        document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
-          ?.textContent?.includes("Run aborted") === true,
-    );
+    // Observe the public workflow without keeping an async script injection open during the Run.
+    await clickPanelButton(page, "Apply Long Text");
+    await expect.poll(() => readPanelText(page)).toContain("Run aborted");
     const panelText = await readPanelText(page);
-    expect(panelText).toContain("Run aborted");
     expect(panelText).toContain("Restore completed");
     expect(panelText).toContain("No Findings were produced");
     expect(panelText).not.toContain("Restore conflict");
+    expect(await page.$eval("#primary-target", (target) => target.textContent)).toBe(originalText);
+    expect(await page.$eval("#minimum-target", (target) => target.textContent)).toBe("OK");
   } finally {
     await page.close();
   }

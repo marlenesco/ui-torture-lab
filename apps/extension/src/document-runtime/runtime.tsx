@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createRoot, type Root } from "react-dom/client";
-import { createRunController, type RunController } from "@ui-torture-lab/engine";
+import { createRunController, type MarkdownReportInput, type RunController } from "@ui-torture-lab/engine";
 import { browser } from "wxt/browser";
 import { ExtensionPanel } from "./panel";
 import {
@@ -137,6 +137,29 @@ const panelCss = `
 
   .run-controls p {
     margin: 0;
+  }
+
+  .markdown-report {
+    display: grid;
+    gap: 12px;
+    margin-block-start: 16px;
+  }
+
+  .markdown-report textarea {
+    display: block;
+    inline-size: 100%;
+    margin-block-start: 8px;
+    color: inherit;
+    background: #2a2c27;
+    font: 12px/1.4 monospace;
+    white-space: pre;
+    resize: vertical;
+    user-select: text;
+  }
+
+  .markdown-report textarea:focus-visible {
+    outline: 2px solid #d7f36b;
+    outline-offset: 2px;
   }
 
   .panel-action {
@@ -302,6 +325,7 @@ class DocumentRuntime {
     ReturnType<RunController["getSnapshot"]>["findings"][number]
   >();
   private storedResult: ReturnType<RunController["getSnapshot"]>["result"] = null;
+  private currentRunReport: MarkdownReportInput | null = null;
   private previousRunResult: StoredRunResult | null = null;
   private reportedRunActivity: boolean | null = null;
   private liveFindingMessage: string | null = null;
@@ -321,6 +345,7 @@ class DocumentRuntime {
       if (snapshot.result !== null && snapshot.result !== this.storedResult) {
         this.storedResult = snapshot.result;
         this.storeCurrentRunResult(snapshot.result);
+        this.panel?.render(this.panel.host.dataset.uiTortureLabCollapsed === "true");
       }
       this.reportRunActivity();
     });
@@ -492,6 +517,7 @@ class DocumentRuntime {
       root.render(
         <ExtensionPanel
           collapsed={collapsed}
+          currentRunReport={this.currentRunReport}
           onClearPreviousRunResult={() => this.clearPreviousRunResult()}
           onCollapse={() => render(true)}
           onExpand={() => render(false)}
@@ -555,9 +581,11 @@ class DocumentRuntime {
   ): void {
     const location = this.document.defaultView?.location;
     if (location === undefined) return;
+    const page = pageMetadataFor(location);
+    this.currentRunReport = { page, result, state: "current" };
     void browser.runtime
       .sendMessage({
-        page: pageMetadataFor(location),
+        page,
         result,
         type: storeRunResultMessageType,
       })

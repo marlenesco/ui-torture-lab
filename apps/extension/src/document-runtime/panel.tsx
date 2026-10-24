@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useSyncExternalStore } from "react";
-import type { RunController, ScenarioId } from "@ui-torture-lab/engine";
+import type { MarkdownReportInput, RunController, ScenarioId } from "@ui-torture-lab/engine";
 import type { StoredRunResult } from "../target-page/current-run-result";
+import { MarkdownReport } from "./markdown-report";
 
 type ExtensionPanelProps = {
   readonly collapsed: boolean;
+  readonly currentRunReport: MarkdownReportInput | null;
   readonly onClearPreviousRunResult: () => void;
   readonly liveFindingMessage: string | null;
   readonly previousRunResult: StoredRunResult | null;
@@ -25,6 +27,7 @@ type ExtensionPanelProps = {
 
 export function ExtensionPanel({
   collapsed,
+  currentRunReport,
   onClearPreviousRunResult,
   liveFindingMessage,
   previousRunResult,
@@ -81,6 +84,9 @@ export function ExtensionPanel({
         previousRunResult={previousRunResult}
         snapshot={snapshot}
       />
+      {snapshot.result !== null && currentRunReport?.result === snapshot.result
+        ? <MarkdownReport report={currentRunReport} />
+        : null}
     </section>
   );
 }
@@ -120,6 +126,7 @@ function RunControls({
             />
             <RestoreSummary result={previousRunResult.result} />
             <p>{previousRunResult.result.summary}</p>
+            <MarkdownReport report={previousRunResult} />
             <button className="panel-toggle" onClick={onClearPreviousRunResult} type="button">
               Clear saved result
             </button>
