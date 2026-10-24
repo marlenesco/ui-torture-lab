@@ -12,7 +12,7 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:4173",
     browserName: "chromium",
     channel: "chrome",
-    trace: "on-first-retry",
+    trace: { mode: "retain-on-failure", screenshots: false, snapshots: true, sources: true },
   },
   webServer: {
     command: "pnpm dev:fixtures",

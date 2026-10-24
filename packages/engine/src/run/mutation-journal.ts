@@ -334,6 +334,7 @@ export function createStyleMutationRecord(options: {
   readonly property: string;
   readonly target: HTMLElement;
 }): MutationRecord<StyleState> {
+  const originallyHadStyleAttribute = options.target.hasAttribute("style");
   const readState = (): StyleState => ({
     value: options.target.style.getPropertyValue(options.property),
     priority: options.target.style.getPropertyPriority(options.property),
@@ -350,6 +351,9 @@ export function createStyleMutationRecord(options: {
     writeState: ({ value, priority }) => {
       if (value === "") {
         options.target.style.removeProperty(options.property);
+        if (!originallyHadStyleAttribute && options.target.getAttribute("style") === "") {
+          options.target.removeAttribute("style");
+        }
         return;
       }
       options.target.style.setProperty(options.property, value, priority);
