@@ -117,3 +117,17 @@ test("ending an idle Target Page creates no fabricated Run result", async ({ pag
     return controller.endTarget("same-document-navigation");
   })).toBeNull();
 });
+
+test("Page Exit cleanup is synchronous even when a detachable client throws", async ({ page }) => {
+  await page.goto("/same-document-navigation/");
+  const result = await page.evaluate(async () => {
+    const moduleUrl = "/__engine__/index.js";
+    const engine = await import(moduleUrl) as typeof import("../../packages/engine/src/index.js");
+    const controller = engine.createRunController({ document, isExtensionOwnedNode: () => false });
+    await controller.startScenario("long-text");
+    controller.subscribe(() => { throw new Error("Synthetic detached UI failure"); });
+    const result = controller.endTarget("page-exit");
+    return { result, text: document.querySelector("#boundary")?.textContent, later: document.querySelector("#later-target")?.textContent };
+  });
+  expect(result).toMatchObject({ text: "Checkout", later: "Continue", result: { terminationReason: "page-exit", restore: { status: "restored" } } });
+});

@@ -244,7 +244,8 @@ export function createRunController(
   const publish = (next: RunSnapshot): void => {
     snapshot = Object.freeze(next);
     for (const listener of listeners) {
-      listener();
+      try { listener(); }
+      catch { /* A detachable client cannot interrupt Engine state transitions or Restore. */ }
     }
   };
 

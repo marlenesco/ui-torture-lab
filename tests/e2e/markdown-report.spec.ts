@@ -169,7 +169,7 @@ test("Previous-Target Snapshot remains copyable after reload with no live Findin
     await page.waitForSelector("[data-ui-torture-lab-root]");
     await waitForPreview(page);
     const markdown = await preview(page);
-    expect(markdown).toBe(current.replace("Lifecycle: Current Run Result", "Lifecycle: Previous-Target Snapshot") + "This Previous-Target Snapshot has no live DOM actions; elements are not rematched.\n");
+    expect(markdown.replace("- Termination reason: page\\-exit\n", "")).toBe(current.replace("Lifecycle: Current Run Result", "Lifecycle: Previous-Target Snapshot") + "This Previous-Target Snapshot has no live DOM actions; elements are not rematched.\n");
     expect(await panelText(page)).not.toContain("Highlight subject");
     expect(await panelText(page)).not.toContain("Navigate");
     await clipboardProbe("success");

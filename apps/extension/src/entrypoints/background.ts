@@ -14,8 +14,10 @@ import {
   type StoredRunResult,
   type TabSession,
 } from "../target-page/current-run-result";
+import { createRuntimeReachability } from "../target-page/reachability";
 import { showAuthorizationFeedback, showRunActivity } from "../target-page/feedback";
 import {
+  isUnreachableMessage,
   isInvalidateGrantMessage,
   isClearRunResultMessage,
   isReadRunResultMessage,
@@ -92,6 +94,10 @@ const reconcileOrphans = async (): Promise<void> => {
       : [],
   );
   await browser.storage.session.remove([...orphanKeys, ...orphanResultKeys]);
+  for (const tab of tabs) {
+    const session = stored[tabSessionStorageKey(tab.id ?? -1)] as TabSession | undefined;
+    if (tab.id !== undefined && session?.documentId != null) await showRunActivity(tab.id, false);
+  }
 };
 
 const tabChains = new Map<number, Promise<void>>();
@@ -102,7 +108,7 @@ const enqueueTab = (tabId: number, work: () => Promise<void>): Promise<void> => 
   tabChains.set(tabId, next);
   void next.finally(() => {
     if (tabChains.get(tabId) === next) tabChains.delete(tabId);
-  });
+  }).catch(() => undefined);
   return next;
 };
 
@@ -115,9 +121,11 @@ export default defineBackground(() => {
     if (tabId !== undefined) void enqueueTab(tabId, () => resetTabSession(tabId));
   });
   browser.tabs.onRemoved.addListener((tabId) => {
+    reachability.forget(tabId);
     void enqueueTab(tabId, () => clearTabSession(tabId));
   });
   browser.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
+    reachability.forget(removedTabId);
     void enqueueTab(removedTabId, () => clearTabSession(removedTabId));
     void enqueueTab(addedTabId, () => resetTabSession(addedTabId));
   });
@@ -140,7 +148,29 @@ export default defineBackground(() => {
       : null;
   };
 
+  const reachability = createRuntimeReachability(async (sender, grantId, allowEnded, work) => {
+    const authorized = await authorizedSender(sender, grantId, allowEnded);
+    if (authorized === null) return;
+    await enqueueTab(authorized.tabId, async () => {
+      const session = await readTabSession(authorized.tabId);
+      if (session?.id !== authorized.session.id || session.grantId !== grantId || !allowEnded && session.documentId !== authorized.documentId) return;
+      await work(authorized.tabId);
+    });
+  });
+
   browser.runtime.onMessage.addListener((message, sender) => {
+    if (isUnreachableMessage(message)) {
+      void authorizedSender(sender, message.grantId, true).then(async (authorized) => {
+        if (authorized === null) return;
+        await enqueueTab(authorized.tabId, async () => {
+          const session = await readTabSession(authorized.tabId);
+          if (session?.grantId !== message.grantId) return;
+          reachability.markLost(authorized.tabId, message.grantId);
+          await showRunActivity(authorized.tabId, false);
+        });
+      });
+      return;
+    }
     if (isInvalidateGrantMessage(message)) {
       return authorizedSender(sender, message.grantId).then(async (authorized) => {
         if (authorized === null) return;
@@ -165,7 +195,7 @@ export default defineBackground(() => {
           return enqueueTab(authorized.tabId, async () => {
             const session = await readTabSession(authorized.tabId);
             if (session?.id !== authorized.session.id || session.grantId !== message.grantId) return;
-            await showRunActivity(authorized.tabId, message.active);
+            if (reachability.report(authorized.tabId, message.grantId, message.active)) await showRunActivity(authorized.tabId, message.active);
           });
         }
       });
@@ -246,7 +276,8 @@ export default defineBackground(() => {
         const session = await readTabSession(tab.id);
         if (session !== null) await writeTabSession(tab.id, { ...session, documentId: null });
       }
-      await showAuthorizationFeedback(tab.id, response);
+      if (response.status === "authorized" && grantId !== null && reachability.isActive(tab.id, grantId)) await showRunActivity(tab.id, true);
+      else await showAuthorizationFeedback(tab.id, response);
     }
   });
 });

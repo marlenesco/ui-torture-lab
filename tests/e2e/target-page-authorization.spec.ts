@@ -476,7 +476,7 @@ test("floating UI loss and remount preserve one active Document Runtime without 
   }
 });
 
-test("toolbar marks an active Run while collapsed and clears after Restore", async () => {
+test("toolbar marks an active Run while collapsed and clears on Page Exit and explicit Restore", async () => {
   const page = await browser.newPage();
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
@@ -531,6 +531,13 @@ test("toolbar marks an active Run while collapsed and clears after Restore", asy
           .querySelector("[data-ui-torture-lab-root]")
           ?.shadowRoot?.querySelector('[aria-label="Expand UI Torture Lab"]') === null,
     );
+    const ended = await page.$eval("[data-ui-torture-lab-root]", (host) => host.shadowRoot?.textContent ?? "");
+    expect(ended).toContain("Target Page authorization ended");
+    expect(ended).toContain("Previous Target Snapshot");
+    expect(await page.$eval("#clipping-boundary", (element) => element.textContent)).toBe("Checkout");
+    await triggerToolbarAction(page);
+    await page.locator('::-p-aria(Apply Long Text)').click();
+    await page.waitForFunction(() => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent?.includes("Long Text Scenario active") === true);
     await page.evaluate(() => {
       const restore = [...(
         document

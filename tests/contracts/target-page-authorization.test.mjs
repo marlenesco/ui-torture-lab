@@ -13,6 +13,7 @@ const loadBackground = async ({
   session = new Map(),
 }) => {
   const messageListeners = [];
+  const connectListeners = [];
   const tabCreatedListeners = [];
   const tabRemovedListeners = [];
   const tabReplacedListeners = [];
@@ -50,6 +51,7 @@ const loadBackground = async ({
           messageListeners.push(listener);
         },
       },
+      onConnect: { addListener(listener) { connectListeners.push(listener); } },
     },
     scripting: {
       async executeScript(details) {
@@ -136,6 +138,22 @@ const loadBackground = async ({
       await new Promise((resolve) => setImmediate(resolve));
     },
     invokeToolbar: toolbarListeners[0],
+    bindGrant(sender, active = false) {
+      const messages = [];
+      const disconnect = [];
+      const incoming = [];
+      let closed = false;
+      const port = {
+        name: "ui-torture-lab/document-reachability", sender, messages,
+        onMessage: { addListener(callback) { incoming.push(callback); } },
+        onDisconnect: { addListener(callback) { disconnect.push(callback); } },
+        postMessage(message) { messages.push(message); },
+        disconnect() { if (!closed) { closed = true; for (const callback of disconnect) callback(); } },
+      };
+      connectListeners[0](port);
+      for (const callback of incoming) callback({ type: "bind-page-grant", grantId: session.get(`ui-torture-lab:tab-session:${sender.tab?.id}`)?.grantId, active });
+      return port;
+    },
     invokeMessage: messageListeners[0],
     invokeGrantedMessage(message, sender) {
       return messageListeners[0]({ ...message, grantId: session.get(`ui-torture-lab:tab-session:${sender.tab?.id}`)?.grantId }, sender);
@@ -218,6 +236,8 @@ const authorizedBackground = async ({
     session,
   });
   await background.invokeToolbar({ id: 42, url: "https://fixture.test/path?token=secret#fragment" });
+  background.bindGrant({ documentId, frameId: 0, tab: { id: 42 } });
+  await new Promise((resolve) => setImmediate(resolve));
   return background;
 };
 
@@ -322,6 +342,8 @@ test("Run activity survives a service-worker restart for its authorized Document
     },
     session: initialWorker.session,
   });
+  restartedWorker.bindGrant({ documentId: "document-1", frameId: 0, tab: { id: 42 } });
+  await settled();
   restartedWorker.invokeGrantedMessage(
     { active: true, type: "run-activity-changed" },
     { documentId: "document-1", frameId: 0, tab: { id: 42 } },
@@ -350,6 +372,8 @@ test("Run activity only accepts the currently authorized Document", async () => 
   });
 
   await background.invokeToolbar({ id: 42, url: "https://fixture.test/" });
+  background.bindGrant({ documentId: "document-1", frameId: 0, tab: { id: 42 } });
+  await settled();
   const feedbackBeforeStaleMessage = background.feedback.length;
   background.invokeGrantedMessage(
     { active: true, type: "run-activity-changed" },
@@ -801,4 +825,44 @@ test("live messages require their exact toolbar grant token", async () => {
   }
   await settled();
   assert.equal(background.feedback.length, count);
+});
+
+test("port loss clears reachability and Run feedback without revoking the live page grant", async () => {
+  const background = await authorizedBackground();
+  const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
+  const grantId = background.session.get("ui-torture-lab:tab-session:42").grantId;
+  const port = background.bindGrant(sender, true);
+  await settled();
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "RUN");
+  port.disconnect();
+  await settled();
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "");
+  assert.equal(background.session.get("ui-torture-lab:tab-session:42").documentId, "document-1");
+  background.invokeMessage({ type: "run-activity-changed", grantId, active: true }, sender);
+  await settled();
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "");
+  background.bindGrant(sender, true);
+  await settled();
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "RUN");
+});
+
+test("an older port disconnect cannot clear a newer connection's Run indicator", async () => {
+  const background = await authorizedBackground();
+  const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
+  const old = background.bindGrant(sender, true);
+  await settled();
+  background.bindGrant(sender, true);
+  await settled();
+  old.disconnect();
+  await settled();
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "RUN");
+});
+
+test("a child frame cannot bind a top-level Run transport", async () => {
+  const background = await authorizedBackground();
+  const count = background.feedback.length;
+  const port = background.bindGrant({ documentId: "document-1", frameId: 1, tab: { id: 42 } }, true);
+  await settled();
+  assert.equal(background.feedback.length, count);
+  assert.equal(port.messages.length, 0);
 });

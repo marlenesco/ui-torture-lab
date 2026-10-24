@@ -14,6 +14,22 @@ export const storePreviousRunResultMessageType = "store-previous-run-result" as 
 export const readRunResultMessageType = "read-current-run-result" as const;
 export const clearRunResultMessageType = "clear-current-run-result" as const;
 export const invalidateGrantMessageType = "invalidate-page-grant" as const;
+export const runtimePortName = "ui-torture-lab/document-reachability";
+export const bindGrantMessageType = "bind-page-grant" as const;
+export const unreachableMessageType = "runtime-unreachable" as const;
+
+export type BindGrantMessage = {
+  readonly type: typeof bindGrantMessageType;
+  readonly grantId: string;
+  readonly active: boolean;
+};
+
+export const isBindGrantMessage = (value: unknown): value is BindGrantMessage =>
+  isRecord(value) && hasExactKeys(value, ["active", "grantId", "type"]) &&
+  value.type === bindGrantMessageType && isGrantId(value.grantId) && typeof value.active === "boolean";
+
+export const isUnreachableMessage = (value: unknown): value is { type: typeof unreachableMessageType; grantId: string } =>
+  isRecord(value) && hasExactKeys(value, ["grantId", "type"]) && value.type === unreachableMessageType && isGrantId(value.grantId);
 
 export type InvalidateGrantMessage = {
   readonly type: typeof invalidateGrantMessageType;

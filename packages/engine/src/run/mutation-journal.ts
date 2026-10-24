@@ -288,6 +288,7 @@ export function createMutationJournal(document: Document): MutationJournal {
           });
           continue;
         }
+        if (outcome === "pending") conflicts.push({ kind: record.kind, reason: "restore-unverified", target: record.target });
         restoredTargets += 1;
       }
 
