@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export { createRunController } from "./run/run-controller.js";
+export { formatMarkdownReport } from "./report/markdown.js";
+export type { MarkdownReportInput } from "./report/markdown.js";
 export type {
   RunController,
   RunControllerOptions,
