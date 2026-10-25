@@ -1,6 +1,6 @@
 # Dependency and asset review
 
-Review scope: pre-release build, 2026-10-25. No dependency version was added or upgraded by the navigation, lifecycle, documentation, or guardrail implementation.
+Review scope: 1.0.0 candidate, 2026-10-25. No dependency version was added or upgraded by the navigation, lifecycle, documentation, or guardrail implementation.
 
 ## Shipped runtime
 
@@ -12,7 +12,7 @@ Review scope: pre-release build, 2026-10-25. No dependency version was added or 
 | WXT generated adapter code | 0.21.3 | MIT | Full upstream MIT license in extension notices |
 | @wxt-dev/browser wrapper | 0.2.5 | MIT | Same upstream project MIT license in extension notices |
 | Engine | workspace source | Apache-2.0 | Original repository source; no runtime package dependencies |
-| Website | static HTML/CSS | Apache-2.0 | Original authored content and synthetic illustration; no runtime JS, external fonts, images, or embeds |
+| Website | static HTML/CSS and inline SVG | Apache-2.0 | Original authored content, synthetic illustration and owner-supplied logo; no runtime JS, external fonts, remote assets, or embeds |
 
 `pnpm licenses list --prod --json` confirms React, React DOM, and Scheduler as the package production dependency graph. WXT and its browser wrapper are build dependencies whose generated wrapper code is incorporated into the extension, so their notices are also included. Dependencies retain their own terms; the monorepo license does not replace them.
 
@@ -28,4 +28,4 @@ Astro 7.1.6 compiles the static site; WXT 0.21.3/Vite 8.2.0 compile the extensio
 
 Only esbuild and sharp dependency build scripts are permitted by `pnpm-workspace.yaml`. The sole workspace postinstall is `wxt prepare`, which generates local extension types. Frozen installation is mandatory in CI and reconstruction. GitHub Actions dependencies are pinned by full commit; the failure-evidence uploader retains only synthetic test artifacts for seven days, with screenshot recording disabled.
 
-All fixture pages, documentation, CSS, and illustrations are original synthetic project material. No production HTML, real report, proprietary code, participant data, private asset, uncertain-origin image, or generated raster asset was imported. The artifact/source scanner rejects common credential formats and private network URLs. These tripwires complement code and provenance review; they do not prove absence of every possible secret or personal datum. Every new dependency, asset, remote request, or vendor exception requires an explicit review and matching public-contract update before release.
+All fixture pages, documentation, CSS, and illustrations are original synthetic project material. The project owner supplied both official SVG logo variants; their unchanged originals, generated transparent PNG application icons and derivative hashes are recorded in `assets/branding/`. The README and website credit Marlenesco; the extension ships the original NOTICE, Apache-2.0 license and third-party notices together. No production HTML, real report, proprietary code, participant data, private asset or uncertain-origin image was imported. The artifact/source scanner rejects common credential formats and private network URLs. These tripwires complement code and provenance review; they do not prove absence of every possible secret or personal datum. Every new dependency, asset, remote request, or vendor exception requires an explicit review and matching public-contract update before release.

@@ -44,6 +44,10 @@ for (const width of [360, 800, 1280]) {
       await expect(page.locator("h1")).toBeVisible();
       await expect(page.locator(".wordmark svg.site-logo")).toBeVisible();
       await expect(page.locator(".wordmark svg.site-logo")).toHaveAttribute("aria-hidden", "true");
+      await expect(page.locator(".brand-emblem")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      const footer = page.locator("footer");
+      await expect(footer.getByRole("link", { name: "GitHub repository", exact: true })).toHaveAttribute("href", "https://github.com/marlenesco/ui-torture-lab");
+      await expect(footer.getByRole("link", { name: "Marlenesco", exact: true })).toHaveAttribute("href", "https://github.com/marlenesco");
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       expect(await page.locator("body").evaluate((element) => getComputedStyle(element).fontSize)).not.toBe("0px");
     }

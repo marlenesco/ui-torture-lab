@@ -1,7 +1,10 @@
 {
   "sourceSha256": "e852dc3813d0d33dd14bcc566a3feb8b77cedaa05e44bbf18596465d705c0f71",
+  "lightSourceSha256": "7ad0a43877e5db9ece0e406d6cb6ef7650a52f82e4eed36948e82ace52aca833",
   "files": {
-    "apps/site/src/assets/brand-logo.svg": "7b0a197bdc0b99dfab1d43784324801750a57e4c4a09bc4b573eae14f19cb153",
+    "apps/site/src/assets/brand-logo.svg": "2c2f36d3c687a92a9c46bff2b73bc514856fbca8b8747e6c61a92164a1664852",
+    "assets/branding/logo-light.svg": "2c2f36d3c687a92a9c46bff2b73bc514856fbca8b8747e6c61a92164a1664852",
+    "assets/branding/logo-dark.svg": "7b0a197bdc0b99dfab1d43784324801750a57e4c4a09bc4b573eae14f19cb153",
     "assets/branding/icon.svg": "71ab004805fc0b0f040e58503a5fdddf2d8267130442c85fab1ae6debbf92d7d",
     "apps/site/public/favicon.svg": "71ab004805fc0b0f040e58503a5fdddf2d8267130442c85fab1ae6debbf92d7d",
     "apps/extension/src/document-runtime/brand-logo.tsx": "00475e685a0c4ad098565f8c9dbcb9a7d58c75b0542e2fff8c603dd54c3bfc77",

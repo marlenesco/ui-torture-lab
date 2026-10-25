@@ -8,7 +8,7 @@ a:focus-visible, summary:focus-visible { outline: 3px solid #246039; outline-off
 .site-header, .site-footer { padding: 1.5rem clamp(1.25rem, 5vw, 5rem); }
 .site-header { display: flex; flex-wrap: wrap; gap: 1.4rem; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); }
 .wordmark { display: inline-flex; align-items: center; gap: .75rem; font-weight: 800; font-size: 1.25rem; text-decoration: none; }
-.brand-emblem { display: grid; place-items: center; width: 48px; height: 52px; padding: 4px; border-radius: 8px; background: #191d18; flex: 0 0 auto; }
+.brand-emblem { display: grid; place-items: center; width: 48px; height: 52px; padding: 4px; flex: 0 0 auto; }
 .site-logo { display: block; width: 40px; height: 44px; }
 nav ul { display: flex; gap: 1.3rem; flex-wrap: wrap; padding: 0; margin: 0; list-style: none; font-size: .9rem; }
 [aria-current="page"] { font-weight: 700; }
