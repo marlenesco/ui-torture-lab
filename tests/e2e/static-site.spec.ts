@@ -39,7 +39,7 @@ for (const width of [360, 800, 1280]) {
     await page.emulateMedia({ reducedMotion: "reduce" });
     const requests: string[] = [];
     page.on("request", (request) => requests.push(request.url()));
-    for (const route of ["/", "/docs/", "/scope/", "/install/"]) {
+    for (const route of ["/", "/docs/", "/scope/", "/install/", "/privacy/", "/permissions/", "/license/", "/support/"]) {
       await page.goto(`/__site__${route}`);
       await expect(page.locator("h1")).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

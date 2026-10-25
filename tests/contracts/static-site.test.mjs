@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
-const routes = ["/", "/docs/", "/scope/", "/install/"];
+const routes = ["/", "/docs/", "/scope/", "/install/", "/privacy/", "/permissions/", "/license/", "/support/"];
 const fileFor = (route) => path.join("apps/site/dist", route, "index.html");
 
 test("required static routes expose essential content and consistent canonical metadata", async () => {

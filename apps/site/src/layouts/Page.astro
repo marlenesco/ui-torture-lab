@@ -30,7 +30,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <main id="content" tabindex="-1" class:list={[home ? "home" : "article"]}><slot /></main>
     <footer class="site-footer">
       <p>Measured regressions. Explicit limits.</p>
-      <nav aria-label="Project"><ul><li><a href={repository}>Public source</a></li><li><a href={`${repository}/blob/main/SECURITY.md`}>Security reporting</a></li><li><a href={`${repository}/blob/main/LICENSE`}>Apache License 2.0</a></li></ul></nav>
+      <nav aria-label="Project"><ul><li><a href="/support/">Support &amp; security</a></li><li><a href="/license/">License &amp; distribution</a></li><li><a href={repository}>Public source</a></li><li><a href={`${repository}/blob/main/SECURITY.md`}>Security reporting</a></li><li><a href={`${repository}/blob/main/LICENSE`}>Apache License 2.0</a></li></ul></nav>
       <p class="fine">Original code and documentation · © 2026 UI Torture Lab contributors.</p>
     </footer>
   </body>

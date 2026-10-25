@@ -6,5 +6,7 @@ export const detectors = ["Text Clipping", "Horizontal Containment Overflow", "V
 export const navigation = [
   { href: "/docs/", label: "Usage" },
   { href: "/scope/", label: "Supported Scope" },
+  { href: "/privacy/", label: "Privacy" },
+  { href: "/permissions/", label: "Permissions" },
   { href: "/install/", label: "Install" },
 ] as const;
