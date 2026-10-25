@@ -1,0 +1,182 @@
+{
+  "recordedDate": "2026-10-25",
+  "issue": 26,
+  "technicalValidation": "pending",
+  "source": {
+    "repository": "https://github.com/marlenesco/ui-torture-lab",
+    "visibility": "public",
+    "commit": "4a208062a79872817a948aed3fa0a7b901523cab",
+    "cleanAfterChecks": true,
+    "mainProtected": false
+  },
+  "environment": {
+    "platform": "macOS",
+    "osVersion": "27.0.1",
+    "osBuild": "26A434",
+    "architecture": "arm64",
+    "node": "24.13.1",
+    "pnpm": "11.20.0",
+    "chrome": "155.0.8059.85"
+  },
+  "commands": [
+    {
+      "command": "git clone --branch main --single-branch https://github.com/marlenesco/ui-torture-lab.git <fresh-directory>",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm install --frozen-lockfile",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm check",
+      "exitCode": 0,
+      "contracts": 70,
+      "e2e": 166,
+      "e2eSeconds": 26.5,
+      "workers": 4,
+      "retries": 0,
+      "lint": "passed",
+      "types": "passed",
+      "build": "passed",
+      "artifactCheck": "passed"
+    },
+    {
+      "command": "pnpm exec playwright test tests/e2e/target-page-authorization.spec.ts --workers=2 --repeat-each=5 --retries=0",
+      "exitCode": 0,
+      "passed": 60,
+      "seconds": 12.5
+    },
+    {
+      "command": "pnpm exec playwright test tests/e2e/runtime-bounds.spec.ts tests/e2e/ui-surface-comparison.spec.ts --workers=2 --retries=0 --reporter=json",
+      "exitCode": 0,
+      "passed": 7,
+      "flaky": 0,
+      "skipped": 0,
+      "seconds": 3.692
+    }
+  ],
+  "runtimeBenchmarks": [
+    {
+      "test": "long-text remains bounded on large-document without attributing unstable geometry",
+      "runAndRestoreMs": 214,
+      "eligibleTargets": 500,
+      "inconclusiveTargets": 500,
+      "findingCount": 0,
+      "findingSubjects": [],
+      "restore": "restored"
+    },
+    {
+      "test": "long-text remains bounded on dynamic-layout without attributing unstable geometry",
+      "runAndRestoreMs": 193.1,
+      "eligibleTargets": 2,
+      "inconclusiveTargets": 3,
+      "findingCount": 1,
+      "findingSubjects": [
+        "div#stable"
+      ],
+      "restore": "restored"
+    },
+    {
+      "test": "unbreakable-text remains bounded on large-document without attributing unstable geometry",
+      "runAndRestoreMs": 205.2,
+      "eligibleTargets": 500,
+      "inconclusiveTargets": 500,
+      "findingCount": 0,
+      "findingSubjects": [],
+      "restore": "restored"
+    },
+    {
+      "test": "unbreakable-text remains bounded on dynamic-layout without attributing unstable geometry",
+      "runAndRestoreMs": 185.3,
+      "eligibleTargets": 2,
+      "inconclusiveTargets": 3,
+      "findingCount": 1,
+      "findingSubjects": [
+        "div#stable"
+      ],
+      "restore": "restored"
+    },
+    {
+      "test": "large-text remains bounded on large-document without attributing unstable geometry",
+      "runAndRestoreMs": 212.3,
+      "eligibleTargets": 500,
+      "inconclusiveTargets": 500,
+      "findingCount": 0,
+      "findingSubjects": [],
+      "restore": "restored"
+    },
+    {
+      "test": "large-text remains bounded on dynamic-layout without attributing unstable geometry",
+      "runAndRestoreMs": 213.5,
+      "eligibleTargets": 2,
+      "inconclusiveTargets": 3,
+      "findingCount": 1,
+      "findingSubjects": [
+        "div#stable"
+      ],
+      "restore": "restored"
+    }
+  ],
+  "manifest": {
+    "manifest_version": 3,
+    "name": "UI Torture Lab",
+    "description": "Deterministic text stress testing for measurable layout regressions.",
+    "version": "0.0.0",
+    "incognito": "not_allowed",
+    "minimum_chrome_version": "155",
+    "permissions": [
+      "activeTab",
+      "scripting",
+      "storage"
+    ],
+    "action": {
+      "default_title": "Open UI Torture Lab"
+    },
+    "background": {
+      "service_worker": "background.js"
+    }
+  },
+  "sha256": {
+    "pnpm-lock.yaml": "dd783f7520fb334d1772f444675502b1508e3ffe5d7da48314939210ee4f0ff5",
+    "apps/extension/.output/chrome-mv3/THIRD_PARTY_NOTICES.txt": "e65835d245fba56250c4feff593f136b52476461d3eb1de31dc0aa626942c632",
+    "apps/extension/.output/chrome-mv3/background.js": "156f06c55f7181e034ff539068fc93f10e7cacda6f890c8f36f9a3b488f40167",
+    "apps/extension/.output/chrome-mv3/document-runtime.js": "52d06ce7b9ad9eda0e5cf99b7aac18577f7bc08b99ddce2501cb7b8b6e6dcc40",
+    "apps/extension/.output/chrome-mv3/manifest.json": "25e471a5af3f1596f88898e859c0e53aefd082e75df101d3c5c7f28e1cfe2dcf",
+    "apps/site/dist/docs/index.html": "6f00cf3690ff79e8dd7e09439725d721bf19b019167382438d74a8db977e3d9a",
+    "apps/site/dist/index.html": "ac29577298b7bf33784792ccf7100898e9029b8e7b5241913127593bb245ca5e",
+    "apps/site/dist/install/index.html": "db76ffc483daa1eac79a71d260cc0a36cdd033a9845f9cd108db759b984b2428",
+    "apps/site/dist/license/index.html": "caa5f5d4806461cec2ef18eebf3ecfcbe9dc9d2f9f0ca0db43874df9b3530f5e",
+    "apps/site/dist/permissions/index.html": "d586f155658d572136bf88667f4ddd21d246c7b3bc40f53766789ada99e447e1",
+    "apps/site/dist/privacy/index.html": "a5bc6acf21522083c3c259ecb194907d7734bd0b540e8d9237b853056ccbe16f",
+    "apps/site/dist/scope/index.html": "6989c9b9875b0e02272fa58b76e6c2f2a114f674c592e4c11ec67223e6d5ddc5",
+    "apps/site/dist/support/index.html": "bc0ac6a8d2e467e3ba6c845a25d3b1042839baade67cc43d33d450b2c15a2a81"
+  },
+  "publicCI": {
+    "url": "https://github.com/marlenesco/ui-torture-lab/actions/runs/40152953482",
+    "commit": "4a208062a79872817a948aed3fa0a7b901523cab",
+    "platform": "Linux",
+    "chrome": "156.0.8078.47",
+    "conclusion": "failure",
+    "contractsPassed": 70,
+    "e2ePassed": 165,
+    "e2eFlaky": 1,
+    "test": "Document Runtime excludes owned UI and hides diagnostics during capture",
+    "observation": "Toolbar event delivered; initial two probes denied access; subsequent cancellation injection succeeded. Root cause not established."
+  },
+  "unresolved": [
+    "Linux strict CI authorization flakiness",
+    "Manual current Chrome stable sign-off on macOS",
+    "Manual current Chrome stable sign-off on Windows; no operated Windows host",
+    "Manual current Chrome stable sign-off on Linux"
+  ],
+  "separateDeferredGates": [
+    "Cloudflare account/domain/deployment (#25)",
+    "Participant study (#28)",
+    "Protected source, canonical identities, version/tag and Official Distribution (#29)"
+  ],
+  "limitations": [
+    "Synthetic headless automation does not constitute manual sign-off.",
+    "MacOS Chrome 155 evidence cannot establish Linux Chrome 156 stability.",
+    "Artifact hashes identify this local build; cross-platform byte reproducibility is not claimed."
+  ]
+}

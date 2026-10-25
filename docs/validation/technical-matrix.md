@@ -1,91 +1,83 @@
 # Pre-launch Technical Validation matrix
 
-Status: automated macOS candidate validation passed; launch approval remains blocked. This record does not claim Product Validation, a published clean-checkout validation, manual platform smoke completion, deployment, or an Official Distribution.
+Recorded 2026-10-25 for issue #26. **Technical Validation remains pending:** the public main reconstruction and authorization correction pass locally; manual platform sign-off is incomplete. The captured Linux failure and the correction are recorded separately below. Strict CI on the correction must pass before merge. Cloudflare account/domain selection and deployment are explicitly deferred under #25. No launch gate has been marked passed.
 
-## Candidate and environment
+## Source and clean reconstruction
 
-- Source baseline: public main `3a134c7a0b127a0bfec1776bd1f014823419f41a`, with local issue #19–#24 candidate commits through `b9ed115` and the additional runtime-bounds fixtures in this change.
-- Executed environment: Node 24.22.1, pnpm 11.20.0, Google Chrome desktop stable 155.0.8059.85 on macOS. Node satisfies the workspace range but differs from the exact `.node-version` release environment (24.13.1).
-- Manifest: MV3, minimum Chrome 155, Incognito not_allowed, activeTab/scripting/storage only, no persistent host access.
-- Website: eight static HTML routes with local CSS and no required JavaScript. Local canonicals are intentional until a real official SITE_URL is configured.
+- Public repository: `https://github.com/marlenesco/ui-torture-lab` (visibility verified through GitHub).
+- Merged main: `4a208062a79872817a948aed3fa0a7b901523cab`, including [PR #47](https://github.com/marlenesco/ui-torture-lab/pull/47).
+- A fresh HTTPS clone installed with `pnpm install --frozen-lockfile`, then ran `pnpm check`. Source remained clean after verification. This supersedes the earlier unpublished-candidate reconstruction.
+- Environment: macOS 27.0.1 arm64, installed Google Chrome 155.0.8059.85, exact declared Node 24.13.1 and pnpm 11.20.0. This tests the Chrome floor; it does not establish manual acceptance of newer stable builds.
+- **Passed:** lint, strict TypeScript/Astro checks, all production builds, 70 contract tests, 166 E2E tests (26.5 seconds), and artifact checks. E2E used four workers and zero retries.
+- Authorization repetition: **60 tests passed** (12 tests × five repetitions, two workers, zero retries, 12.5 seconds). The Linux failure was not reproduced on this macOS/Chrome version.
+- [Machine-readable baseline evidence](records/2026-10-25-main-4a20806.json) records pre-fix commands, environment, outcomes, synthetic measurements and artifact SHA-256 hashes; it intentionally retains the baseline failure state. Local `.scratch/issue26-*` logs supplement this record; no participant or third-party page data was collected.
 
 ## Contract matrix
 
-| Area | Automated evidence | Candidate outcome |
+| Area | Executed evidence | Clean macOS outcome |
 | --- | --- | --- |
-| Every Scenario/Detector positive pairing and compatible negatives | scenario-detector-matrix, individual Engine and built-extension Run suites | Passed |
-| Intentional ellipsis/line clamp, scrolling, pre-existing unchanged defects | detector-specific positive/negative fixtures | Passed |
-| Unstable/replaced/disconnected nodes, strict identity, no rematching | detector and live inspection suites | Passed |
+| All nine Scenario/Detector positive pairings and compatible negatives | scenario-detector-matrix; individual Engine and built-extension Run suites | Passed |
+| Intentional ellipsis/line clamp, scrolling, unchanged pre-existing defects | Detector-specific positive/negative fixtures | Passed |
+| Unstable/replaced/disconnected nodes; strict identity without rematching | Detector and live inspection suites | Passed |
 | Restore conflicts, Unknown Mutation State, abort, unverified cleanup | mutation-journal, long-text-run, target-end-engine | Passed |
-| Navigation, same-URL state, frame isolation, Page Exit, real and unavailable BFCache | same-document-navigation, page-exit | Passed |
-| UI loss, remount, highlights, layout viewport/document extent | target-page-authorization, distribution-lifecycle, UI-surface comparison | Passed |
-| Worker suspension, port loss, runtime removal, tab closure | distribution-lifecycle and sender/session contracts | Passed |
-| Permission, trusted session lifetime, redaction, explicit native Markdown Copy | artifact, sender-validation, formatter, Markdown, distribution-lifecycle | Passed |
-| No extension Run network request | native page and worker Network observations during public workflows | Passed |
-| Static HTML, keyboard/focus, no-JS navigation, responsive/reduced motion | static-site contracts and browser smoke | Passed |
-| Artifact capabilities, supply chain, attribution, source/provenance tripwires | check:artifacts and adversarial policy contracts | Passed |
-| 500-node flexible page and continuous layout instability | runtime-bounds six-case benchmark | Passed |
+| Same-document navigation, same-URL entries, frame isolation, Page Exit, successful/unavailable BFCache | same-document-navigation, page-exit | Passed |
+| UI loss/remount, ownership exclusions, diagnostic hiding, document geometry | target-page-authorization, distribution-lifecycle, ui-surface-comparison | Passed locally; see Linux regression/correction below |
+| Worker suspension, lost heap state, port loss, runtime interruption, tab closure | distribution-lifecycle; sender/session contracts | Passed |
+| Native explicit Copy, exact visible Markdown, clipboard denial/unavailability, hidden-field omission and redaction | markdown-report browser/contracts, formatter goldens, distribution-lifecycle | Passed |
+| Network and retention | Native page/worker Network observations; trusted session inspection and tab-close deletion | No Run requests observed; one reduced result per tab; cleanup passed |
+| Manifest and public claims | Artifact/public-contract/static-site contracts | MV3; activeTab/scripting/storage only; minimum Chrome 155; Incognito disallowed; no persistent hosts |
+| Website | Eight static routes; no-JavaScript navigation; keyboard/focus/responsive checks | Passed locally; canonical origin intentionally local until #25 |
+| Supply chain and generated capabilities | Dependency/notices checks and adversarial artifact contracts | Passed; no capture API, remote code, page bridge, persistent storage or expanded permissions |
+| Large/dynamic pages | Six runtime-bounds cases; fresh measurement below | Passed within the 8,000 ms fixture budget |
 
-The prior complete candidate gate passed 52 contract tests and 145 E2E tests; the six additional runtime-bounds tests passed separately. Lint, strict types, production build, and read-only artifact checks passed. A clean candidate reconstruction and final combined suite are recorded separately when executed; these numbers are not a claim about an unexecuted public CI run.
+Static inspection is a regression guard, not a proof against arbitrary obfuscated code. Network observations cover the exercised workflows, not every future browser state. These outcomes do not validate a published Store artifact.
 
-## Measurement policy and known limits
+## Captured post-merge Linux failure
 
-Use [scenario-detector-matrix](../../tests/benchmarks/scenario-detector-matrix.md) for the two-sample before/after windows, 0.5 CSS-pixel stability tolerance, and 1,000 ms frame bounds. The [viewport benchmark](../../tests/benchmarks/viewport-overflow-geometry.md) permits only a 1 CSS-pixel extent-attribution rounding allowance and requires a stable direct contributor. Long Text repeats three times, Unbreakable Text appends the single 64-character token, and Large Text scales stable baseline font sizes by two; each has a dedicated intensity benchmark.
+The [strict PR run](https://github.com/marlenesco/ui-torture-lab/actions/runs/40151923258) passed 70 contracts and 166 E2E tests without flakiness on Linux/Chrome 156.0.8078.47. The [subsequent main run](https://github.com/marlenesco/ui-torture-lab/actions/runs/40152953482), on the merged SHA with Node 24.13.1 and pnpm 11.20.0, **failed the strict stability gate**: 70 contracts passed; E2E reported 165 passed and one flaky test, `Document Runtime excludes owned UI and hides diagnostics during capture`.
 
-The rejected Side Panel consumed layout width, while the selected floating Shadow UI preserved the controlled geometry; see [UI surface comparison](../../tests/benchmarks/ui-surface-comparison.md). That original spike's recorded Chrome version is historical; current candidate regressions pass on 155. An unchanged historic number is not presented as a fresh manual observation.
+Its screenshot-free `synthetic-failure-evidence` artifact confirms one delivered toolbar event with a URL present, two initial pure probes rejected with `Cannot access contents of the page`, and a subsequent successful cancellation call on that tab. The host never mounted in the failing attempt; the test passed on retry. This is compatible with a native grant-availability window, but does not establish whether Chrome or the simulated action is responsible. No unsafe Mutation, Restore, data exposure or permission expansion was observed in this failure.
 
-Private router transitions without an observable entry change are outside the navigation guarantee. When Navigation entries are unavailable the UI requires Restore before SPA route changes. Page Exit cleanup is synchronous for delivered events, while abrupt runtime termination can prevent cleanup or final result delivery. The technical Chrome floor is the tested 155 candidate; older versions, other browsers, mobile, iframe/Shadow traversal, and application behavior remain unsupported. Dynamic/unsupported comparisons are inconclusive, never attributed as Findings. Large-document timing is an empirical fixture budget, not a universal performance guarantee.
+### Authorization publication correction
 
-## Unresolved platform and source gates
+The original adapter exhausted both initial access probes immediately. Both failures could arrive before native permission publication completed. The correction yields **100 ms once**, only after the first specific access-denial error, before the existing sole recheck. The target, expected URL and attempt token stay identical. The adapter checks that the attempt is still current before either probe; a newer action or closed tab cancels the delayed recheck. Permanent denial still fails closed after two probes, unrelated errors do not wait/retry, and no bootstrap, mounting or Mutation is replayed.
 
-| Gate | Actual state | Required evidence |
+A virtual-clock regression failed before the correction because it observed two probes before permission publication. A built-extension regression also failed before the correction: one toolbar event, delayed native-access availability, no panel. Both now pass. Additional contracts cover supersession during the wait, tab closure, permanent denial, changed context and access denial after the first successful probe. The browser fixture injects only the native denial window; it does not grant broader access or fake a successful probe.
+
+Local follow-up validation on the exact declared Node/pnpm passed **75 contracts, 167 E2E tests (26.2 seconds)**, lint, strict types, build and artifact checks. Five repetitions of the updated authorization file passed **65 tests**, two workers, zero retries (13.8 seconds). CI also runs these five repetitions with zero retries after the full strict suite. Test timeouts, global retry policy, permission budget and manual gates are unchanged. The current PR checks are the public Linux acceptance evidence; the historical main failure must not be relabeled as a successful run.
+
+The first follow-up CI exposed a separate harness assumption in the small-viewport test: it read the host synchronously after native action dispatch, before asynchronous authorization/mounting completed. That test now waits for the host and rendered panel before measuring geometry, using the existing bounded readiness checks. Its geometry assertions are unchanged. The strict failure is retained as evidence rather than accepted through retry.
+
+Native implementation context: Chromium updates the browser-side tab permission, completes a network permissions update, then notifies renderer processes. The browser action and scripting response are not an acknowledgement that every renderer has received the update. See [ActiveTabPermissionGranter](https://github.com/chromium/chromium/blob/main/extensions/browser/permissions/active_tab_permission_granter.cc) and [DevTools action dispatch](https://github.com/chromium/chromium/blob/main/chrome/browser/devtools/protocol/extensions_handler.cc). These sources explain the publication boundary; the controlled regression and actual strict Linux CI remain the behavioral evidence. The 100 ms window is bounded best-effort recovery, not a guarantee that Chrome will always grant access. A persistent denial remains visible and never authorizes a Run.
+
+## Measurement policy and fresh benchmarks
+
+The [Scenario/Detector policy](../../tests/benchmarks/scenario-detector-matrix.md) uses two frame samples before and after Mutation, a 0.5 CSS-pixel stability tolerance, and 1,000 ms frame bounds. [Viewport attribution](../../tests/benchmarks/viewport-overflow-geometry.md) adds only a 1 CSS-pixel rounding allowance and requires a stable direct contributor; magnitude does not rank different Detectors. Intensities remain fixed: [Long Text ×3](../../tests/benchmarks/long-text-expansion.md), [one 64-character Unbreakable Token](../../tests/benchmarks/unbreakable-token.md), [Large Text ×2](../../tests/benchmarks/large-text-scaling.md).
+
+Fresh Run-plus-Restore measurements, 1280×900 viewport, two workers, zero retries:
+
+| Scenario | 500-target flexible document | Dynamic boundary plus stable positive control |
+| --- | ---: | ---: |
+| Long Text | 214.0 ms | 193.1 ms |
+| Unbreakable Text | 205.2 ms | 185.3 ms |
+| Large Text | 212.3 ms | 213.5 ms |
+
+Each large-page Run retained 500 eligible targets and produced no Finding; this does not mean every Detector-local comparison was conclusive. Each dynamic Run left the unstable boundary unattributed, produced the stable control Finding and restored successfully. All six were below 8,000 ms. These are synthetic fixture budgets, not deadlines for arbitrary pages.
+
+The fresh full suite asserted exact before/after equality for floating UI viewport/client width, document/body scroll width, breakpoint and resize count: zero measured change in those controlled observables. The fresh rejected Side Panel benchmark passed the opposite assertions: reduced layout/client/scroll widths, wide-to-narrow breakpoint transition, unchanged outer width and resize events. The historical 900→514 px result in [UI surface comparison](../../tests/benchmarks/ui-surface-comparison.md) is not presented as a new numeric observation. The seven-case focused benchmark run passed without retries or flaky tests.
+
+## Remaining manual validation
+
+Use [the platform checklist and blank sign-off record](manual-platform-smoke.md) on the exact candidate, in normal current Chrome stable, with actual toolbar interaction. Automated drivers do not constitute manual sign-off.
+
+| Platform | Available automated evidence | Manual state |
 | --- | --- | --- |
-| Clean published source checkout and exact release Node | Not yet run on a published candidate commit | Publish/review the candidate, reconstruct at its public SHA using the declared versions, and preserve complete gate output |
-| macOS manual Chrome stable smoke | Automated tests passed; no independent manual sign-off | Complete the checklist below and record operator, Chrome version, candidate SHA, and outcome |
-| Windows manual Chrome stable smoke | Unresolved platform blocker: no Windows host operated in this task | Same checklist on Windows; do not infer success from macOS |
-| Linux manual Chrome stable smoke | Unresolved platform blocker: no Linux host operated in this task | Same checklist on Linux; future CI is complementary and does not fabricate manual sign-off |
-| Cloudflare deployment/rollback | Account selection and live deployment unresolved (#25) | Verified public routes, settings, preview and rollback record |
-| Formative study | No participants observed (#28) | Six to eight independent qualifying developers and a redacted launch decision |
+| macOS | Clean public checkout passed on Chrome 155.0.8059.85 | Pending on current stable; record operator/version/artifact and checklist outcomes |
+| Windows | No Windows host or run operated in this task | Explicit unresolved platform blocker; complete the same checklist on Windows |
+| Linux | Public Chrome 156 baseline plus the current correction PR checks | Pending; actual-toolbar smoke must distinguish native action from test-driver behavior |
 
-`launch-gates.json.technicalValidation` remains pending. No unsafe Restore, false attribution, data exposure, unexpected extension network use, hidden export, or public-contract divergence may be waived to proceed.
+Known limits: top-level HTTP(S) light-DOM HTML only; no iframe/Shadow traversal, other browsers, mobile, Incognito or private-router observation guarantee. Unobservable SPA transitions require Restore first. Page Exit cleanup depends on event delivery; abrupt termination can prevent cleanup. Inconclusive Evidence never becomes a Finding. The Chrome floor is 155; Linux Chrome 156 behavior cannot be inferred from macOS/155.
 
-## Manual smoke checklist
+Unsafe Restore, false attribution, undeclared retention, unexpected extension requests, hidden export data and artifact divergence remain non-waivable blockers. None was observed by the passing checks; strict CI is required for the correction and manual unknowns remain open. `launch-gates.json.technicalValidation` stays `pending`; **#26 must remain open**.
 
-Use the exact candidate artifact on current Chrome desktop stable in a normal context. Record only synthetic outcomes and environment identifiers.
-
-1. Install/load the candidate and verify its version and three permissions; Incognito access is unavailable.
-2. On a local HTTP fixture, explicitly authorize by toolbar, run each Scenario, inspect representative Findings from all three Detectors, and Restore.
-3. Collapse/remove/reopen the UI during an active Run; mutation and Evidence remain consistent and Restore stays available. Check a small viewport, keyboard controls, and page geometry.
-4. Compare the visible Markdown preview with Copy; retry with clipboard denial and manual selection. Confirm no query/fragment or form values appear. Never paste private reports into project systems.
-5. Trigger a conflict and verify reload-required preserves external changes and blocks another Run. A true reload permits a fresh toolbar grant.
-6. Exercise same-document navigation, reload, back/forward, Page Exit, BFCache where available, port loss, tab close, and extension interruption. Record actual cache outcomes; never infer them from disconnect alone.
-7. Inspect extension network/session state: no application request or screenshot, one reduced result per tab, no durable history, deletion after tab close. Distinguish the target page's own requests.
-8. Open all eight site routes from an ordinary static server with JavaScript disabled; check keyboard focus, responsive layout, canonical paths, and installation status.
-
-Any failure records a blocker with a synthetic reproduction, affected gate, owner, and retest requirement. Leave unknowns unresolved until observed.
-
-## Clean local candidate reconstruction
-
-On 2026-10-25, an isolated clean local clone at candidate commit `aa9d49b958790c1f9b419a3567cec991019c02d2` installed dependencies with `pnpm install --offline --frozen-lockfile` and passed the complete `pnpm check` command. The source tree remained clean after verification. This candidate is not yet a published protected main commit.
-
-Results: lint passed; strict TypeScript/Astro checks reported zero errors, warnings, or hints; all three production workspaces built; 52 contract tests and 160 E2E tests passed; the release artifact gate passed. E2E used four workers and completed in 25.5 seconds on this machine. Environment: Node 24.22.1, pnpm 11.20.0, Chrome 155.0.8059.85/macOS. No retry or timeout increase was used to obtain this result.
-
-The temporary checkout and its processes were removed after verification. Local command logs remain under `.scratch/clean-install.log` and `.scratch/clean-check.log`; those logs are not public release evidence or participant data. Manual platform sign-off, the exact release Node reconstruction on a published candidate, Cloudflare deployment/rollback, Product Validation, and release publication remain unresolved. Technical Validation is therefore still pending as a launch gate.
-
-## Candidate review follow-up
-
-Independent standards/spec review found and corrected pending-authorization navigation races, reentrant Restore, stale pre-build release metadata, and a missing capture-API regression guard. See [candidate-review.md](candidate-review.md). The complete local check components after these corrections and transient-attempt cleanup passed 66 contract tests and 166 E2E tests (24.9 seconds), lint, strict types, build, and artifact checks. These follow-up results supersede the earlier automated test counts for the current code candidate; public CI and human launch gates are recorded separately.
-
-## Public Linux CI and stability follow-up
-
-[The first public candidate run](https://github.com/marlenesco/ui-torture-lab/actions/runs/40148667312) at `efcab568ffc1dc5e267c2786056f774f87feafbc` completed successfully on the declared Node 24.13.1 and pnpm 11.20.0. Playwright installed Google Chrome stable 156.0.8078.47 on the Ubuntu runner, which is newer than the local macOS 155 benchmark. Two tests required retries (clipboard-unavailable fallback and grouped Text Clipping), so that green result is not a clean stability sign-off.
-
-The follow-up uses the public panel for the grouping test and the existing bounded ISOLATED request/collect helper for clipboard probes. Five repetitions of the two affected files passed all 45 tests locally without retries. CI uses two workers to limit concurrent browser pressure, records actual tool/browser/resource versions, and fails on flaky tests even when a retry passes. Timeouts and retry counts were not increased. The current PR's latest strict CI result is the authority for candidate readiness; an earlier successful run with flakiness must not be substituted.
-
-An additional trusted-context regression ensures Page Exit or route invalidation between native mounting and toolbar feedback cannot later display a stale authorized badge. The updated contract suite passes 67 tests. Manual platform smoke checks, protected release source/tag evidence, deployment and Product Validation remain open.
-
-The [first strict run](https://github.com/marlenesco/ui-torture-lab/actions/runs/40149313353) correctly failed on three flaky cases despite successful retries. Its retained screenshot-free traces located the native clipboard case before the first Apply step and exposed a fragile worker test assertion on Target identity. The worker test now requests native closure, observes local Restore, reconnects its driver, and verifies that a volatile background marker was lost; it does not equate Target identity with JavaScript-heap lifetime. Setup/navigation/authorization phases have bounded named steps for actionable timeout evidence. The affected three files passed 24 targeted local tests after these changes; strict CI remains the acceptance gate.
-
-## Captured access-denial window
-
-The [receiver-traced strict run](https://github.com/marlenesco/ui-torture-lab/actions/runs/40151428503) captured a delivered toolbar event and an initial `Cannot access contents of the page` scripting failure followed immediately by successful cleanup on the same tab. The adapter now permits one repeated initial pure probe for that specific error, keeping the original URL, target, and attempt token. Permanent denial and changed context remain rejected; the toolbar event and later Mutation are never retried. The regression failed before the correction. Complete local `pnpm check` then passed 70 contract tests, 166 E2E tests, lint, strict types, build, and artifact checks. The latest strict public CI remains the acceptance gate.
+Separate later gates are unchanged: Cloudflare deployment/rollback (#25, deferred), participant study (#28), and Official Distribution (#29). GitHub reports main as unprotected; protection, canonical URLs, version/tag and final release-record validation remain release prerequisites. No repository settings, Cloudflare resources, tags, Store submission or release publication were changed.

@@ -11,6 +11,7 @@ import {
 } from "./messages";
 
 const protectedProtocols = new Set(["chrome:", "chrome-extension:", "devtools:"]);
+const permissionPublicationDelayMs = 100;
 
 const rejectionMessages: Readonly<Record<TargetRejectionReason, string>> = {
   "document-changed":
@@ -70,6 +71,7 @@ const validateTargetUrl = (
 export async function authorizeTargetPage(
   tab: Pick<Browser.tabs.Tab, "id" | "url">,
   attemptId: string,
+  isCurrentAttempt: () => boolean,
 ): Promise<TargetAuthorizationResponse> {
   if (tab.id === undefined) {
     return rejectTargetAuthorization("missing-target");
@@ -84,6 +86,7 @@ export async function authorizeTargetPage(
   try {
     let probeInjections: Browser.scripting.InjectionResult<unknown>[] | undefined;
     for (let probeAttempt = 0; probeAttempt < 2; probeAttempt++) {
+      if (!isCurrentAttempt()) return rejectTargetAuthorization("document-changed");
       try {
         probeInjections = await browser.scripting.executeScript({
           target: { tabId: tab.id, frameIds: [0] },
@@ -94,10 +97,12 @@ export async function authorizeTargetPage(
         });
         break;
       } catch (error) {
-        // A toolbar event can precede activeTab propagation. Recheck once, without replaying the action.
         if (probeAttempt !== 0 || !String(error).includes("Cannot access contents of the page")) {
           return rejectTargetAuthorization("injection-failed");
         }
+        // Native permission publication crosses processes. Yield before the sole recheck;
+        // immediate failed RPCs can both finish before the renderer receives its grant.
+        await new Promise<void>((resolve) => setTimeout(resolve, permissionPublicationDelayMs));
       }
     }
 
