@@ -79,7 +79,7 @@ async function completedRun(page: Page): Promise<void> {
   await waitForPreview(page);
 }
 
-test("built extension downloads the exact visible UTF-8 Markdown only on a user click after Restore", async () => {
+test("built extension downloads the exact preview UTF-8 Markdown only on a user click after Restore", async () => {
   const page = await test.step("Create download fixture tab", () => browser.newPage(), { timeout: 5000 });
   const downloads = await observeMarkdownDownloads(browser);
   try {
@@ -214,5 +214,37 @@ test("Restore conflicts keep the reload-required result available for download",
     await expect.poll(() => panelText(page)).toContain("Markdown download requested.");
     expect(file.bytes).toEqual(Buffer.from(markdown, "utf8"));
     expect(await page.$eval("#clipping-boundary", (element) => element.textContent)).toBe("External change");
+  } finally { await downloads.dispose(); await page.close(); }
+});
+
+test("Markdown preview stays collapsed until its plain icon is activated and downloads stay identical", async () => {
+  const page = await browser.newPage();
+  const downloads = await observeMarkdownDownloads(browser);
+  try {
+    await completedRun(page);
+    const markdown = await preview(page);
+    const visible = () => page.$eval('[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]', element => element.getClientRects().length > 0);
+    expect(await visible()).toBe(false);
+    const disclosure = await page.$("::-p-aria(Show Markdown preview)");
+    if (disclosure === null) throw new Error("Preview disclosure unavailable");
+    expect(await disclosure.evaluate(button => ({ expanded: button.getAttribute("aria-expanded"), background: getComputedStyle(button).backgroundColor, border: getComputedStyle(button).borderStyle,
+      iconBackground: getComputedStyle(button.querySelector("svg") as SVGElement).backgroundColor,
+      targetExists: (button.getRootNode() as ShadowRoot).getElementById(button.getAttribute("aria-controls") ?? "") !== null,
+    }))).toEqual({ expanded: "false", background: "rgba(0, 0, 0, 0)", border: "none", iconBackground: "rgba(0, 0, 0, 0)", targetExists: true });
+    const reportSection = await page.$('[data-ui-torture-lab-root] >>> .markdown-report');
+    if (reportSection === null) throw new Error("Markdown Report section unavailable");
+    await reportSection.screenshot({ path: test.info().outputPath("report-collapsed.png") });
+    await disclosure.focus();
+    await page.keyboard.press("Enter");
+    await expect.poll(visible).toBe(true);
+    const hide = await page.$("::-p-aria(Hide Markdown preview)");
+    expect(await hide?.evaluate(button => button.getAttribute("aria-expanded"))).toBe("true");
+    expect(await preview(page)).toBe(markdown);
+    expect(downloads.count()).toBe(0);
+    await click(page, "Hide Markdown preview");
+    expect(await visible()).toBe(false);
+    const file = await downloads.capture(() => click(page, "Download Report"));
+    expect(file.bytes).toEqual(Buffer.from(markdown, "utf8"));
+    expect(await visible()).toBe(false);
   } finally { await downloads.dispose(); await page.close(); }
 });
