@@ -33,7 +33,10 @@ Start with a new archive; do not reuse an older ZIP that could retain stale file
 The ZIP root must contain manifest.json, background.js, document-runtime.js,
 THIRD_PARTY_NOTICES.txt and icons/icon-{16,32,48,128}.png. Exclude source files,
 development bundles, credentials and the website. This candidate is for inspection
-and draft preparation; generate the final package from the verified release commit.
+and draft preparation. Complete manual Technical Validation and freeze the runtime
+before its first Store upload. After recording the draft identity, the final
+protected source/tag must reproduce every packaged file byte-for-byte; preserve
+the exact uploaded ZIP and its hash with the final release evidence.
 
 ## Remaining release gates
 
@@ -76,8 +79,9 @@ publication and final installed-artifact validation in
    required before publishing or updating. Review the public publisher name and
    contact details. Chrome [ignores manifest `author`](https://developer.chrome.com/docs/extensions/reference/manifest/author);
    configure the public publisher credit in the dashboard.
-3. Add a new item and upload the candidate ZIP as a draft. Record its real item ID
-   and listing URL. Uploading a draft is separate from submitting for review.
+3. After Technical Validation and runtime freeze, add a new item and upload the
+   frozen 1.0.0 ZIP as a draft. Record its real item ID and listing URL. Uploading
+   a draft is separate from submitting for review.
    See [publishing](https://developer.chrome.com/docs/webstore/publish).
 4. Fill the listing from the canonical copy: title, description, English language,
    appropriate developer-tool category, homepage and support links. Preserve the
@@ -94,8 +98,10 @@ publication and final installed-artifact validation in
 6. Choose free distribution, audience and regions; add reviewer instructions for
    toolbar authorization, applying one Scenario, inspecting a Finding, Restore
    and Download Report. No product login or credentials are needed.
-7. After the release gates pass, upload the final verified ZIP, submit for review
-   and choose publication timing. Deferred publication allows a final check after
+7. Record the real draft identity in a reviewed metadata change and create the
+   final protected source/tag/release record. Verify that its packaged files equal
+   the already uploaded frozen ZIP. After all release gates pass, submit that
+   draft for review and choose publication timing. Deferred publication allows a final check after
    approval. Once live, install from the canonical listing, run the installed-build
    smoke checks, publish source/tag/hash/release notes and update availability on
    the website. Approval and review timing are controlled by Google.
@@ -107,3 +113,16 @@ graphics are not required to create a draft. Publisher registration, questionnai
 completion, the real Store item identity, review submission and the final
 Store-installed smoke check remain open. [Reviewer instructions](reviewer-instructions.md)
 and [draft field guidance](store-fields.md) are prepared for the dashboard.
+
+## Package version sequencing
+
+The Store requires an increased manifest version when uploading a replacement
+package. Do not plan a provisional 1.0.0 upload followed by a different 1.0.0
+package. Finish manual checks and freeze the extension first; obtain the draft
+identity with that exact ZIP, then record the URL and final source/tag using
+metadata changes that preserve every packaged byte. Keep the first-upload ZIP
+and compare it against the final verified build. If a packaged file changes after
+upload, follow the Store's version-increment rules before replacement; do not
+claim the original uploaded artifact represents the changed runtime. See
+[package updates](https://developer.chrome.com/docs/webstore/update) and
+[the upload API](https://developer.chrome.com/docs/webstore/using-api).
