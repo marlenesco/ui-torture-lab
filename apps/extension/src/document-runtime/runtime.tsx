@@ -214,6 +214,7 @@ class DocumentRuntime {
   private liveFindingMessage: string | null = null;
   private overlay: MountedOverlay | undefined;
   private panel: MountedPanel | undefined;
+  private closedMarker: HTMLElement | undefined;
 
   constructor() {
     this.runController = this.createController();
@@ -304,6 +305,11 @@ class DocumentRuntime {
   }
 
   mountOrReveal(): void {
+    if (this.closedMarker !== undefined) {
+      this.ownership.delete(this.closedMarker);
+      this.closedMarker.remove();
+      this.closedMarker = undefined;
+    }
     if (this.panel?.host.isConnected) {
       this.panel.render(false);
       this.ensureOverlay();
@@ -316,6 +322,26 @@ class DocumentRuntime {
     this.ensureOverlay();
     this.reportRunActivity();
     this.loadPreviousRunResult();
+  }
+
+  private closePanel(): void {
+    if (this.closedMarker === undefined) {
+      // Retain admission evidence across context loss without leaving interactive UI behind.
+      const marker = this.document.createElement("ui-torture-lab-runtime");
+      marker.style.setProperty("display", "none", "important");
+      marker.setAttribute("aria-hidden", "true");
+      this.document.documentElement.append(marker);
+      this.ownership.add(marker);
+      this.closedMarker = marker;
+    }
+    const panel = this.panel;
+    const overlay = this.overlay;
+    this.panel = undefined;
+    this.overlay = undefined;
+    this.clearDiagnosticHighlights();
+    if (this.reachabilityBound) this.liveFindingMessage = null;
+    panel?.remove();
+    overlay?.remove();
   }
 
   isExtensionOwnedNode(node: Node): boolean {
@@ -473,6 +499,7 @@ class DocumentRuntime {
           currentRunReport={this.currentRunReport}
           onClearPreviousRunResult={() => this.clearPreviousRunResult()}
           onCollapse={() => render(true)}
+          onClose={() => this.closePanel()}
           onExpand={() => render(false)}
           onInspectFinding={(finding, action) => this.inspectFinding(finding, action)}
           isFindingActionEnabled={(finding) => !this.invalidLiveFindings.has(finding)}

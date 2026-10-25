@@ -51,6 +51,26 @@ export const panelCss = `
     gap: 5px;
     min-inline-size: 0;
   }
+  .panel-header .panel-window-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 4px;
+  }
+  .panel-icon {
+    flex: 0 0 16px;
+  }
+  .panel-toggle,
+  .panel-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-shell .panel-icon-button {
+    inline-size: 30px;
+    min-block-size: 30px;
+    padding: 6px;
+    justify-content: center;
+  }
   .panel-header strong {
     font-size: 17px;
     font-weight: 650;
