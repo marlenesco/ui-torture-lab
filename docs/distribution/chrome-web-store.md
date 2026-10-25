@@ -8,13 +8,13 @@ UI Torture Lab
 
 ## Short description
 
-Stress text on your own web interface. Inspect measured layout regressions, Restore, and copy the Evidence as Markdown.
+Stress text on your own web interface. Inspect measured layout regressions, Restore, and download the Evidence as Markdown.
 
 ## Detailed description
 
 UI Torture Lab helps frontend developers expose and investigate layout regressions on an interface they own or can modify.
 
-Open a top-level HTTP or HTTPS HTML page in Google Chrome desktop stable, including localhost. Click the toolbar action and choose one Scenario: Long Text, Unbreakable Text, or Large Text. Read comparable Baseline and Mutated Evidence from Text Clipping, Horizontal Containment Overflow, and Viewport Overflow. Inspect a live Finding Subject or Primary Contributor, Restore, then copy the visible deterministic Markdown Report. Clipboard failure leaves a selectable preview.
+Open a top-level HTTP or HTTPS HTML page in Google Chrome desktop stable, including localhost. Click the toolbar action and choose one Scenario: Long Text, Unbreakable Text, or Large Text. Read comparable Baseline and Mutated Evidence from Text Clipping, Horizontal Containment Overflow, and Viewport Overflow. Inspect a live Finding Subject or Primary Contributor, Restore, then use Download Report to save the visible deterministic Markdown as a .md file. Initiation failure leaves a selectable preview for manual saving.
 
 A Finding requires a new or measurably worsened supported regression on the same connected element. No Findings does not prove that the page is correct. Unstable or unsupported comparisons are inconclusive. Possible Cause is a hypothesis. Findings have no severity or global quality score. This is not accessibility auditing, visual regression, behavioral testing, or cross-browser testing.
 
@@ -42,7 +42,7 @@ No host permissions, persistent content-script matches, tabs, webNavigation, cli
 
 Local DOM, eligible text, CSS, and geometry analysis begins only after the toolbar action. Complete original values needed for Restore temporarily remain in in-memory Active Run State and are released at Run end. One reduced result per tab can contain numeric Evidence, diagnostic Locators, short redacted previews, origin, and pathname; query strings and fragments are excluded. A later completed Run replaces it. After authorization ends it becomes a non-live Previous-Target Snapshot. Clear saved result deletes a previous snapshot; reload and reopen the toolbar to expose that control for a completed current result. Tab close deletes the stored result; browser session storage is not durable history.
 
-The extension makes no Run network request, takes no automatic screenshot, retains no serialized full page text, and transmits no result to a project server. Copy Report as Markdown is the only export, only on a user gesture, and its payload equals the visible preview without a new page read. No JSON, file, rich HTML, screenshot, hidden content, or remote export is provided. The page and browser may make their own requests. Redaction cannot guarantee anonymity: review origin, pathname, Locators, short excerpts, and context before sharing.
+The extension makes no Run network request, takes no automatic screenshot, retains no serialized full page text, and transmits no result to a project server. Download Report is the only export: an explicit local UTF-8 .md download with suggested filename ui-torture-lab-report.md. Its bytes equal the visible preview without a new page read. It uses a local Blob URL without downloads/clipboardWrite permissions or clipboard writes; initiation failures leave selectable Markdown for manual saving. The browser controls save completion, cancellation, destination and duplicate names. Downloaded files are user-managed copies outside extension retention; clearing a result, closing a tab or ending the session does not delete them. No automatic download, JSON, rich HTML, screenshot, hidden content or remote export is provided. The page and browser may make their own requests. Redaction cannot guarantee anonymity: review origin, pathname, Locators, short excerpts, and context before sharing.
 
 The static website uses no analytics, tracking, third-party fonts, embeds, forms, accounts, advertising, or non-essential cookies. Hosting, Chrome Web Store, GitHub, and browsers apply their own policies.
 

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "product": "UI Torture Lab",
   "distributionStatus": "pre-release",
   "repository": "https://github.com/marlenesco/ui-torture-lab",
@@ -16,7 +16,7 @@
   "scenarios": ["Long Text", "Unbreakable Text", "Large Text"],
   "detectors": ["Text Clipping", "Horizontal Containment Overflow", "Viewport Overflow"],
   "retention": { "area": "session", "resultsPerTab": 1, "history": false, "tabCloseDeletes": true },
-  "export": { "format": "Markdown", "gestureRequired": true, "previewEqualsPayload": true },
+  "export": { "format": "Markdown", "delivery": "download", "extension": ".md", "suggestedFilename": "ui-torture-lab-report.md", "mimeType": "text/markdown;charset=utf-8", "gestureRequired": true, "previewEqualsPayload": true },
   "runNetwork": false,
   "automaticScreenshots": false,
   "fullTextSerialization": false,

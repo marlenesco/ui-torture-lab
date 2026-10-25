@@ -26,7 +26,7 @@ Suggested invitation (send only with explicit organizer authorization):
 - A: a trustworthy Text Clipping Finding at a stable clipping boundary. All three Scenarios are validated positive. The boundary is the Finding Subject; the affected text is separate. Observe whether the participant can read before/after Evidence and identify a plausible CSS investigation without treating Possible Cause as a diagnosis.
 - B: flexible normal content produces no supported Finding at the controlled viewport for each Scenario. Observe whether the participant avoids claiming the interface is proven correct.
 - C: all visible content is editable and outside Mutation Eligibility. Each Scenario has zero eligible targets and no Findings. Observe whether the participant distinguishes a coverage limitation from demonstrated robustness or a Scenario-caused defect.
-- All three: explicit Restore and native Copy Markdown are fixture-tested. A controlled conflict may be explored only after the core uncoached tasks, with a separate synthetic fixture; it must not overwrite the primary outcome or be explained as a Finding.
+- All three: explicit Restore and native Download Report are fixture-tested. A controlled conflict may be explored only after the core uncoached tasks, with a separate synthetic fixture; it must not overwrite the primary outcome or be explained as a Finding.
 
 The installed-extension fixture suite validates these outcomes through public controls. Re-run it when changing the fixture, candidate, browser, viewport, or font assumptions. Do not change target layout during a Run to rescue a study outcome.
 
@@ -42,4 +42,4 @@ Any systematic terminology, trust, workflow, inspection, Restore, report, or UI 
 
 ## Fixture verification
 
-On Chrome 155.0.8059.85/macOS, all nine combinations of three controlled fixtures and three Scenarios passed through the installed extension UI, including explicit Restore and native Copy. Lint, strict types, and artifact checks passed. No participant observations were performed.
+On Chrome 155.0.8059.85/macOS, all nine combinations of three controlled fixtures and three Scenarios passed through the installed extension UI, including explicit Restore and the then-current native Copy action (historical evidence; superseded by ADR-0031). Lint, strict types, and artifact checks passed. No participant observations were performed.

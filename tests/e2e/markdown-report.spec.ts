@@ -3,12 +3,12 @@
 import { expect, test } from "@playwright/test";
 import { triggerFixtureAction } from "../support/extension-action";
 import { waitForExtensionPanel } from "../support/extension-panel";
+import { observeMarkdownDownloads } from "../support/markdown-download";
 import { executeAsyncInIsolated } from "../support/extension-script";
 import path from "node:path";
 import puppeteer, { type Browser, type Extension, type Page, type WebWorker } from "puppeteer-core";
 
-type ClipboardMode = "success" | "denied" | "unavailable";
-type ClipboardProbe = { readonly writes: readonly string[]; readonly gestures: readonly boolean[] };
+type DownloadMode = "success" | "create-failed" | "click-failed";
 type ChromeApi = {
   readonly storage: { readonly session: { get(key: null): Promise<Record<string, unknown>> } };
   readonly tabs: { query(details: { active: true; currentWindow: true }): Promise<{ id?: number }[]> };
@@ -36,24 +36,23 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => { await browser?.close(); });
 
-// Replace only the external Clipboard API in the same world as the installed extension.
-const clipboardProbe = (mode: ClipboardMode): Promise<ClipboardProbe> => test.step(`Clipboard probe: ${mode}`, () =>
-  executeAsyncInIsolated(worker, async (mode: ClipboardMode) => {
-    const scope = globalThis as unknown as { clipboardProbe?: { writes: string[]; gestures: boolean[] } };
-    const probe = scope.clipboardProbe ??= { writes: [], gestures: [] };
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: mode === "unavailable" ? undefined : {
-        writeText: async (value: string) => {
-          probe.writes.push(value);
-          probe.gestures.push(navigator.userActivation.isActive);
-          if (mode === "denied") throw new DOMException("Clipboard denied", "NotAllowedError");
-        },
-      },
-    });
-    return probe;
-  }, mode),
-);
+// Fault injection changes only the native export boundary, never the report or formatter.
+const downloadProbe = (mode: DownloadMode): Promise<boolean[]> => executeAsyncInIsolated(worker, async (mode: DownloadMode) => {
+  const scope = globalThis as unknown as { reportDownloadProbe?: {
+    create: typeof URL.createObjectURL; click: typeof HTMLAnchorElement.prototype.click; gestures: boolean[];
+  } };
+  const probe = scope.reportDownloadProbe ??= { create: URL.createObjectURL.bind(URL), click: HTMLAnchorElement.prototype.click, gestures: [] };
+  URL.createObjectURL = blob => {
+    probe.gestures.push(navigator.userActivation.isActive);
+    if (mode === "create-failed") throw new Error("Synthetic object URL failure");
+    return probe.create(blob);
+  };
+  HTMLAnchorElement.prototype.click = function () {
+    if (mode === "click-failed") throw new Error("Synthetic download activation failure");
+    return probe.click.call(this);
+  };
+  return probe.gestures;
+}, mode);
 
 const preview = (page: Page): Promise<string> => page.$eval(
   '[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]',
@@ -70,76 +69,81 @@ const panelText = (page: Page): Promise<string | null> => page.$eval(
 const click = (page: Page, name: string): Promise<void> => test.step(`Panel click: ${name}`, () => page.locator(`::-p-aria(${name})`).setTimeout(5000).click());
 
 async function completedRun(page: Page): Promise<void> {
-  await test.step("Navigate to clipboard fixture", () => page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment"), { timeout: 5000 });
-  await test.step("Activate clipboard fixture tab", () => page.bringToFront(), { timeout: 5000 });
-  await test.step("Authorize clipboard fixture by toolbar", () => triggerFixtureAction(page, extension), { timeout: 5000 });
-  await test.step("Mount clipboard fixture panel", () => waitForExtensionPanel(page), { timeout: 5000 });
+  await test.step("Navigate to download fixture", () => page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment"), { timeout: 5000 });
+  await test.step("Activate download fixture tab", () => page.bringToFront(), { timeout: 5000 });
+  await test.step("Authorize download fixture by toolbar", () => triggerFixtureAction(page, extension), { timeout: 5000 });
+  await test.step("Mount download fixture panel", () => waitForExtensionPanel(page), { timeout: 5000 });
   await click(page, "Apply Long Text");
   await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
   await click(page, "Restore");
   await waitForPreview(page);
 }
 
-test("built extension copies the exact visible Markdown only on a user click after Restore", async () => {
-  const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
+test("built extension downloads the exact visible UTF-8 Markdown only on a user click after Restore", async () => {
+  const page = await test.step("Create download fixture tab", () => browser.newPage(), { timeout: 5000 });
+  const downloads = await observeMarkdownDownloads(browser);
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await page.bringToFront();
     await triggerFixtureAction(page, extension);
-    await clipboardProbe("success");
+    await downloadProbe("success");
     await click(page, "Apply Long Text");
     await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
-    expect((await clipboardProbe("success")).writes).toEqual([]);
+    expect(downloads.count()).toBe(0);
     await click(page, "Restore");
     await waitForPreview(page);
     const markdown = await preview(page);
     expect(markdown).toContain("### Text Clipping");
     expect(markdown).toContain("Restore status: restored");
     expect(markdown).not.toContain("No supported Finding was produced");
-    expect((await clipboardProbe("success")).writes).toEqual([]);
+    expect(downloads.count()).toBe(0);
     await page.$eval("#clipping-boundary", (element) => { element.textContent = "NEW PAGE CONTENT MUST NOT BE EXPORTED"; });
-    await click(page, "Copy Report as Markdown");
-    await expect.poll(() => panelText(page)).toContain("Markdown copied.");
+    const file = await downloads.capture(() => click(page, "Download Report"));
+    await expect.poll(() => panelText(page)).toContain("Markdown download requested.");
     expect(await preview(page)).toBe(markdown);
-    expect(await clipboardProbe("success")).toEqual({ writes: [markdown], gestures: [true] });
-    await click(page, "Copy Report as Markdown");
-    expect((await clipboardProbe("success")).writes).toEqual([markdown, markdown]);
-  } finally { await page.close(); }
+    expect(file.filename).toBe("ui-torture-lab-report.md");
+    expect(file.url).toMatch(/^blob:/u);
+    expect(file.bytes).toEqual(Buffer.from(markdown, "utf8"));
+    expect(markdown).toContain("—");
+    expect(await downloadProbe("success")).toEqual([true]);
+    const repeat = await downloads.capture(() => click(page, "Download Report"));
+    expect(repeat.filename).toBe(file.filename);
+    expect(repeat.bytes).toEqual(file.bytes);
+    expect(downloads.count()).toBe(2);
+  } finally { await downloads.dispose(); await page.close(); }
 });
 
-for (const mode of ["denied", "unavailable"] as const) {
-  test(`built extension keeps full selectable Markdown when clipboard is ${mode}`, async () => {
-    const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
+for (const mode of ["create-failed", "click-failed"] as const) {
+  test(`built extension preserves selectable Markdown when download is ${mode}`, async () => {
+    const page = await browser.newPage();
+    const downloads = await observeMarkdownDownloads(browser);
     try {
       await completedRun(page);
       const markdown = await preview(page);
       expect(markdown).not.toContain("private=query");
       expect(markdown).not.toContain("fragment");
-      expect((await clipboardProbe(mode)).writes).toEqual([]);
-      await click(page, "Copy Report as Markdown");
-      await expect.poll(() => panelText(page)).toContain("Clipboard unavailable. Select the Markdown below and copy it manually.");
+      await downloadProbe(mode);
+      await click(page, "Download Report");
+      await expect.poll(() => panelText(page)).toContain("Download unavailable. Select the Markdown below and save it as a .md file.");
       expect(await preview(page)).toBe(markdown);
+      expect(downloads.count()).toBe(0);
       await click(page, "Markdown preview");
-      const selection = await page.$eval(
-        '[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]',
-        (element) => {
-          const textarea = element as HTMLTextAreaElement;
-          return textarea.value.slice(textarea.selectionStart, textarea.selectionEnd);
-        },
-      );
+      const selection = await page.$eval('[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]', element => {
+        const textarea = element as HTMLTextAreaElement;
+        return textarea.value.slice(textarea.selectionStart, textarea.selectionEnd);
+      });
       expect(selection).toBe(markdown);
-      expect((await clipboardProbe(mode)).writes).toEqual(mode === "denied" ? [markdown] : []);
-      // A retry succeeds without a new Run or loss of the serialized result.
-      await clipboardProbe("success");
-      await click(page, "Copy Report as Markdown");
-      await expect.poll(() => panelText(page)).toContain("Markdown copied.");
-      expect((await clipboardProbe("success")).writes.at(-1)).toBe(markdown);
-    } finally { await page.close(); }
+      await downloadProbe("success");
+      const file = await downloads.capture(() => click(page, "Download Report"));
+      expect(file.bytes).toEqual(Buffer.from(markdown, "utf8"));
+      await expect.poll(() => panelText(page)).toContain("Markdown download requested.");
+    } finally { await downloads.dispose(); await page.close(); }
   });
 }
 
-test("Previous-Target Snapshot remains copyable after reload with no live Finding actions", async () => {
-  const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
+test("Previous-Target Snapshot remains downloadable after reload with no live Finding actions", async () => {
+  const page = await test.step("Create download fixture tab", () => browser.newPage(), { timeout: 5000 });
+  const downloads = await observeMarkdownDownloads(browser);
   try {
     await completedRun(page);
     const current = await preview(page);
@@ -160,29 +164,37 @@ test("Previous-Target Snapshot remains copyable after reload with no live Findin
     expect(markdown.replace("- Termination reason: page\\-exit\n", "")).toBe(current.replace("Lifecycle: Current Run Result", "Lifecycle: Previous-Target Snapshot") + "This Previous-Target Snapshot has no live DOM actions; elements are not rematched.\n");
     expect(await panelText(page)).not.toContain("Highlight subject");
     expect(await panelText(page)).not.toContain("Navigate");
-    await clipboardProbe("success");
+
     await page.$eval("#clipping-boundary", (element) => element.remove());
-    await click(page, "Copy Report as Markdown");
-    await expect.poll(() => panelText(page)).toContain("Markdown copied.");
-    expect(await clipboardProbe("success")).toEqual({ writes: [markdown], gestures: [true] });
+    const file = await downloads.capture(() => click(page, "Download Report"));
+    await expect.poll(() => panelText(page)).toContain("Markdown download requested.");
+    expect(file.bytes).toEqual(Buffer.from(markdown, "utf8"));
     await click(page, "Clear saved result");
     expect(await page.$('[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]')).toBeNull();
-  } finally { await page.close(); }
+  } finally { await downloads.dispose(); await page.close(); }
 });
 
-test("Chrome copies the report through its native permissionless Clipboard API", async () => {
-  const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
+test("a zero-Finding result remains downloadable as Markdown", async () => {
+  const page = await browser.newPage();
+  const downloads = await observeMarkdownDownloads(browser);
   try {
-    await completedRun(page);
+    await page.goto("http://127.0.0.1:4173/product-validation/c/");
+    await page.bringToFront();
+    await triggerFixtureAction(page, extension);
+    await click(page, "Apply Long Text");
+    await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
+    await click(page, "Restore");
+    await waitForPreview(page);
     const markdown = await preview(page);
-    await click(page, "Copy Report as Markdown");
-    await expect.poll(() => panelText(page)).toContain("Markdown copied.");
-    expect(await preview(page)).toBe(markdown);
-  } finally { await page.close(); }
+    expect(markdown).toContain("No Findings were produced.");
+    const file = await downloads.capture(() => click(page, "Download Report"));
+    expect(file.bytes).toEqual(Buffer.from(markdown, "utf8"));
+  } finally { await downloads.dispose(); await page.close(); }
 });
 
-test("Restore conflicts keep the reload-required result available for copying", async () => {
-  const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
+test("Restore conflicts keep the reload-required result available for download", async () => {
+  const page = await test.step("Create download fixture tab", () => browser.newPage(), { timeout: 5000 });
+  const downloads = await observeMarkdownDownloads(browser);
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await page.bringToFront();
@@ -197,10 +209,10 @@ test("Restore conflicts keep the reload-required result available for copying", 
     expect(markdown).toContain("Reload required: yes");
     expect(markdown).toContain("target\\-disconnected");
     expect(await panelText(page)).toContain("Reload required");
-    await clipboardProbe("success");
-    await click(page, "Copy Report as Markdown");
-    await expect.poll(() => panelText(page)).toContain("Markdown copied.");
-    expect((await clipboardProbe("success")).writes).toEqual([markdown]);
+
+    const file = await downloads.capture(() => click(page, "Download Report"));
+    await expect.poll(() => panelText(page)).toContain("Markdown download requested.");
+    expect(file.bytes).toEqual(Buffer.from(markdown, "utf8"));
     expect(await page.$eval("#clipping-boundary", (element) => element.textContent)).toBe("External change");
-  } finally { await page.close(); }
+  } finally { await downloads.dispose(); await page.close(); }
 });
