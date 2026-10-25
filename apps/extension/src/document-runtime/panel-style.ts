@@ -119,27 +119,28 @@ export const panelCss = `
   .panel-toggle,
   .panel-action {
     appearance: none;
-    border: 1px solid var(--panel-line);
-    border-radius: 8px;
+    border: 0;
+    border-radius: 4px;
     cursor: pointer;
-    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    transition: color 120ms ease;
   }
 
   .panel-toggle {
     min-block-size: 32px;
     color: #d7ded1;
-    background: #252c22;
-    padding: 6px 9px;
+    background: transparent;
+    padding: 6px 4px;
     font-size: 12px;
     font-weight: 550;
   }
 
   .panel-toggle:hover:enabled {
-    background: #303a2a;
-    border-color: #65715b;
+    color: var(--panel-accent);
+    text-decoration: underline;
+    text-underline-offset: 4px;
   }
   .panel-toggle:active:enabled {
-    background: #1e251b;
+    color: #bddb60;
   }
   button:focus-visible,
   .markdown-report textarea:focus-visible {
@@ -164,39 +165,27 @@ export const panelCss = `
   .panel-action {
     min-block-size: 42px;
     justify-self: stretch;
-    color: #191d18;
-    background: var(--panel-accent);
-    border-color: var(--panel-accent);
-    padding: 10px 12px;
+    color: var(--panel-accent);
+    background: transparent;
+    padding: 10px 4px;
     text-align: start;
     font-weight: 650;
   }
 
   .panel-action:hover:enabled {
-    background: #e4ff87;
-    border-color: #e4ff87;
+    color: #e4ff87;
+    text-decoration: underline;
+    text-underline-offset: 4px;
   }
   .panel-action:active:enabled {
-    background: #c5e354;
-  }
-  .scenario-actions .panel-action {
-    background: #252e1e;
-    border-color: #425334;
-    color: var(--panel-accent);
-  }
-  .scenario-actions .panel-action:hover:enabled {
-    background: #35442a;
-    border-color: #7a925e;
-  }
-  .scenario-actions .panel-action:active:enabled {
-    background: #1e2718;
+    color: #bddb60;
   }
 
   .panel-shell button:disabled {
     color: #9da694;
-    background: #20251f;
-    border-color: #4b5546;
-    border-style: dashed;
+    background: transparent;
+    border: 0;
+    text-decoration: none;
     font-weight: 500;
     cursor: not-allowed;
     opacity: 1;
@@ -268,6 +257,7 @@ export const panelCss = `
   }
 
   .panel-toggle--expand {
+    background: #191d18;
     margin: 0;
     padding: 9px 12px;
     border-radius: 999px;

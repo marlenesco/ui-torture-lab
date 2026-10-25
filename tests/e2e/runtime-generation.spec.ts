@@ -103,7 +103,8 @@ test("Scenario controls show an unavailable state until the current grant acknow
     expect(disabledAppearance).toHaveLength(3);
     for (const style of disabledAppearance) {
       expect(style.cursor).toBe("not-allowed");
-      expect(style.border).toBe("dashed");
+      expect(style.border).toBe("none");
+      expect(style.background).toBe("rgba(0, 0, 0, 0)");
     }
     await page.screenshot({ path: test.info().outputPath("panel-disabled.png") });
     expect(await page.$eval("#boundary", node => node.textContent)).toBe("Checkout");
@@ -117,13 +118,13 @@ test("Scenario controls show an unavailable state until the current grant acknow
     await worker.evaluate("globalThis.releaseGrantAcknowledgement()");
     await expect.poll(controls).toEqual([false, false, false]);
     await expect.poll(async () => (await appearance()).map((style, index) =>
-      style.background !== disabledAppearance[index]?.background && style.color !== disabledAppearance[index]?.color,
+      style.color !== disabledAppearance[index]?.color,
     )).toEqual([true, true, true]);
     const enabledAppearance = await appearance();
     for (const [index, style] of enabledAppearance.entries()) {
       expect(style.cursor).toBe("pointer");
-      expect(style.border).toBe("solid");
-      expect(style.background).not.toBe(disabledAppearance[index]?.background);
+      expect(style.border).toBe("none");
+      expect(style.background).toBe("rgba(0, 0, 0, 0)");
       expect(style.color).not.toBe(disabledAppearance[index]?.color);
     }
     await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);
@@ -133,6 +134,17 @@ test("Scenario controls show an unavailable state until the current grant acknow
       return getComputedStyle(button).transitionDuration;
     })).toBe("0s");
     await page.screenshot({ path: test.info().outputPath("panel-enabled.png") });
+    let keyboardFocus: { style: string; width: string } | null = null;
+    for (let attempt = 0; attempt < 8 && keyboardFocus === null; attempt += 1) {
+      await page.keyboard.press("Tab");
+      keyboardFocus = await page.evaluate(() => {
+        const active = document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.activeElement;
+        if (!(active instanceof HTMLButtonElement)) return null;
+        const style = getComputedStyle(active);
+        return { style: style.outlineStyle, width: style.outlineWidth };
+      });
+    }
+    expect(keyboardFocus).toEqual({ style: "solid", width: "2px" });
     await page.locator("::-p-aria(Apply Long Text)").setTimeout(5000).click();
     await expect.poll(() => page.evaluate(() => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent)).toContain("Long Text Scenario active");
     await page.screenshot({ path: test.info().outputPath("panel-findings.png") });
