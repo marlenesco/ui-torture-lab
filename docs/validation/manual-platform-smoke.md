@@ -4,7 +4,7 @@ Use this checklist for issue #26 on macOS, Windows and Linux separately. All thr
 
 ## Preparation
 
-1. Use a clean checkout of public commit `4a208062a79872817a948aed3fa0a7b901523cab` (or an explicitly recorded successor), exact Node from `.node-version`, and pnpm from `packageManager`. Run `pnpm install --frozen-lockfile` and `pnpm build`.
+1. Use a clean checkout of public commit `4ed925d7b99dc96b95691638754348f2081265b2`, the main merge containing PR #48's authorization correction, with exact Node from `.node-version` and pnpm from `packageManager`. Record any intentionally selected successor before the session. Run `pnpm install --frozen-lockfile` and `pnpm build`. The older `4a20806` record is historical baseline evidence, not the smoke candidate.
 2. Load `apps/extension/.output/chrome-mv3` as an unpacked extension in normal desktop Chrome stable. Record actual OS/browser versions, source SHA and SHA-256 of the manifest, background.js and document-runtime.js. Version 0.0.0 is a pre-release candidate, not an Official Distribution.
 3. Start `pnpm dev:fixtures` for original synthetic HTTP fixtures. For the eight static site routes, run `pnpm --filter @ui-torture-lab/site exec astro preview --host 127.0.0.1`. The local canonical is intentional while Cloudflare is deferred. Close both processes afterward. Use only original synthetic pages for recorded evidence.
 
