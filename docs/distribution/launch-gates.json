@@ -1,6 +1,6 @@
 {
   "technicalValidation": "pending",
-  "productValidation": "pending",
+  "productValidation": "passed",
   "siteDeployment": "passed",
   "sourceProtection": "passed"
 }

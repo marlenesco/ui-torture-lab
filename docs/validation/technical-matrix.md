@@ -1,6 +1,6 @@
 # Pre-launch Technical Validation matrix
 
-Recorded 2026-10-25 for issue #26. **Technical Validation remains pending:** the public main reconstruction and authorization correction pass locally; manual platform sign-off is incomplete. The captured Linux failure and the correction are recorded separately below. Strict CI on the correction must pass before merge. The static Pages site is deployed and its separate hosting evidence is in [the deployment record](../distribution/cloudflare-pages.md). Technical and Product Validation remain pending.
+Recorded 2026-10-25 for issue #26. **Technical Validation remains pending:** the public main reconstruction and authorization correction pass locally; manual platform sign-off is incomplete. The captured Linux failure and the correction are recorded separately below. Strict CI on the correction must pass before merge. The static Pages site is deployed and its separate hosting evidence is in [the deployment record](../distribution/cloudflare-pages.md). Technical Validation remains pending; Product Validation now follows the owner-adopted [six-profile simulation](product/2026-10-26-simulated-review.md), without a human usability claim.
 
 ## Source and clean reconstruction
 
@@ -68,7 +68,7 @@ The fresh full suite asserted exact before/after equality for floating UI viewpo
 
 ## Merged correction
 
-[PR #48](https://github.com/marlenesco/ui-torture-lab/pull/48) merged as `4ed925d7b99dc96b95691638754348f2081265b2`. [Strict main CI](https://github.com/marlenesco/ui-torture-lab/actions/runs/40213504538) passed 75 contracts, 167 E2E and 65 zero-retry authorization checks. The smoke checklist now pins this merged candidate; pre-fix records remain historical. Standards review found zero issues; Spec review found one non-blocking candidate-SHA documentation follow-up, addressed by that pin. See [the review](pr48-review.md).
+[PR #48](https://github.com/marlenesco/ui-torture-lab/pull/48) merged as `4ed925d7b99dc96b95691638754348f2081265b2`. [Strict main CI](https://github.com/marlenesco/ui-torture-lab/actions/runs/40213504538) passed 75 contracts, 167 E2E and 65 zero-retry authorization checks. This was the corrected historical candidate; the smoke checklist now pins protected main `7b579c0` (version 1.0.0, PR #51). Pre-fix records remain historical. Standards review found zero issues; Spec review found one non-blocking candidate-SHA documentation follow-up, addressed by that pin. See [the review](pr48-review.md).
 
 ## Remaining manual validation
 
@@ -84,6 +84,6 @@ Known limits: top-level HTTP(S) light-DOM HTML only; no iframe/Shadow traversal,
 
 Unsafe Restore, false attribution, undeclared retention, unexpected extension requests, hidden export data and artifact divergence remain non-waivable blockers. None was observed by the passing checks; strict CI on the merged correction passed and manual unknowns remain open. `launch-gates.json.technicalValidation` stays `pending`; **#26 must remain open**.
 
-Cloudflare deployment/preview/rollback evidence is recorded under #25. The participant study (#28) and Official Distribution (#29) remain open. GitHub reports main as unprotected; protection, canonical Store identity, version/tag and final release-record validation remain prerequisites. The Pages GitHub App was explicitly authorized for only this repository. No tags, Store submission or release publication were performed.
+Cloudflare deployment/preview/rollback evidence is recorded under #25. The owner replaced the human-participant launch criterion in #28 with [six explicitly simulated professional-role reviews](product/2026-10-26-simulated-review.md); human usability remains unverified. Official Distribution (#29) remains pending. Main protection was enabled and [read back on 2026-10-26](records/2026-10-26-main-protection.json). Canonical Store identity, final tag and release-record validation remain prerequisites. The Pages GitHub App was explicitly authorized for only this repository. No tags, Store submission or release publication were performed.
 
 The 2026-10-25 macOS session reported disconnected and overlapping control panels. [Runtime generation recovery](runtime-generation-recovery.md) records the synthetic reproduction, conservative admission correction, and manual retest requirement. This report does not complete a platform sign-off.

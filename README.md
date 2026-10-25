@@ -9,8 +9,10 @@ UI Torture Lab is a pre-release Chrome desktop extension for deterministic text
 stress testing with measurable before-and-after Evidence.
 
 > **Project status:** the development build implements the text stress workflow.
-> Manual platform and Product Validation remain pending; no Official Distribution
-> is published on Chrome Web Store.
+> Manual platform validation remains pending. Product Validation uses an explicit
+> [six-profile AI review](docs/validation/product/2026-10-26-simulated-review.md);
+> actual human usability remains unverified. No Official Distribution is published
+> on Chrome Web Store.
 
 The workspace and Chrome manifest are versioned **1.0.0** as a release candidate.
 See the [publication checklist](docs/distribution/publication.md) for the remaining
