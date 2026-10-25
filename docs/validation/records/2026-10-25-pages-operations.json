@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-25",
+  "project": "ui-torture-lab",
+  "productionOrigin": "https://ui-torture-lab.pages.dev",
+  "productionSource": "4ed925d7b99dc96b95691638754348f2081265b2",
+  "repositoryScope": {
+    "selection": "only-selected",
+    "repositories": [
+      "marlenesco/ui-torture-lab"
+    ],
+    "verifiedOnInstalledGitHubAppScreen": true
+  },
+  "rollback": {
+    "from": "8a5adccc-1892-46c3-90bd-003024db3fe6",
+    "to": "ac7488a1-d36e-48aa-88cc-9343f2e9ab06",
+    "sameSourceAndPayload": true,
+    "activeProductionConfirmedInDashboard": true,
+    "routeChecksPassed": 8,
+    "matchesLocalCanonicalBuild": true,
+    "checkedAt": "2026-10-25T17:04:07.142Z",
+    "note": "Live rollback between two successful identical production builds; no extension release or content change."
+  },
+  "preview": {
+    "deployment": "a37dce60-c68a-4138-8cb5-7800fbfe6a23",
+    "origin": "https://a37dce60.ui-torture-lab.pages.dev",
+    "source": "444845d8eeecda1aa6e00b12315621e3a3272eb8",
+    "branch": "issue-25-pages-deployment",
+    "pullRequest": 49,
+    "routeChecksPassed": 8,
+    "matchesLocalCanonicalBuild": true,
+    "canonicalOriginRemainsProduction": true,
+    "checkedAt": "2026-10-25T17:04:06.874Z"
+  },
+  "hosting": {
+    "staticHtmlFiles": 8,
+    "javascriptFiles": 0,
+    "separateAssets": 0,
+    "css": "inlined in static HTML",
+    "functionsUploaded": false,
+    "bindings": [],
+    "secretVariables": [],
+    "textVariables": {
+      "NODE_VERSION": "24.13.1",
+      "PNPM_VERSION": "11.20.0",
+      "SITE_URL": "https://ui-torture-lab.pages.dev"
+    },
+    "webAnalytics": "disabled",
+    "addedWorkerOrStorageResources": false
+  },
+  "validationBoundary": "Read-only HTTPS artifact comparison plus actual provider UI operations; no manual Chrome platform acceptance or participant study is claimed."
+}
