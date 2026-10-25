@@ -23,7 +23,7 @@ Recorded 2026-10-25 for issue #26. **Technical Validation remains pending:** the
 | Same-document navigation, same-URL entries, frame isolation, Page Exit, successful/unavailable BFCache | same-document-navigation, page-exit | Passed |
 | UI loss/remount, ownership exclusions, diagnostic hiding, document geometry | target-page-authorization, distribution-lifecycle, ui-surface-comparison | Passed locally; see Linux regression/correction below |
 | Worker suspension, lost heap state, port loss, runtime interruption, tab closure | distribution-lifecycle; sender/session contracts | Passed |
-| Native explicit Copy, exact visible Markdown, clipboard denial/unavailability, hidden-field omission and redaction | markdown-report browser/contracts, formatter goldens, distribution-lifecycle | Passed |
+| Native explicit .md download, exact UTF-8 preview bytes, initiation-failure fallback, hidden-field omission and redaction | markdown-report browser/contracts, formatter goldens, distribution-lifecycle | Passed |
 | Network and retention | Native page/worker Network observations; trusted session inspection and tab-close deletion | No Run requests observed; one reduced result per tab; cleanup passed |
 | Manifest and public claims | Artifact/public-contract/static-site contracts | MV3; activeTab/scripting/storage only; minimum Chrome 155; Incognito disallowed; no persistent hosts |
 | Website | Eight static routes; no-JavaScript navigation; keyboard/focus/responsive checks | Passed locally; public canonical origin verified under #25 |

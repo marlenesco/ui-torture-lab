@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { observeMarkdownDownloads } from "../support/markdown-download";
 import { expect, test } from "@playwright/test";
 import { triggerFixtureAction } from "../support/extension-action";
 import path from "node:path";
@@ -48,8 +49,13 @@ for (const fixture of ["a", "b", "c"] as const) {
         } else expect(markdown).toContain("No Findings were produced.");
         if (fixture === "c") expect(markdown).toContain("Eligible targets: 0");
         expect(await page.$eval("main", (element) => element.innerHTML)).toBe(original);
-        await click(page, "Copy Report as Markdown");
-        await expect.poll(() => panelText(page)).toContain("Markdown copied.");
+        const downloads = await observeMarkdownDownloads(browser);
+        try {
+          const file = await downloads.capture(() => click(page, "Download Report"));
+          expect(file.filename).toBe("ui-torture-lab-report.md");
+          expect(file.bytes).toEqual(Buffer.from(markdown, "utf8"));
+        } finally { await downloads.dispose(); }
+        await expect.poll(() => panelText(page)).toContain("Markdown download requested.");
         expect(await preview(page)).toBe(markdown);
       } finally { await page.close(); }
     });

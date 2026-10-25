@@ -30,17 +30,24 @@ test("published trust copy agrees with the exact manifest permission and browser
 });
 
 test("retention and export claims match executable release-contract commitments", async () => {
+  assert.equal(contract.schemaVersion, 2);
   assert.deepEqual(contract.retention, { area: "session", resultsPerTab: 1, history: false, tabCloseDeletes: true });
-  assert.deepEqual(contract.export, { format: "Markdown", gestureRequired: true, previewEqualsPayload: true });
+  assert.deepEqual(contract.export, { format: "Markdown", delivery: "download", extension: ".md", suggestedFilename: "ui-torture-lab-report.md", mimeType: "text/markdown;charset=utf-8", gestureRequired: true, previewEqualsPayload: true });
   for (const text of [pages.privacy, listing]) for (const term of ["Active Run State", "Previous-Target Snapshot", "session", "one", "redacted", "origin", "pathname", "query", "fragment", "Clear saved result", "tab", "no Run network request", "no automatic screenshot", "visible preview", "cannot guarantee anonymity"]) assert.ok(text.toLowerCase().includes(term.toLowerCase()), term);
   assert.equal(contract.runNetwork, false);
   assert.equal(contract.automaticScreenshots, false);
   assert.equal(contract.fullTextSerialization, false);
   // Behavioral enforcement lives in the installed-extension, sender-validation, and formatter suites.
   const runtime = await read("apps/extension/src/document-runtime/markdown-report.tsx");
-  assert.match(runtime, /navigator\.clipboard\.writeText\(markdown\)/u);
+  assert.match(runtime, /requestMarkdownDownload\(markdown, container\)/u);
+  assert.doesNotMatch(runtime, /navigator\.clipboard/u);
   assert.match(runtime, /value=\{markdown\}/u);
-  assert.doesNotMatch(runtime, /writeText\([^)]+\)[\s\S]*useEffect/u);
+  assert.doesNotMatch(runtime, /useEffect/u);
+  assert.doesNotMatch(listing, /copy the (?:Evidence|visible deterministic Markdown)|Clipboard failure/iu);
+  for (const text of [pages.privacy, pages.docs, pages.permissions, listing]) {
+    assert.ok(text.includes("Download Report"));
+    assert.ok(!text.includes("Copy Report as Markdown"));
+  }
 });
 
 test("distribution, license, support, and pre-release status agree across public surfaces", () => {

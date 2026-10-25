@@ -155,9 +155,9 @@ _Avoid_: Run history, Active Run State
 The deterministic, human-readable representation of exactly one serialized Current Run Result, containing no data absent from the visible redacted result.
 _Avoid_: Rich export, hidden payload
 
-**Copy Report**:
-The explicit user action that sends the visible Markdown Report to the clipboard or presents the same Markdown for manual copying when permissionless clipboard access is unavailable.
-_Avoid_: Automatic export
+**Download Report**:
+The explicit user action that saves exactly the visible Markdown Report as a local Markdown file controlled by the user.
+_Avoid_: Copy Report, automatic export
 
 **Previous-Target Snapshot**:
 A Current Run Result retained after its Explicit Page Grant is invalidated by reload, document replacement, or observed same-document navigation. It remains available for evidence inspection only, with all live DOM actions disabled and no attempt to rematch its elements even when the same Document survives.

@@ -10,6 +10,7 @@ const paths = {
   close: "M6 6l12 12M18 6 6 18",
   highlight: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M9 12h6",
   navigate: "m4 11 16-7-7 16-2-7-7-2Z",
+  download: "M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5",
   copy: "M8 8h12v13H8ZM4 16V3h12",
   clear: "M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7",
 } as const;

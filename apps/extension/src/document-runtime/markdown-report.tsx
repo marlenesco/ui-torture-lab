@@ -1,31 +1,34 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import { PanelIcon } from "./panel-icon";
+import { requestMarkdownDownload } from "./markdown-download";
 import { formatMarkdownReport, type MarkdownReportInput } from "@ui-torture-lab/engine";
 
 export function MarkdownReport({ report }: { readonly report: MarkdownReportInput }) {
   const markdown = formatMarkdownReport(report);
-  const [copyState, setCopyState] = useState<{
+  const [downloadState, setDownloadState] = useState<{
     readonly markdown: string;
     readonly message: string;
   } | null>(null);
 
-  const copy = async (): Promise<void> => {
+  const download = (event: MouseEvent<HTMLButtonElement>): void => {
     try {
-      await navigator.clipboard.writeText(markdown);
-      setCopyState({ markdown, message: "Markdown copied." });
+      const container = event.currentTarget.parentElement;
+      if (container === null) throw new Error("Report container unavailable");
+      requestMarkdownDownload(markdown, container);
+      setDownloadState({ markdown, message: "Markdown download requested." });
     } catch {
-      setCopyState({ markdown, message: "Clipboard unavailable. Select the Markdown below and copy it manually." });
+      setDownloadState({ markdown, message: "Download unavailable. Select the Markdown below and save it as a .md file." });
     }
   };
 
   return (
     <section aria-label="Markdown Report" className="markdown-report">
-      <button className="panel-toggle" onClick={() => { void copy(); }} type="button">
-        <PanelIcon name="copy" />Copy Report as Markdown
+      <button className="panel-toggle" onClick={download} type="button">
+        <PanelIcon name="download" />Download Report
       </button>
-      {copyState?.markdown === markdown ? <p role="status">{copyState.message}</p> : null}
+      {downloadState?.markdown === markdown ? <p role="status">{downloadState.message}</p> : null}
       <label>
         Markdown preview
         <textarea
