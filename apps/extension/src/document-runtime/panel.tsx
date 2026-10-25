@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 import type { MarkdownReportInput, RunController, ScenarioId } from "@ui-torture-lab/engine";
 import { MarkdownReport } from "./markdown-report";
 import { PanelIcon } from "./panel-icon";
+import { BrandLogo } from "./brand-logo";
 
 type ExtensionPanelProps = {
   readonly collapsed: boolean;
@@ -69,9 +70,12 @@ export function ExtensionPanel({
   return (
     <section aria-label="UI Torture Lab" className="panel-shell">
       <header className="panel-header">
-        <div>
-          <strong>UI Torture Lab</strong>
-          <span className="panel-authorization" data-ready={canStartScenario}>{authorized ? "Target Page authorized" : "Target Page authorization ended"}</span>
+        <div className="panel-brand">
+          <BrandLogo />
+          <div>
+            <strong>UI Torture Lab</strong>
+            <span className="panel-authorization" data-ready={canStartScenario}>{authorized ? "Target Page authorized" : "Target Page authorization ended"}</span>
+          </div>
         </div>
         <div className="panel-window-actions">
           <button

@@ -10,6 +10,7 @@
     "pnpm": "11.20.0"
   },
   "scripts": {
+    "brand:generate": "node scripts/generate-branding.mjs",
     "build": "pnpm -r --if-present run build",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm check:artifacts",
     "dev:extension": "pnpm --filter @ui-torture-lab/extension dev",

@@ -1,0 +1,13 @@
+{
+  "sourceSha256": "e852dc3813d0d33dd14bcc566a3feb8b77cedaa05e44bbf18596465d705c0f71",
+  "files": {
+    "apps/site/src/assets/brand-logo.svg": "7b0a197bdc0b99dfab1d43784324801750a57e4c4a09bc4b573eae14f19cb153",
+    "assets/branding/icon.svg": "71ab004805fc0b0f040e58503a5fdddf2d8267130442c85fab1ae6debbf92d7d",
+    "apps/site/public/favicon.svg": "71ab004805fc0b0f040e58503a5fdddf2d8267130442c85fab1ae6debbf92d7d",
+    "apps/extension/src/document-runtime/brand-logo.tsx": "00475e685a0c4ad098565f8c9dbcb9a7d58c75b0542e2fff8c603dd54c3bfc77",
+    "apps/extension/public/icons/icon-16.png": "11c02f8e6c70aa25f05fa5d49842e1deb8d8bce25cf19150242b296de82938cd",
+    "apps/extension/public/icons/icon-32.png": "b28f7555d896c5b11592c4853ae77b8275ec7088b7282090b7d47b415257f501",
+    "apps/extension/public/icons/icon-48.png": "8594c72415a0b96a18211ad71447518a9fd772c03026457abacae0b3796c810f",
+    "apps/extension/public/icons/icon-128.png": "5cad6e47fcf249267933db64eef41767a0dd949a98a51f711d7cc6e6608be403"
+  }
+}

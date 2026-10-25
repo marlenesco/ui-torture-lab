@@ -246,6 +246,10 @@ test("toolbar mounts one floating control shell without geometry contamination",
         ?.shadowRoot?.querySelector(".panel-shell"),
     );
 
+    expect(await page.$eval("[data-ui-torture-lab-root]", host => {
+      const logo = host.shadowRoot?.querySelector("svg.panel-logo");
+      return { count: host.shadowRoot?.querySelectorAll("svg.panel-logo").length, hidden: logo?.getAttribute("aria-hidden"), shapes: logo?.querySelectorAll("path,rect").length };
+    })).toEqual({ count: 1, hidden: "true", shapes: 17 });
     const after = await readFixtureGeometry(page);
     const panel = await page.evaluate(() => {
       const hosts = document.querySelectorAll("[data-ui-torture-lab-root]");
