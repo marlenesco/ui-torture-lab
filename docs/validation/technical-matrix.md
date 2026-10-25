@@ -1,11 +1,11 @@
 # Pre-launch Technical Validation matrix
 
-Recorded 2026-10-25 for issue #26. **Technical Validation remains pending:** the public main reconstruction and authorization correction pass locally; manual platform sign-off is incomplete. The captured Linux failure and the correction are recorded separately below. Strict CI on the correction must pass before merge. Cloudflare account/domain selection and deployment are explicitly deferred under #25. No launch gate has been marked passed.
+Recorded 2026-10-25 for issue #26. **Technical Validation remains pending:** the public main reconstruction and authorization correction pass locally; manual platform sign-off is incomplete. The captured Linux failure and the correction are recorded separately below. Strict CI on the correction must pass before merge. The static Pages site is deployed and its separate hosting evidence is in [the deployment record](../distribution/cloudflare-pages.md). Technical and Product Validation remain pending.
 
 ## Source and clean reconstruction
 
 - Public repository: `https://github.com/marlenesco/ui-torture-lab` (visibility verified through GitHub).
-- Merged main: `4a208062a79872817a948aed3fa0a7b901523cab`, including [PR #47](https://github.com/marlenesco/ui-torture-lab/pull/47).
+- Baseline main: `4a208062a79872817a948aed3fa0a7b901523cab`, including [PR #47](https://github.com/marlenesco/ui-torture-lab/pull/47).
 - A fresh HTTPS clone installed with `pnpm install --frozen-lockfile`, then ran `pnpm check`. Source remained clean after verification. This supersedes the earlier unpublished-candidate reconstruction.
 - Environment: macOS 27.0.1 arm64, installed Google Chrome 155.0.8059.85, exact declared Node 24.13.1 and pnpm 11.20.0. This tests the Chrome floor; it does not establish manual acceptance of newer stable builds.
 - **Passed:** lint, strict TypeScript/Astro checks, all production builds, 70 contract tests, 166 E2E tests (26.5 seconds), and artifact checks. E2E used four workers and zero retries.
@@ -26,7 +26,7 @@ Recorded 2026-10-25 for issue #26. **Technical Validation remains pending:** the
 | Native explicit Copy, exact visible Markdown, clipboard denial/unavailability, hidden-field omission and redaction | markdown-report browser/contracts, formatter goldens, distribution-lifecycle | Passed |
 | Network and retention | Native page/worker Network observations; trusted session inspection and tab-close deletion | No Run requests observed; one reduced result per tab; cleanup passed |
 | Manifest and public claims | Artifact/public-contract/static-site contracts | MV3; activeTab/scripting/storage only; minimum Chrome 155; Incognito disallowed; no persistent hosts |
-| Website | Eight static routes; no-JavaScript navigation; keyboard/focus/responsive checks | Passed locally; canonical origin intentionally local until #25 |
+| Website | Eight static routes; no-JavaScript navigation; keyboard/focus/responsive checks | Passed locally; public canonical origin verified under #25 |
 | Supply chain and generated capabilities | Dependency/notices checks and adversarial artifact contracts | Passed; no capture API, remote code, page bridge, persistent storage or expanded permissions |
 | Large/dynamic pages | Six runtime-bounds cases; fresh measurement below | Passed within the 8,000 ms fixture budget |
 
@@ -66,6 +66,10 @@ Each large-page Run retained 500 eligible targets and produced no Finding; this 
 
 The fresh full suite asserted exact before/after equality for floating UI viewport/client width, document/body scroll width, breakpoint and resize count: zero measured change in those controlled observables. The fresh rejected Side Panel benchmark passed the opposite assertions: reduced layout/client/scroll widths, wide-to-narrow breakpoint transition, unchanged outer width and resize events. The historical 900→514 px result in [UI surface comparison](../../tests/benchmarks/ui-surface-comparison.md) is not presented as a new numeric observation. The seven-case focused benchmark run passed without retries or flaky tests.
 
+## Merged correction
+
+[PR #48](https://github.com/marlenesco/ui-torture-lab/pull/48) merged as `4ed925d7b99dc96b95691638754348f2081265b2`. [Strict main CI](https://github.com/marlenesco/ui-torture-lab/actions/runs/40213504538) passed 75 contracts, 167 E2E and 65 zero-retry authorization checks. The smoke checklist now pins this merged candidate; pre-fix records remain historical. Standards review found zero issues; Spec review found one non-blocking candidate-SHA documentation follow-up, addressed by that pin. See [the review](pr48-review.md).
+
 ## Remaining manual validation
 
 Use [the platform checklist and blank sign-off record](manual-platform-smoke.md) on the exact candidate, in normal current Chrome stable, with actual toolbar interaction. Automated drivers do not constitute manual sign-off.
@@ -78,6 +82,6 @@ Use [the platform checklist and blank sign-off record](manual-platform-smoke.md)
 
 Known limits: top-level HTTP(S) light-DOM HTML only; no iframe/Shadow traversal, other browsers, mobile, Incognito or private-router observation guarantee. Unobservable SPA transitions require Restore first. Page Exit cleanup depends on event delivery; abrupt termination can prevent cleanup. Inconclusive Evidence never becomes a Finding. The Chrome floor is 155; Linux Chrome 156 behavior cannot be inferred from macOS/155.
 
-Unsafe Restore, false attribution, undeclared retention, unexpected extension requests, hidden export data and artifact divergence remain non-waivable blockers. None was observed by the passing checks; strict CI is required for the correction and manual unknowns remain open. `launch-gates.json.technicalValidation` stays `pending`; **#26 must remain open**.
+Unsafe Restore, false attribution, undeclared retention, unexpected extension requests, hidden export data and artifact divergence remain non-waivable blockers. None was observed by the passing checks; strict CI on the merged correction passed and manual unknowns remain open. `launch-gates.json.technicalValidation` stays `pending`; **#26 must remain open**.
 
-Separate later gates are unchanged: Cloudflare deployment/rollback (#25, deferred), participant study (#28), and Official Distribution (#29). GitHub reports main as unprotected; protection, canonical URLs, version/tag and final release-record validation remain release prerequisites. No repository settings, Cloudflare resources, tags, Store submission or release publication were changed.
+Cloudflare deployment/preview/rollback evidence is recorded under #25. The participant study (#28) and Official Distribution (#29) remain open. GitHub reports main as unprotected; protection, canonical Store identity, version/tag and final release-record validation remain prerequisites. The Pages GitHub App was explicitly authorized for only this repository. No tags, Store submission or release publication were performed.

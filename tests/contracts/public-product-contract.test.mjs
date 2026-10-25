@@ -55,7 +55,7 @@ test("distribution, license, support, and pre-release status agree across public
     assert.ok(listing.includes(term), term);
   }
   assert.equal(contract.distributionStatus, "pre-release");
-  assert.equal(contract.siteOrigin, null);
+  assert.equal(contract.siteOrigin, "https://ui-torture-lab.pages.dev");
   assert.equal(contract.storeListing, null);
   assert.ok(pages.install.includes("not yet published"));
   assert.ok(listing.includes("pre-release draft"));

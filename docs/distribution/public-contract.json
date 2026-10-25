@@ -3,7 +3,7 @@
   "product": "UI Torture Lab",
   "distributionStatus": "pre-release",
   "repository": "https://github.com/marlenesco/ui-torture-lab",
-  "siteOrigin": null,
+  "siteOrigin": "https://ui-torture-lab.pages.dev",
   "storeListing": null,
   "browser": "Google Chrome desktop stable",
   "validatedMinimumChrome": "155",

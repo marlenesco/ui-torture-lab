@@ -1,0 +1,81 @@
+{
+  "recordedAt": "2026-10-25T16:57:55.251Z",
+  "sourceCommit": "4ed925d7b99dc96b95691638754348f2081265b2",
+  "origin": "https://ui-torture-lab.pages.dev",
+  "routes": [
+    {
+      "route": "/",
+      "status": 200,
+      "canonical": "https://ui-torture-lab.pages.dev/",
+      "sha256": "58e9400f3b62aeef35f8cae1962d3bf63cbdda23ad48a0abbc367ff8e8fd6657",
+      "matchesLocalBuild": true,
+      "hasScript": false,
+      "hasSetCookie": false
+    },
+    {
+      "route": "/docs/",
+      "status": 200,
+      "canonical": "https://ui-torture-lab.pages.dev/docs/",
+      "sha256": "03e7be388b4d28e622e7af2f9497dc582b1f7f14449aa3e9e01423a027b3f142",
+      "matchesLocalBuild": true,
+      "hasScript": false,
+      "hasSetCookie": false
+    },
+    {
+      "route": "/scope/",
+      "status": 200,
+      "canonical": "https://ui-torture-lab.pages.dev/scope/",
+      "sha256": "49c7469b626adbcb8c333aa8e4b725c92f09331625a26cc94005dff00cf551bb",
+      "matchesLocalBuild": true,
+      "hasScript": false,
+      "hasSetCookie": false
+    },
+    {
+      "route": "/install/",
+      "status": 200,
+      "canonical": "https://ui-torture-lab.pages.dev/install/",
+      "sha256": "c026fd279102d31aec0a08f76d0860459a52f24db8afe7ae93fc25103d94c293",
+      "matchesLocalBuild": true,
+      "hasScript": false,
+      "hasSetCookie": false
+    },
+    {
+      "route": "/privacy/",
+      "status": 200,
+      "canonical": "https://ui-torture-lab.pages.dev/privacy/",
+      "sha256": "19be154b3613f5e96b5a6747c8e3be1d255112f7b00005c757f8c60831286df7",
+      "matchesLocalBuild": true,
+      "hasScript": false,
+      "hasSetCookie": false
+    },
+    {
+      "route": "/permissions/",
+      "status": 200,
+      "canonical": "https://ui-torture-lab.pages.dev/permissions/",
+      "sha256": "c2bd205a75c96574cf1eddeeb925f5d7cb8d17417c209600a195294592db3d5b",
+      "matchesLocalBuild": true,
+      "hasScript": false,
+      "hasSetCookie": false
+    },
+    {
+      "route": "/license/",
+      "status": 200,
+      "canonical": "https://ui-torture-lab.pages.dev/license/",
+      "sha256": "a55c67a4322d4e1775469a716762bc2f288cc4f18a1ddb5b835a0cdf34495f35",
+      "matchesLocalBuild": true,
+      "hasScript": false,
+      "hasSetCookie": false
+    },
+    {
+      "route": "/support/",
+      "status": 200,
+      "canonical": "https://ui-torture-lab.pages.dev/support/",
+      "sha256": "cd815c3b803b68d717b68580275145b58ff59176b4932e33971af04f0b4b8c1b",
+      "matchesLocalBuild": true,
+      "hasScript": false,
+      "hasSetCookie": false
+    }
+  ],
+  "assets": [],
+  "note": "Read-only HTTPS payload comparison with the local SITE_URL build. CSS may be inlined in HTML. This is not manual platform sign-off."
+}
