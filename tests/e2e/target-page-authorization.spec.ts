@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { waitForExtensionPanel } from "../support/extension-panel";
 import path from "node:path";
 import puppeteer, {
   type Browser,
@@ -237,7 +238,7 @@ test("toolbar mounts one floating control shell without geometry contamination",
     const before = await readFixtureGeometry(page);
 
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
     await page.waitForFunction(() =>
       document
         .querySelector("[data-ui-torture-lab-root]")
@@ -340,7 +341,7 @@ test("Document Runtime excludes owned UI and hides diagnostics during capture", 
       "http://127.0.0.1:4173/extension-ui-contamination/",
     );
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
 
     const probe = await exerciseMeasurementSafeRuntime();
 
@@ -370,7 +371,7 @@ test("floating UI loss and remount preserve one active Document Runtime without 
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
 
     const initialRuntimeId = await page.$eval(
       "[data-ui-torture-lab-root]",
@@ -437,7 +438,7 @@ test("floating UI loss and remount preserve one active Document Runtime without 
       await devTools.send("DOM.removeNode", { nodeId });
     }
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
     await expect
       .poll(() =>
         page.$eval(
@@ -452,7 +453,7 @@ test("floating UI loss and remount preserve one active Document Runtime without 
       document.querySelector("[data-ui-torture-lab-overlay-root]")?.remove();
     });
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
 
     const remounted = await page.evaluate(() => ({
       hostCount: document.querySelectorAll("[data-ui-torture-lab-root]").length,
@@ -481,7 +482,7 @@ test("toolbar marks an active Run while collapsed and clears on Page Exit and ex
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
 
     await page.evaluate(() => {
       const root = document.querySelector("[data-ui-torture-lab-root]");
@@ -575,7 +576,7 @@ test("a replacement Document creates a fresh runtime only after a new toolbar ac
     expect(await page.$$("[data-ui-torture-lab-root]")).toHaveLength(0);
 
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
     const nextRuntimeId = await page.$eval(
       "[data-ui-torture-lab-root]",
       (host) => (host as HTMLElement).dataset.uiTortureLabRuntimeId,
@@ -593,7 +594,7 @@ test("a completed Run survives reload only as a non-live Previous Target Snapsho
   try {
     await test.step("Navigate to snapshot fixture", () => page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment"), { timeout: 5000 });
     await test.step("Authorize snapshot fixture", () => triggerToolbarAction(page), { timeout: 5000 });
-    await test.step("Mount snapshot fixture panel", () => page.waitForSelector("[data-ui-torture-lab-root]", { timeout: 5000 }), { timeout: 5000 });
+    await test.step("Mount snapshot fixture panel", () => waitForExtensionPanel(page), { timeout: 5000 });
     await page.evaluate(() => {
       const start = [...(
         document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot

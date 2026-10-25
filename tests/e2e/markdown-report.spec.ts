@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { waitForExtensionPanel } from "../support/extension-panel";
 import { executeAsyncInIsolated } from "../support/extension-script";
 import path from "node:path";
 import puppeteer, { type Browser, type Extension, type Page, type WebWorker } from "puppeteer-core";
@@ -71,7 +72,7 @@ async function completedRun(page: Page): Promise<void> {
   await test.step("Navigate to clipboard fixture", () => page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment"), { timeout: 5000 });
   await test.step("Activate clipboard fixture tab", () => page.bringToFront(), { timeout: 5000 });
   await test.step("Authorize clipboard fixture by toolbar", () => page.triggerExtensionAction(extension), { timeout: 5000 });
-  await test.step("Mount clipboard fixture panel", () => page.waitForSelector("[data-ui-torture-lab-root]", { timeout: 5000 }), { timeout: 5000 });
+  await test.step("Mount clipboard fixture panel", () => waitForExtensionPanel(page), { timeout: 5000 });
   await click(page, "Apply Long Text");
   await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
   await click(page, "Restore");
@@ -152,7 +153,7 @@ test("Previous-Target Snapshot remains copyable after reload with no live Findin
     })).toBe("current");
     await page.reload();
     await page.triggerExtensionAction(extension);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
     await waitForPreview(page);
     const markdown = await preview(page);
     expect(markdown.replace("- Termination reason: page\\-exit\n", "")).toBe(current.replace("Lifecycle: Current Run Result", "Lifecycle: Previous-Target Snapshot") + "This Previous-Target Snapshot has no live DOM actions; elements are not rematched.\n");

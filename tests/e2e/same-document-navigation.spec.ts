@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { waitForExtensionPanel } from "../support/extension-panel";
 import path from "node:path";
 import puppeteer, { type Browser, type Extension, type Page, type WebWorker } from "puppeteer-core";
 
@@ -39,7 +40,7 @@ async function open(page: Page): Promise<void> {
   await page.goto("http://127.0.0.1:4173/same-document-navigation/");
   await page.bringToFront();
   await page.triggerExtensionAction(extension);
-  await page.waitForSelector("[data-ui-torture-lab-root]");
+  await waitForExtensionPanel(page);
 }
 
 const panelText = (page: Page): Promise<string> => page.$eval("[data-ui-torture-lab-root]", (host) => host.shadowRoot?.textContent ?? "");

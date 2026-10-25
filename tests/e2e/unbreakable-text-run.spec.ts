@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { waitForExtensionPanel } from "../support/extension-panel";
 import path from "node:path";
 import puppeteer, {
   type Browser,
@@ -16,7 +17,7 @@ let extension: Extension;
 const triggerToolbarAction = async (page: Page): Promise<void> => {
   await page.bringToFront();
   await page.triggerExtensionAction(extension);
-  await page.waitForSelector("[data-ui-torture-lab-root]", { timeout: 5_000 });
+  await waitForExtensionPanel(page);
 };
 
 const clickPanelButton = async (page: Page, label: string): Promise<void> => {
