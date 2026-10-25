@@ -264,7 +264,7 @@ export default defineBackground(() => {
     let releaseRequired = false;
     try {
       await reconciled;
-      let response = await authorizeTargetPage(tab, attemptId);
+      let response = await authorizeTargetPage(tab, attemptId, isLatest);
       releaseRequired = response.status === "authorized";
       if (!isLatest() || tabId === undefined) return;
       let grantId: string | null = null;

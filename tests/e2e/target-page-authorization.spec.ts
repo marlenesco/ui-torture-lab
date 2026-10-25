@@ -367,6 +367,48 @@ test("Document Runtime excludes owned UI and hides diagnostics during capture", 
   }
 });
 
+test("one toolbar action survives delayed native access publication before the initial probe", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto("http://127.0.0.1:4173/smoke/");
+    await serviceWorker.evaluate(`(() => {
+      const key = Symbol.for("ui-torture-lab/test-delayed-access");
+      const original = chrome.scripting.executeScript;
+      const probe = globalThis[key] = { original, ready: false, calls: 0, clicked: 0 };
+      probe.onClicked = () => { probe.clicked++; };
+      chrome.action.onClicked.addListener(probe.onClicked);
+      chrome.scripting.executeScript = async details => {
+        if (details.target.frameIds && details.args?.length === 2) {
+          probe.calls++;
+          if (!probe.ready) {
+            if (probe.calls === 1) setTimeout(() => { probe.ready = true; }, 50);
+            throw new Error("Cannot access contents of the page. Extension manifest must request permission to access the respective host.");
+          }
+        }
+        return original.call(chrome.scripting, details);
+      };
+    })()`);
+    await triggerToolbarAction(page);
+    await waitForExtensionPanel(page);
+    expect(await serviceWorker.evaluate(`(() => {
+      const probe = globalThis[Symbol.for("ui-torture-lab/test-delayed-access")];
+      return { calls: probe.calls, clicked: probe.clicked };
+    })()`)).toEqual({ calls: 2, clicked: 1 });
+    await expect.poll(readActiveTabActionState).toMatchObject({ badge: "OK" });
+  } finally {
+    await serviceWorker.evaluate(`(() => {
+      const key = Symbol.for("ui-torture-lab/test-delayed-access");
+      const probe = globalThis[key];
+      if (probe) {
+        chrome.scripting.executeScript = probe.original;
+        chrome.action.onClicked.removeListener(probe.onClicked);
+        delete globalThis[key];
+      }
+    })()`);
+    await page.close();
+  }
+});
+
 test("floating UI loss and remount preserve one active Document Runtime without Restore", async () => {
   const page = await browser.newPage();
   try {

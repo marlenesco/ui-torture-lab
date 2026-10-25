@@ -12,6 +12,7 @@ const loadBackground = async ({
   liveTabs = [{ id: 42 }],
   session = new Map(),
   afterAuthorization = async () => undefined,
+  onAuthorizationDelay = (resume) => setImmediate(resume),
 }) => {
   const messageListeners = [];
   const connectListeners = [];
@@ -23,6 +24,7 @@ const loadBackground = async ({
   const feedback = [];
   const scheduledFeedback = [];
   const storageAccessLevels = [];
+  const authorizationDelays = [];
   const backgroundCode = await readFile(
     "apps/extension/.output/chrome-mv3/background.js",
     "utf8",
@@ -118,6 +120,11 @@ const loadBackground = async ({
       },
     },
     setTimeout(callback, delay) {
+      if (delay !== 4000) {
+        authorizationDelays.push(delay);
+        onAuthorizationDelay(callback, delay);
+        return -1;
+      }
       scheduledFeedback.push({ callback, delay });
       return scheduledFeedback.length;
     },
@@ -132,6 +139,7 @@ const loadBackground = async ({
   assert.equal(tabReplacedListeners.length, 1, "tab replacement must reset session identity");
 
   return {
+    authorizationDelays,
     feedback,
     async flushFeedback() {
       for (const scheduled of scheduledFeedback) {
@@ -935,6 +943,7 @@ test("persistent denied access stays bounded and never mounts a runtime", async 
   } });
   await background.invokeToolbar({ id: 42, url: "https://fixture.test/" });
   assert.equal(probes, 2);
+  assert.deepEqual(background.authorizationDelays, [100]);
   assert.equal(background.scriptCalls.some((call) => call.files), false);
   assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "!");
 });
@@ -947,6 +956,99 @@ test("navigation discovered by the repeated initial probe still rejects the orig
   } });
   await background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
   assert.equal(probes, 2);
+  assert.equal(background.scriptCalls.some((call) => call.files), false);
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "!");
+});
+
+test("initial access recheck yields for native permission publication instead of exhausting both probes immediately", async () => {
+  let resume;
+  let permissionReady = false;
+  let probes = 0;
+  const background = await loadBackground({
+    onAuthorizationDelay(callback) { resume = () => { permissionReady = true; callback(); }; },
+    executeScript: async (details) => {
+      if (details.target.frameIds) {
+        probes++;
+        if (!permissionReady) throw new Error("Cannot access contents of the page");
+      }
+      return [{ frameId: 0, documentId: "document-1", result: details.target.frameIds
+        ? { type: "target-probe-response", status: "matched", protocol: "http:" }
+        : { type: "target-bootstrap-response", status: "bootstrapped", protocol: "http:", contentType: "text/html", topLevel: true } }];
+    },
+  });
+  const pending = background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
+  await settled();
+  assert.equal(probes, 1, "the second probe must wait for a native publication opportunity");
+  assert.deepEqual(background.authorizationDelays, [100]);
+  assert.equal(background.feedback.length, 0);
+  resume();
+  await pending;
+  assert.equal(probes, 2);
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "OK");
+  assert.deepEqual(JSON.parse(JSON.stringify(background.scriptCalls[0].args)), JSON.parse(JSON.stringify(background.scriptCalls[1].args)));
+  assert.deepEqual(JSON.parse(JSON.stringify(background.scriptCalls[0].target)), JSON.parse(JSON.stringify(background.scriptCalls[1].target)));
+});
+
+test("an older toolbar attempt waiting for permissions cannot probe over a newer grant", async () => {
+  let resume;
+  let probes = 0;
+  const background = await loadBackground({
+    onAuthorizationDelay(callback) { resume = callback; },
+    executeScript: async (details) => {
+      if (details.target.frameIds && ++probes === 1) throw new Error("Cannot access contents of the page");
+      return [{ frameId: 0, documentId: "document-1", result: details.target.frameIds
+        ? { type: "target-probe-response", status: "matched", protocol: "http:" }
+        : { type: "target-bootstrap-response", status: "bootstrapped", protocol: "http:", contentType: "text/html", topLevel: true } }];
+    },
+  });
+  const old = background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
+  await settled();
+  assert.equal(typeof resume, "function");
+  await background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
+  const session = JSON.stringify(background.session.get("ui-torture-lab:tab-session:42"));
+  const feedback = background.feedback.length;
+  resume();
+  await old;
+  assert.equal(probes, 2, "superseded attempt must not inject another probe");
+  assert.equal(JSON.stringify(background.session.get("ui-torture-lab:tab-session:42")), session);
+  assert.equal(background.feedback.length, feedback);
+});
+
+test("unrelated initial injection errors reject without waiting or retrying", async () => {
+  const background = await loadBackground({ executeScript: async () => { throw new Error("No tab with id: 42"); } });
+  await background.invokeToolbar({ id: 42, url: "https://fixture.test/" });
+  assert.deepEqual(background.authorizationDelays, []);
+  assert.equal(background.scriptCalls.filter((call) => call.args?.length === 2).length, 1);
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "!");
+});
+
+test("closing a tab during permission publication cancels its initial access recheck", async () => {
+  let resume;
+  let probes = 0;
+  const background = await loadBackground({
+    onAuthorizationDelay(callback) { resume = callback; },
+    executeScript: async () => { probes++; throw new Error("Cannot access contents of the page"); },
+  });
+  const pending = background.invokeToolbar({ id: 42, url: "https://fixture.test/" });
+  await settled();
+  background.invokeTabRemoved(42);
+  await settled();
+  resume();
+  await pending;
+  assert.equal(probes, 1);
+  assert.equal(background.session.has("ui-torture-lab:tab-session:42"), false);
+  assert.equal(background.feedback.length, 0);
+});
+
+test("access denial after the first successful probe is never delayed or replayed", async () => {
+  let injections = 0;
+  const background = await loadBackground({ executeScript: async () => {
+    if (++injections > 1) throw new Error("Cannot access contents of the page");
+    return [{ frameId: 0, documentId: "document-1", result: { type: "target-probe-response", status: "matched", protocol: "https:" } }];
+  } });
+  await background.invokeToolbar({ id: 42, url: "https://fixture.test/" });
+  assert.equal(injections, 2);
+  assert.deepEqual(background.authorizationDelays, []);
   assert.equal(background.scriptCalls.some((call) => call.files), false);
   assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "!");
 });
