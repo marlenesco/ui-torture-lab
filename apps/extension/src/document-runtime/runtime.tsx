@@ -208,6 +208,7 @@ class DocumentRuntime {
   private page = pageMetadataFor(window.location);
   private unsubscribeEngine: () => void = () => undefined;
   private reachabilityPort: Browser.runtime.Port | null = null;
+  private reachabilityBound = false;
   private navigationObserver: ReturnType<typeof observeSameDocumentNavigation>;
   private reportedRunActivity: boolean | null = null;
   private liveFindingMessage: string | null = null;
@@ -296,6 +297,7 @@ class DocumentRuntime {
     this.reportedRunActivity = false;
     const port = this.reachabilityPort;
     this.reachabilityPort = null;
+    this.reachabilityBound = false;
     try { port?.disconnect(); } catch { /* The local cleanup is already complete. */ }
     if (reason !== "page-exit") this.panel?.render(this.panel.host.dataset.uiTortureLabCollapsed === "true");
     if (this.grantId !== null) this.notifyRuntime({ type: invalidateGrantMessageType, grantId: this.grantId, page: this.page, result });
@@ -466,6 +468,7 @@ class DocumentRuntime {
         <ExtensionPanel
           collapsed={collapsed}
           authorized={this.authorized}
+          canStartScenario={this.authorized && this.reachabilityBound}
           navigationComplete={this.navigationObserver.complete}
           currentRunReport={this.currentRunReport}
           onClearPreviousRunResult={() => this.clearPreviousRunResult()}
@@ -475,7 +478,7 @@ class DocumentRuntime {
           isFindingActionEnabled={(finding) => !this.invalidLiveFindings.has(finding)}
           onRestore={() => { if (this.authorized) this.runController.restore(); }}
           onStartScenario={(scenarioId) => {
-            if (!this.authorized) return;
+            if (!this.authorized || !this.reachabilityBound) return;
             void this.withMeasurementSafeUi(() =>
               this.runController.startScenario(scenarioId)
             );
@@ -576,30 +579,39 @@ class DocumentRuntime {
   private openReachability(): void {
     const old = this.reachabilityPort;
     this.reachabilityPort = null;
+    this.reachabilityBound = false;
     try { old?.disconnect(); } catch { /* The previous transport may already be gone. */ }
     if (this.grantId === null) return;
     const grantId = this.grantId;
+    this.liveFindingMessage = "Connecting to the extension. Wait before starting a Scenario.";
     try {
       const port = browser.runtime.connect({ name: runtimePortName });
       this.reachabilityPort = port;
       port.onMessage.addListener((message) => {
         if (message?.type !== "grant-bound" || message.grantId !== grantId || this.reachabilityPort !== port) return;
+        this.reachabilityBound = true;
+        this.liveFindingMessage = null;
         this.reportedRunActivity = null;
         this.reportRunActivity();
+        this.panel?.render(this.panel.host.dataset.uiTortureLabCollapsed === "true");
       });
       port.onDisconnect.addListener(() => {
         if (this.reachabilityPort !== port) return;
         this.reachabilityPort = null;
+        this.reachabilityBound = false;
         this.reportedRunActivity = false;
         this.notifyRuntime({ type: unreachableMessageType, grantId });
         if (!this.targetEnded) {
-          this.liveFindingMessage = "Extension connection lost. Restore remains available; reopen the toolbar to reconnect.";
+          this.liveFindingMessage = "Extension connection lost. Restore remains available; reopen the toolbar before starting another Scenario.";
           this.panel?.render(this.panel.host.dataset.uiTortureLabCollapsed === "true");
         }
       });
       const phase = this.runController.getSnapshot().phase;
       port.postMessage({ type: bindGrantMessageType, grantId, active: phase === "applying-mutations" || phase === "ready-for-inspection" || phase === "restoring" });
     } catch {
+      this.reachabilityPort = null;
+      this.reachabilityBound = false;
+      this.liveFindingMessage = "Extension connection lost. Restore remains available; reopen the toolbar before starting another Scenario.";
       this.notifyRuntime({ type: unreachableMessageType, grantId });
     }
   }

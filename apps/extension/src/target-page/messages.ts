@@ -66,6 +66,7 @@ export type TargetRejectionReason =
   | "not-top-level-document"
   | "protected-page"
   | "ui-mount-failed"
+  | "unverified-control-surface"
   | "reload-required"
   | "unsupported-protocol";
 
@@ -217,6 +218,7 @@ export const isTargetBootstrapResponse = (
     hasExactKeys(value, ["reason", "status", "type"]) &&
     (value.reason === "document-changed" ||
       value.reason === "non-html-document" ||
+      value.reason === "unverified-control-surface" ||
       value.reason === "not-top-level-document" ||
       value.reason === "unsupported-protocol")
   );

@@ -553,6 +553,21 @@ test("toolbar rejects a same-URL Document replacement between probe and bootstra
   );
 });
 
+test("unverified control surfaces reject authorization with reload feedback before runtime injection", async () => {
+  let call = 0;
+  const background = await loadBackground({
+    executeScript: async () => [{
+      documentId: "orphan-document", frameId: 0,
+      result: ++call === 1
+        ? { type: "target-probe-response", status: "matched", protocol: "https:" }
+        : { type: "target-bootstrap-response", status: "rejected", reason: "unverified-control-surface" },
+    }],
+  });
+  await background.invokeToolbar({ id: 42, url: "https://fixture.test/" });
+  assert.equal(background.scriptCalls.some(call => call.files !== undefined), false);
+  assert.ok(background.feedback.some(([kind, details]) => kind === "title" && details.title.includes("Reload the page")));
+});
+
 test("trusted context rejects malformed bootstrap messages", async () => {
   let injectionNumber = 0;
   const background = await loadBackground({

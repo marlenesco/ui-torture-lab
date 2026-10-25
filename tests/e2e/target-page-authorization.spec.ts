@@ -446,17 +446,7 @@ test("floating UI loss and remount preserve one active Document Runtime without 
       )
       .toBe("false");
 
-    await page.evaluate(() => {
-      const start = [...(
-        document
-          .querySelector("[data-ui-torture-lab-root]")
-          ?.shadowRoot?.querySelectorAll("button") ?? []
-      )].find((button) => button.textContent?.trim() === "Apply Long Text");
-      if (!(start instanceof HTMLButtonElement)) {
-        throw new Error("Long Text control was unavailable");
-      }
-      start.click();
-    });
+    await page.locator("::-p-aria(Apply Long Text)").setTimeout(5000).click();
     await page.waitForFunction(
       () =>
         document
@@ -527,16 +517,7 @@ test("toolbar marks an active Run while collapsed and clears on Page Exit and ex
     await triggerToolbarAction(page);
     await waitForExtensionPanel(page);
 
-    await page.evaluate(() => {
-      const root = document.querySelector("[data-ui-torture-lab-root]");
-      const start = [...(root?.shadowRoot?.querySelectorAll("button") ?? [])].find(
-        (button) => button.textContent?.trim() === "Apply Long Text",
-      );
-      if (!(start instanceof HTMLButtonElement)) {
-        throw new Error("Long Text control was unavailable");
-      }
-      start.click();
-    });
+    await page.locator("::-p-aria(Apply Long Text)").setTimeout(5000).click();
     await page.waitForFunction(
       () =>
         document
@@ -639,14 +620,7 @@ test("a completed Run survives reload only as a non-live Previous Target Snapsho
     await test.step("Navigate to snapshot fixture", () => page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment"), { timeout: 5000 });
     await test.step("Authorize snapshot fixture", () => triggerToolbarAction(page), { timeout: 5000 });
     await test.step("Mount snapshot fixture panel", () => waitForExtensionPanel(page), { timeout: 5000 });
-    await page.evaluate(() => {
-      const start = [...(
-        document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
-          ?.querySelectorAll("button") ?? []
-      )].find((button) => button.textContent?.trim() === "Apply Long Text");
-      if (!(start instanceof HTMLButtonElement)) throw new Error("Long Text control was unavailable");
-      start.click();
-    });
+    await page.locator("::-p-aria(Apply Long Text)").setTimeout(5000).click();
     await page.waitForFunction(
       () => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent?.includes("Restore") === true,
     );

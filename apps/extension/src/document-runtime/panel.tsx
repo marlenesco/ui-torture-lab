@@ -7,6 +7,7 @@ import { MarkdownReport } from "./markdown-report";
 type ExtensionPanelProps = {
   readonly collapsed: boolean;
   readonly authorized: boolean;
+  readonly canStartScenario: boolean;
   readonly navigationComplete: boolean;
   readonly currentRunReport: MarkdownReportInput | null;
   readonly onClearPreviousRunResult: () => void;
@@ -29,6 +30,7 @@ type ExtensionPanelProps = {
 export function ExtensionPanel({
   collapsed,
   authorized,
+  canStartScenario,
   navigationComplete,
   currentRunReport,
   onClearPreviousRunResult,
@@ -81,6 +83,7 @@ export function ExtensionPanel({
       {!navigationComplete ? <p role="status">Navigation observation is incomplete. Restore before changing SPA routes.</p> : null}
       <RunControls
         authorized={authorized}
+        canStartScenario={canStartScenario}
         onRestore={onRestore}
         onClearPreviousRunResult={onClearPreviousRunResult}
         onInspectFinding={onInspectFinding}
@@ -107,10 +110,12 @@ type RunControlsProps = Pick<
   readonly previousRunResult: ExtensionPanelProps["previousRunResult"];
   readonly snapshot: ReturnType<RunController["getSnapshot"]>;
   readonly authorized: boolean;
+  readonly canStartScenario: boolean;
 };
 
 function RunControls({
   authorized,
+  canStartScenario,
   onInspectFinding,
   onClearPreviousRunResult,
   isFindingActionEnabled,
@@ -141,7 +146,7 @@ function RunControls({
         )}
         {authorized ? <>
           <p>Apply one Scenario to the current Target Page.</p>
-          <ScenarioButtons onStartScenario={onStartScenario} />
+          <ScenarioButtons disabled={!canStartScenario} onStartScenario={onStartScenario} />
         </> : <p role="alert">{snapshot.phase === "reload-required" ? "Reload required. Previous Mutations could not be safely restored." : "Click the toolbar action again to authorize the new Target Page."}</p>}
       </div>
     );
@@ -179,7 +184,7 @@ function RunControls({
         <p>No Findings were produced.</p>
         <RestoreSummary result={snapshot.result} />
         <p>{snapshot.result?.summary}</p>
-        <ScenarioButtons onStartScenario={onStartScenario} />
+        <ScenarioButtons disabled={!canStartScenario} onStartScenario={onStartScenario} />
       </div>
     );
   }
@@ -208,7 +213,7 @@ function RunControls({
       />
       <RestoreSummary result={snapshot.result} />
       <p>{snapshot.result?.summary}</p>
-      <ScenarioButtons onStartScenario={onStartScenario} />
+      <ScenarioButtons disabled={!canStartScenario} onStartScenario={onStartScenario} />
     </div>
   );
 }
@@ -350,14 +355,17 @@ const scenarioLabel = (scenarioId: ScenarioId | null): string => {
 };
 
 function ScenarioButtons({
+  disabled,
   onStartScenario,
 }: {
+  readonly disabled: boolean;
   readonly onStartScenario: (scenarioId: ScenarioId) => void;
 }) {
   return (
     <>
       <button
         className="panel-action"
+        disabled={disabled}
         onClick={() => onStartScenario("large-text")}
         type="button"
       >
@@ -365,6 +373,7 @@ function ScenarioButtons({
       </button>
       <button
         className="panel-action"
+        disabled={disabled}
         onClick={() => onStartScenario("long-text")}
         type="button"
       >
@@ -372,6 +381,7 @@ function ScenarioButtons({
       </button>
       <button
         className="panel-action"
+        disabled={disabled}
         onClick={() => onStartScenario("unbreakable-text")}
         type="button"
       >

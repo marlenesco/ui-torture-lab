@@ -84,6 +84,15 @@ export function bootstrapTargetPage(
   if (protocol !== "http:" && protocol !== "https:") return reject("unsupported-protocol");
   if (window.location.href !== expectedUrl || attempt?.id !== attemptId || !attempt.valid) return reject("document-changed");
   if (document.contentType !== "text/html") return reject("non-html-document");
+  const runtime = (globalThis as typeof globalThis & {
+    [key: symbol]: { document: Document; isExtensionOwnedNode(node: Node): boolean } | undefined;
+  })[Symbol.for("ui-torture-lab/document-runtime")];
+  // Markers cannot prove ownership. An unverified surface blocks admission; it is never removed.
+  for (const host of document.querySelectorAll("ui-torture-lab-root,ui-torture-lab-overlay-root,[data-ui-torture-lab-root],[data-ui-torture-lab-overlay-root]")) {
+    if (runtime?.document !== document || typeof runtime.isExtensionOwnedNode !== "function" || !runtime.isExtensionOwnedNode(host)) {
+      return reject("unverified-control-surface");
+    }
+  }
   return { type: responseType, status: "bootstrapped", protocol: protocol as SupportedTargetProtocol, contentType: "text/html", topLevel: true };
 }
 

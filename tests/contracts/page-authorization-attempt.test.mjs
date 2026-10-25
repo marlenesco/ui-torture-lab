@@ -26,7 +26,7 @@ function fixture() {
   const navigation = Object.assign(new TrackedTarget(), { currentEntry: {} });
   const window = Object.assign(new TrackedTarget(), { navigation, location: { href: url, protocol: "http:" } });
   window.top = window;
-  const document = { contentType: "text/html" };
+  const document = { contentType: "text/html", surfaces: [], querySelectorAll() { return this.surfaces; } };
   const context = vm.createContext({ window, document, exports: {}, Symbol });
   vm.runInContext(code, context);
   return { context, window, document, navigation, api: context.exports };
@@ -104,4 +104,32 @@ test("fallback attempt observation and repeated cancellation release all listene
     assert.equal(getAttempt(context), undefined);
     assert.equal(window.count, 0);
   }
+});
+
+for (const kind of ["missing-runtime", "missing-owner", "foreign-document", "mixed-ownership"]) {
+  test(`bootstrap refuses unverified control surfaces (${kind}) without deleting them`, () => {
+    const { context, api, document, window, navigation } = fixture();
+    const orphan = { marker: "page-or-orphan-owned" };
+    const owned = { marker: "owned" };
+    document.surfaces = kind === "mixed-ownership" ? [owned, orphan] : [orphan];
+    if (kind !== "missing-runtime") context[Symbol.for("ui-torture-lab/document-runtime")] = {
+      document: kind === "foreign-document" ? {} : document,
+      ...(kind === "missing-owner" ? {} : { isExtensionOwnedNode: node => node === owned }),
+    };
+    api.probeTargetPage(url, "attempt");
+    assert.equal(api.bootstrapTargetPage(url, "attempt").reason, "unverified-control-surface");
+    assert.equal(getAttempt(context), undefined);
+    assert.equal(window.count + navigation.count, 0);
+    assert.ok(document.surfaces.includes(orphan));
+    assert.equal(orphan.marker, "page-or-orphan-owned");
+  });
+}
+
+test("bootstrap accepts genuine roots only through the current isolated runtime's direct ownership", () => {
+  const { context, api, document } = fixture();
+  const owned = {};
+  document.surfaces = [owned];
+  context[Symbol.for("ui-torture-lab/document-runtime")] = { document, isExtensionOwnedNode: node => node === owned };
+  api.probeTargetPage(url, "attempt");
+  assert.equal(api.bootstrapTargetPage(url, "attempt").status, "bootstrapped");
 });
