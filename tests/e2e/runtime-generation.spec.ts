@@ -58,7 +58,7 @@ test("a fresh isolated extension context refuses orphan UI until the page reload
   }
 });
 
-test("Scenario controls wait for the current grant acknowledgement", async () => {
+test("Scenario controls show an unavailable state until the current grant acknowledgement", async () => {
   const browser = await puppeteer.launch({ executablePath: await puppeteer.executablePath("chrome"), headless: true, enableExtensions: true });
   try {
     const id = await browser.installExtension(path.resolve("apps/extension/.output/chrome-mv3"));
@@ -85,11 +85,41 @@ test("Scenario controls wait for the current grant acknowledgement", async () =>
     const controls = () => page.evaluate(() => [...(document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.querySelectorAll<HTMLButtonElement>("button") ?? [])]
       .filter(button => button.textContent?.startsWith("Apply ")).map(button => button.disabled));
     await expect.poll(controls).toEqual([true, true, true]);
+    const appearance = () => page.evaluate(() => [...(document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.querySelectorAll<HTMLButtonElement>("button") ?? [])]
+      .filter(button => button.textContent?.startsWith("Apply ")).map(button => {
+        const style = getComputedStyle(button);
+        return { background: style.backgroundColor, color: style.color, border: style.borderTopStyle, cursor: style.cursor };
+      }));
+    const disabledAppearance = await appearance();
+    expect(disabledAppearance).toHaveLength(3);
+    for (const style of disabledAppearance) {
+      expect(style.cursor).toBe("not-allowed");
+      expect(style.border).toBe("dashed");
+    }
+    await page.screenshot({ path: test.info().outputPath("panel-disabled.png") });
     expect(await page.$eval("#boundary", node => node.textContent)).toBe("Checkout");
     await worker.evaluate("globalThis.releaseGrantAcknowledgement()");
     await expect.poll(controls).toEqual([false, false, false]);
+    await expect.poll(async () => (await appearance()).map((style, index) =>
+      style.background !== disabledAppearance[index]?.background && style.color !== disabledAppearance[index]?.color,
+    )).toEqual([true, true, true]);
+    const enabledAppearance = await appearance();
+    for (const [index, style] of enabledAppearance.entries()) {
+      expect(style.cursor).toBe("pointer");
+      expect(style.border).toBe("solid");
+      expect(style.background).not.toBe(disabledAppearance[index]?.background);
+      expect(style.color).not.toBe(disabledAppearance[index]?.color);
+    }
+    await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);
+    expect(await page.$eval("[data-ui-torture-lab-root]", host => {
+      const button = host.shadowRoot?.querySelector(".panel-action");
+      if (button === null || button === undefined) throw new Error("Scenario control unavailable");
+      return getComputedStyle(button).transitionDuration;
+    })).toBe("0s");
+    await page.screenshot({ path: test.info().outputPath("panel-enabled.png") });
     await page.locator("::-p-aria(Apply Long Text)").setTimeout(5000).click();
     await expect.poll(() => page.evaluate(() => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent)).toContain("Long Text Scenario active");
+    await page.screenshot({ path: test.info().outputPath("panel-findings.png") });
     await page.locator("::-p-aria(Restore)").setTimeout(5000).click();
     expect(await page.$eval("#boundary", node => node.textContent)).toBe("Checkout");
   } finally { await browser.close(); }

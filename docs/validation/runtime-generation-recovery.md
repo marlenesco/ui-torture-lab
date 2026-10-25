@@ -1,6 +1,6 @@
 # Runtime generation recovery — issue #26
 
-A macOS manual session on 2026-10-25 reported a disconnected control panel followed by overlapping panels after a reload action. The exact reload action is not confirmed. This blocks the manual sign-off; screenshots from the session are private and are not published here.
+A macOS manual session on 2026-10-25 reported a disconnected control panel followed by overlapping panels. The user confirmed an extension reload in `chrome://extensions` as the trigger and clarified that the test page was the public Official Website. Initial human-only reports did not establish a consistent target tab; they are not verified fixture evidence. Private screenshots are not published here.
 
 ## Reproduction and cause
 
@@ -22,4 +22,12 @@ Contract tests cover absent, incomplete, foreign-Document and mixed ownership, g
 
 Local validation passed with Node 24.13.1 and pnpm 11.20.0: `pnpm check` completed lint, typecheck, builds, 81 contract tests, 169 E2E tests and artifact checks. No E2E retry was used. Linux CI evidence belongs to the correction PR.
 
-These checks do not replace the real-toolbar macOS, Windows and Linux checklist in [manual-platform-smoke.md](manual-platform-smoke.md). All platform sign-offs and `technicalValidation` remain pending. Repeat the reported reload sequence with the corrected artifact, record exactly which UI action was used, and verify one panel, one overlay, explicit authorization and working Restore before clearing this blocker.
+An assisted native-browser retest used the same `https://ui-torture-lab.pages.dev/` tab before and after a human-operated extension reload. Direct DOM inspection confirmed one panel, one overlay, a connection-loss message and three disabled Apply buttons. The real toolbar action preserved those counts and requested a page reload. A true page reload and explicit authorization then permitted Long Text and Restore; the restored page body text exactly matched its pre-Run value. The correction PR records this bounded observation separately from the distinct-ID automated reproduction.
+
+## Panel presentation
+
+The panel retains one compact graphite surface and one lime action accent. Scenario choices use aligned full-width rows; Findings and the Markdown preview use spacing and dividers without hiding Evidence or adding new controls. Disabled buttons use a neutral background, muted readable text, a dashed border and `not-allowed` cursor, with no enabled hover treatment. The native disabled attribute remains the activation guard.
+
+Color and border transitions do not animate geometry, and reduced-motion preferences disable transitions. Native browser coverage compares enabled and disabled computed styles, verifies reduced motion, and exercises the existing narrow-viewport and measurement-contamination checks. Screenshots use original synthetic fixtures only.
+
+These checks do not replace the real-toolbar macOS, Windows and Linux checklist in [manual-platform-smoke.md](manual-platform-smoke.md). The assisted reload/recovery check is a partial result; all complete platform sign-offs and `technicalValidation` remain pending.
