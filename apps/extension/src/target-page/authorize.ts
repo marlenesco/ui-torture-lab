@@ -82,20 +82,26 @@ export async function authorizeTargetPage(
 
   let accepted = false;
   try {
-    let probeInjections: Browser.scripting.InjectionResult<unknown>[];
-    try {
-      probeInjections = await browser.scripting.executeScript({
-        target: { tabId: tab.id, frameIds: [0] },
-        world: "ISOLATED",
-        injectImmediately: true,
-        func: probeTargetPage,
-        args: [target.url, attemptId],
-      });
-    } catch {
-      return rejectTargetAuthorization("injection-failed");
+    let probeInjections: Browser.scripting.InjectionResult<unknown>[] | undefined;
+    for (let probeAttempt = 0; probeAttempt < 2; probeAttempt++) {
+      try {
+        probeInjections = await browser.scripting.executeScript({
+          target: { tabId: tab.id, frameIds: [0] },
+          world: "ISOLATED",
+          injectImmediately: true,
+          func: probeTargetPage,
+          args: [target.url, attemptId],
+        });
+        break;
+      } catch (error) {
+        // A toolbar event can precede activeTab propagation. Recheck once, without replaying the action.
+        if (probeAttempt !== 0 || !String(error).includes("Cannot access contents of the page")) {
+          return rejectTargetAuthorization("injection-failed");
+        }
+      }
     }
 
-    const probeInjection = probeInjections[0];
+    const probeInjection = probeInjections?.[0];
     if (
       probeInjection === undefined ||
       probeInjection.frameId !== 0 ||

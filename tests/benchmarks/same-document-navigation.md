@@ -39,3 +39,9 @@ Platform rationale and primary sources: [same-document-navigation-primary-source
 The first toolbar probe installs a one-shot ISOLATED attempt guard before subsequent injections or transport waits. Every observed entry commit, including same-URL state changes, and Page Exit invalidates that attempt. Bootstrap and final authorization validate the same attempt; reauthorization validates it again after snapshot storage acknowledges. Successful or invalidated attempts release the observer and transient full-URL comparison state. Only the minimized result metadata is serialized.
 
 Regressions commit same-URL navigation between each pair of the four native injections, and commit both a route change and a same-URL state update while a previous-snapshot acknowledgement is held. None can authorize the subsequent logical context. Late older toolbar responses cannot replace a newer session grant or feedback.
+
+## Transient first-probe access denial
+
+A retained Linux/Chrome 156 trace captured one toolbar event, a denied first scripting probe, and an immediately successful exact-attempt cleanup on the same tab. This is consistent with a transient access-grant propagation window, rather than a missing toolbar event. Chrome's [activeTab tutorial](https://developer.chrome.com/docs/extensions/get-started/tutorial/scripts-activetab) associates temporary page access with explicit user invocation.
+
+The adapter now repeats only the initial pure probe once when Chrome reports that specific access-denial error. It reuses the exact target, expected URL, and attempt token; it never replays the toolbar action, broadens permissions, retries later Mutation, or extends an Engine timeout. A repeated denial fails closed. A changed URL or invalid logical context still rejects bootstrap. Three contract regressions cover transient success, persistent denial, and navigation discovered by the repeated probe.

@@ -911,3 +911,42 @@ test("a context ended before toolbar feedback cannot be reported as authorized",
   assert.equal(background.session.get("ui-torture-lab:tab-session:42").documentId, null);
   assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "");
 });
+
+test("one toolbar event tolerates a transient activeTab permission failure before the first probe", async () => {
+  let probes = 0;
+  const background = await loadBackground({ executeScript: async (details) => {
+    if (details.target.frameIds && ++probes === 1) throw new Error("Cannot access contents of the page. Extension manifest must request permission to access the respective host.");
+    return [{ frameId: 0, documentId: "document-1", result: details.target.frameIds
+      ? { type: "target-probe-response", status: "matched", protocol: "http:" }
+      : { type: "target-bootstrap-response", status: "bootstrapped", protocol: "http:", contentType: "text/html", topLevel: true } }];
+  } });
+  await background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
+  assert.equal(probes, 2);
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "OK");
+  assert.deepEqual(JSON.parse(JSON.stringify(background.scriptCalls[0].args)), JSON.parse(JSON.stringify(background.scriptCalls[1].args)));
+  assert.deepEqual(JSON.parse(JSON.stringify(background.scriptCalls[0].target)), JSON.parse(JSON.stringify(background.scriptCalls[1].target)));
+});
+
+test("persistent denied access stays bounded and never mounts a runtime", async () => {
+  let probes = 0;
+  const background = await loadBackground({ executeScript: async () => {
+    probes++;
+    throw new Error("Cannot access contents of the page. Extension manifest must request permission to access the respective host.");
+  } });
+  await background.invokeToolbar({ id: 42, url: "https://fixture.test/" });
+  assert.equal(probes, 2);
+  assert.equal(background.scriptCalls.some((call) => call.files), false);
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "!");
+});
+
+test("navigation discovered by the repeated initial probe still rejects the original attempt", async () => {
+  let probes = 0;
+  const background = await loadBackground({ executeScript: async () => {
+    if (++probes === 1) throw new Error("Cannot access contents of the page");
+    return [{ frameId: 0, documentId: "document-1", result: { type: "target-probe-response", status: "rejected", reason: "document-changed" } }];
+  } });
+  await background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
+  assert.equal(probes, 2);
+  assert.equal(background.scriptCalls.some((call) => call.files), false);
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "!");
+});

@@ -16,7 +16,7 @@ Fixed point: main after PR #46, `3a134c7a0b127a0bfec1776bd1f014823419f41a`. Both
 
 - **Issue #19 transient-attempt cleanup (follow-up, corrected):** rejected bootstrap or unmounted/stale authorization attempts now release only their own provisional guard, dropping the full comparison URL and listeners. Token-scoped cancellation cannot stop a newer attempt. VM regressions cover non-HTML and other rejection paths, fallback observation, and repeated cancellation. Unsupported protocols still return before any injection.
 
-Both axes confirm that Cloudflare, manual platform validation, participant studies, and publication are explicitly deferred gates rather than claimed completed work. Local validation after the fixes passed lint, strict types, build, 67 contract tests, 166 E2E tests, and artifact checks. Tests retain the existing timeout/retry policy.
+Both axes confirm that Cloudflare, manual platform validation, participant studies, and publication are explicitly deferred gates rather than claimed completed work. Local validation after the fixes passed lint, strict types, build, 70 contract tests, 166 E2E tests, and artifact checks. Tests retain the existing timeout/retry policy.
 
 Counts: Standards had two corrected correctness findings and one deferred non-blocking duplication heuristic (worst original: authorization boundary, P1); Spec had three original and one follow-up corrected findings (worst original: authorization boundary). No unresolved correctness finding remains from this review.
 
