@@ -46,3 +46,14 @@ A Store listing identity can exist before approval; the website must continue to
 On 2026-10-25, Chrome 155.0.8059.85/macOS: lint, strict types, production build, 52 contract tests, 145 E2E tests, and the read-only artifact gate passed. Adversarial policy tests reached 100% line/function and 96.32% branch coverage. These results establish the automated candidate gate; they do not mark the pending human or public-release gates passed.
 
 Release identity is checked again after `pnpm check` rebuilds the artifacts. The record uses the final manifest's version, matching tag, and permissions alongside the final hashes; stale generated metadata cannot describe a different rebuilt artifact. Explicit Chrome/media capture APIs are rejected independently of the permission budget, because temporary activeTab access can itself permit capture.
+
+## Preserve the first uploaded package
+
+Complete the manual Technical Validation gate and freeze the extension before
+creating the first 1.0.0 Store draft. Preserve that exact ZIP and its SHA-256 hash.
+Recording the new draft identity may require a subsequent reviewed metadata
+commit before tagging; the final protected source must reproduce all packaged
+files exactly. Compare their hashes with the extracted uploaded ZIP alongside the
+release record, without silently replacing Store bytes under the same version.
+A required runtime change after upload needs the Store's normal version-increment
+workflow. See [the publication sequence](publication.md#package-version-sequencing).

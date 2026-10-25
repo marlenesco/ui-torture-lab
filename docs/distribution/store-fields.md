@@ -26,7 +26,9 @@ Developer registration remains pending according to the owner.
 | Publication timing | Prefer deferred publication so the approved listing can receive its final check before becoming available |
 
 Do not describe the candidate as already published. The listing identity remains
-null until an actual draft item exists. Save its item ID and canonical URL before
+null until an actual draft item exists. Complete manual Technical Validation and
+freeze the packaged runtime before the first 1.0.0 upload; replacement uploads
+require a newer version, so do not rely on re-uploading modified 1.0.0 bytes. Save its item ID and canonical URL before
 updating `public-contract.json`; do not use a guessed URL.
 
 ## Privacy practices — prepared text
