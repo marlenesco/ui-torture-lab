@@ -11,7 +11,7 @@
   },
   "scripts": {
     "build": "pnpm -r --if-present run build",
-    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm check:artifacts",
     "dev:extension": "pnpm --filter @ui-torture-lab/extension dev",
     "dev:fixtures": "node tests/fixtures/server.mjs",
     "dev:site": "pnpm --filter @ui-torture-lab/site dev",
@@ -19,7 +19,8 @@
     "test": "pnpm build && pnpm test:contracts && pnpm test:e2e",
     "test:contracts": "node --test tests/contracts/*.test.mjs",
     "test:e2e": "playwright test",
-    "typecheck": "tsc -p tsconfig.json --noEmit && pnpm -r --if-present run typecheck"
+    "typecheck": "tsc -p tsconfig.json --noEmit && pnpm -r --if-present run typecheck",
+    "check:artifacts": "node scripts/check-artifacts.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
