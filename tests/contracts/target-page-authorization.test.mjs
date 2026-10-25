@@ -431,7 +431,7 @@ test("authorization is rejected when the floating control shell cannot mount", a
     url: "https://fixture.test/",
   });
 
-  assert.equal(background.scriptCalls.length, 3);
+  assert.equal(background.scriptCalls.length, 4);
   assert.ok(
     background.feedback.some(
       ([kind, details]) =>
@@ -528,7 +528,7 @@ test("toolbar rejects a same-URL Document replacement between probe and bootstra
     url: "https://fixture.test/same-url",
   });
 
-  assert.equal(background.scriptCalls.length, 2);
+  assert.equal(background.scriptCalls.length, 3);
   assert.deepEqual(
     JSON.parse(JSON.stringify(background.scriptCalls[1].target)),
     { documentIds: ["document-2"], tabId: 42 },

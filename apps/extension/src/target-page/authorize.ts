@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { bootstrapTargetPage, probeTargetPage } from "./bootstrap";
+import { bootstrapTargetPage, cancelPageAuthorizationAttempt, probeTargetPage } from "./bootstrap";
 import { browser, type Browser } from "wxt/browser";
 import {
   authorizationResponseType,
@@ -80,71 +80,86 @@ export async function authorizeTargetPage(
     return target;
   }
 
-  let probeInjections: Browser.scripting.InjectionResult<unknown>[];
+  let accepted = false;
   try {
-    probeInjections = await browser.scripting.executeScript({
-      target: { tabId: tab.id, frameIds: [0] },
-      world: "ISOLATED",
-      injectImmediately: true,
-      func: probeTargetPage,
-      args: [target.url, attemptId],
-    });
-  } catch {
-    return rejectTargetAuthorization("injection-failed");
-  }
+    let probeInjections: Browser.scripting.InjectionResult<unknown>[];
+    try {
+      probeInjections = await browser.scripting.executeScript({
+        target: { tabId: tab.id, frameIds: [0] },
+        world: "ISOLATED",
+        injectImmediately: true,
+        func: probeTargetPage,
+        args: [target.url, attemptId],
+      });
+    } catch {
+      return rejectTargetAuthorization("injection-failed");
+    }
 
-  const probeInjection = probeInjections[0];
-  if (
-    probeInjection === undefined ||
-    probeInjection.frameId !== 0 ||
-    typeof probeInjection.documentId !== "string" ||
-    probeInjection.documentId.length === 0 ||
-    !isTargetProbeResponse(probeInjection.result)
-  ) {
-    return rejectTargetAuthorization("invalid-bootstrap-response");
-  }
+    const probeInjection = probeInjections[0];
+    if (
+      probeInjection === undefined ||
+      probeInjection.frameId !== 0 ||
+      typeof probeInjection.documentId !== "string" ||
+      probeInjection.documentId.length === 0 ||
+      !isTargetProbeResponse(probeInjection.result)
+    ) {
+      return rejectTargetAuthorization("invalid-bootstrap-response");
+    }
 
-  if (probeInjection.result.status === "rejected") {
-    return rejectTargetAuthorization(probeInjection.result.reason);
-  }
+    if (probeInjection.result.status === "rejected") {
+      return rejectTargetAuthorization(probeInjection.result.reason);
+    }
 
-  let bootstrapInjections: Browser.scripting.InjectionResult<unknown>[];
+    let bootstrapInjections: Browser.scripting.InjectionResult<unknown>[];
+    try {
+      bootstrapInjections = await browser.scripting.executeScript({
+        target: {
+          tabId: tab.id,
+          documentIds: [probeInjection.documentId],
+        },
+        world: "ISOLATED",
+        injectImmediately: true,
+        func: bootstrapTargetPage,
+        args: [target.url, attemptId],
+      });
+    } catch {
+      return rejectTargetAuthorization("document-changed");
+    }
+
+    const bootstrapInjection = bootstrapInjections[0];
+    if (
+      bootstrapInjection === undefined ||
+      bootstrapInjection.frameId !== 0 ||
+      bootstrapInjection.documentId !== probeInjection.documentId ||
+      !isTargetBootstrapResponse(bootstrapInjection.result)
+    ) {
+      return rejectTargetAuthorization("invalid-bootstrap-response");
+    }
+
+    if (bootstrapInjection.result.status === "rejected") {
+      return rejectTargetAuthorization(bootstrapInjection.result.reason);
+    }
+
+    accepted = true;
+    return {
+      type: authorizationResponseType,
+      status: "authorized",
+      documentId: bootstrapInjection.documentId,
+      protocol: bootstrapInjection.result.protocol,
+      contentType: bootstrapInjection.result.contentType,
+      topLevel: bootstrapInjection.result.topLevel,
+      executionWorld: "ISOLATED",
+    };
+  } finally {
+    if (!accepted) await releasePageAuthorizationAttempt(tab.id, attemptId);
+  }
+}
+
+export async function releasePageAuthorizationAttempt(tabId: number, attemptId: string): Promise<void> {
   try {
-    bootstrapInjections = await browser.scripting.executeScript({
-      target: {
-        tabId: tab.id,
-        documentIds: [probeInjection.documentId],
-      },
-      world: "ISOLATED",
-      injectImmediately: true,
-      func: bootstrapTargetPage,
-      args: [target.url, attemptId],
+    await browser.scripting.executeScript({
+      target: { tabId, frameIds: [0] }, world: "ISOLATED",
+      func: cancelPageAuthorizationAttempt, args: [attemptId],
     });
-  } catch {
-    return rejectTargetAuthorization("document-changed");
-  }
-
-  const bootstrapInjection = bootstrapInjections[0];
-  if (
-    bootstrapInjection === undefined ||
-    bootstrapInjection.frameId !== 0 ||
-    bootstrapInjection.documentId !== probeInjection.documentId ||
-    !isTargetBootstrapResponse(bootstrapInjection.result)
-  ) {
-    return rejectTargetAuthorization("invalid-bootstrap-response");
-  }
-
-  if (bootstrapInjection.result.status === "rejected") {
-    return rejectTargetAuthorization(bootstrapInjection.result.reason);
-  }
-
-  return {
-    type: authorizationResponseType,
-    status: "authorized",
-    documentId: bootstrapInjection.documentId,
-    protocol: bootstrapInjection.result.protocol,
-    contentType: bootstrapInjection.result.contentType,
-    topLevel: bootstrapInjection.result.topLevel,
-    executionWorld: "ISOLATED",
-  };
+  } catch { /* Page Exit or unavailable runtime can already have removed the attempt. */ }
 }

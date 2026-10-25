@@ -5,6 +5,7 @@ import { browser } from "wxt/browser";
 import {
   authorizeTargetPage,
   rejectTargetAuthorization,
+  releasePageAuthorizationAttempt,
 } from "../target-page/authorize";
 import { mountTargetPageControlShell } from "../target-page/control-shell";
 import {
@@ -260,36 +261,43 @@ export default defineBackground(() => {
     const tabId = tab.id;
     if (tabId !== undefined) toolbarAttempts.set(tabId, attemptId);
     const isLatest = (): boolean => tabId !== undefined && toolbarAttempts.get(tabId) === attemptId;
-    await reconciled;
-    let response = await authorizeTargetPage(tab, attemptId);
-    if (!isLatest() || tabId === undefined) return;
-    let grantId: string | null = null;
-    if (response.status === "authorized") {
-      const documentId = response.documentId;
-      await enqueueTab(tabId, async () => {
-        if (!isLatest()) return;
-        const session = await ensureTabSession(tabId);
-        const result = await readRunResult(session.id);
-        if (!isLatest()) return;
-        if (result !== null && (result.documentId !== documentId || session.documentId === null)) {
-          await browser.storage.session.set({ [runResultStorageKey(session.id)]: { ...result, state: "previous" } });
-        }
-        await writeTabSession(tabId, { ...session, documentId, grantId: attemptId });
-        grantId = attemptId;
-      });
-    }
-    if (!isLatest()) return;
-    if (response.status === "authorized" && grantId !== null) {
-      const mounted = await mountTargetPageControlShell(tabId, response.documentId, grantId);
-      if (mounted !== "mounted") response = rejectTargetAuthorization(mounted === "reload-required" ? "reload-required" : "ui-mount-failed");
-    }
-    await enqueueTab(tabId, async () => {
-      const session = await readTabSession(tabId);
-      if (!isLatest() || (grantId !== null && session?.grantId !== grantId)) return;
-      if (response.status !== "authorized" && session !== null) await writeTabSession(tabId, { ...session, documentId: null });
+    let releaseRequired = false;
+    try {
+      await reconciled;
+      let response = await authorizeTargetPage(tab, attemptId);
+      releaseRequired = response.status === "authorized";
+      if (!isLatest() || tabId === undefined) return;
+      let grantId: string | null = null;
+      if (response.status === "authorized") {
+        const documentId = response.documentId;
+        await enqueueTab(tabId, async () => {
+          if (!isLatest()) return;
+          const session = await ensureTabSession(tabId);
+          const result = await readRunResult(session.id);
+          if (!isLatest()) return;
+          if (result !== null && (result.documentId !== documentId || session.documentId === null)) {
+            await browser.storage.session.set({ [runResultStorageKey(session.id)]: { ...result, state: "previous" } });
+          }
+          await writeTabSession(tabId, { ...session, documentId, grantId: attemptId });
+          grantId = attemptId;
+        });
+      }
       if (!isLatest()) return;
-      if (response.status === "authorized" && grantId !== null && reachability.isActive(tabId, grantId)) await showRunActivity(tabId, true);
-      else await showAuthorizationFeedback(tabId, response);
-    });
+      if (response.status === "authorized" && grantId !== null) {
+        const mounted = await mountTargetPageControlShell(tabId, response.documentId, grantId);
+        if (mounted === "mounted") releaseRequired = false;
+        if (mounted !== "mounted") response = rejectTargetAuthorization(mounted === "reload-required" ? "reload-required" : "ui-mount-failed");
+      }
+      await enqueueTab(tabId, async () => {
+        const session = await readTabSession(tabId);
+        if (!isLatest() || (grantId !== null && session?.grantId !== grantId)) return;
+        if (response.status !== "authorized" && session !== null) await writeTabSession(tabId, { ...session, documentId: null });
+        if (!isLatest()) return;
+        if (response.status === "authorized" && grantId !== null && reachability.isActive(tabId, grantId)) await showRunActivity(tabId, true);
+        else await showAuthorizationFeedback(tabId, response);
+      });
+    } finally {
+      if (releaseRequired && tabId !== undefined) await releasePageAuthorizationAttempt(tabId, attemptId);
+    }
   });
 });

@@ -72,52 +72,25 @@ export function bootstrapTargetPage(
   attemptId: string,
 ): TargetBootstrapResponse {
   const responseType = "target-bootstrap-response" as const;
-
-  if (window.top !== window) {
-    return {
-      type: responseType,
-      status: "rejected",
-      reason: "not-top-level-document",
-    };
-  }
-
-  const protocol = window.location.protocol;
-  if (protocol !== "http:" && protocol !== "https:") {
-    return {
-      type: responseType,
-      status: "rejected",
-      reason: "unsupported-protocol",
-    };
-  }
-
-  if (window.location.href !== expectedUrl) {
-    return {
-      type: responseType,
-      status: "rejected",
-      reason: "document-changed",
-    };
-  }
-
   const attempt = (globalThis as typeof globalThis & { [key: symbol]: PageAuthorizationAttempt | undefined })[
     Symbol.for("ui-torture-lab/page-authorization-attempt")
   ];
-  if (attempt?.id !== attemptId || !attempt.valid) {
-    return { type: responseType, status: "rejected", reason: "document-changed" };
-  }
-
-  if (document.contentType !== "text/html") {
-    return {
-      type: responseType,
-      status: "rejected",
-      reason: "non-html-document",
-    };
-  }
-
-  return {
-    type: responseType,
-    status: "bootstrapped",
-    protocol: protocol as SupportedTargetProtocol,
-    contentType: "text/html",
-    topLevel: true,
+  const reject = (reason: Extract<TargetBootstrapResponse, { status: "rejected" }>["reason"]): TargetBootstrapResponse => {
+    if (attempt?.id === attemptId) attempt.stop();
+    return { type: responseType, status: "rejected", reason };
   };
+  if (window.top !== window) return reject("not-top-level-document");
+  const protocol = window.location.protocol;
+  if (protocol !== "http:" && protocol !== "https:") return reject("unsupported-protocol");
+  if (window.location.href !== expectedUrl || attempt?.id !== attemptId || !attempt.valid) return reject("document-changed");
+  if (document.contentType !== "text/html") return reject("non-html-document");
+  return { type: responseType, status: "bootstrapped", protocol: protocol as SupportedTargetProtocol, contentType: "text/html", topLevel: true };
+}
+
+/** Serialized cancellation is scoped to the exact attempt, even if the current Document changed. */
+export function cancelPageAuthorizationAttempt(attemptId: string): void {
+  const attempt = (globalThis as typeof globalThis & { [key: symbol]: PageAuthorizationAttempt | undefined })[
+    Symbol.for("ui-torture-lab/page-authorization-attempt")
+  ];
+  if (attempt?.id === attemptId) attempt.stop();
 }

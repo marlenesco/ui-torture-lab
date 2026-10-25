@@ -88,7 +88,7 @@ export function inspectJavaScript(code, { requireInjection = false, firstParty =
     ts.forEachChild(node, visit);
   };
   visit(source);
-  if (requireInjection && injectionCount !== 4) errors.push(`expected four reviewed toolbar injections, found ${injectionCount}`);
+  if (requireInjection && injectionCount !== 5) errors.push(`expected four reviewed toolbar injections plus one exact-attempt cancellation, found ${injectionCount}`);
   return errors;
 }
 
