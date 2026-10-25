@@ -1,6 +1,6 @@
 # Release verification and reconstruction
 
-This procedure prepares evidence; it does not submit, upload, publish, create tags, or modify protection rules. The workspace and manifest identify the 1.0.0 candidate; this version assignment does not establish an Official Distribution. The verified site origin is https://ui-torture-lab.pages.dev; the Store listing remains unconfigured. Technical and Product Validation in `launch-gates.json` remain pending, and public source protection is unverified. See [the publication checklist](publication.md) for the remaining steps.
+This procedure prepares evidence; it does not submit, upload, publish, create tags, or modify protection rules. The workspace and manifest identify the 1.0.0 candidate; this version assignment does not establish an Official Distribution. The verified site origin is https://ui-torture-lab.pages.dev; the Store listing remains unconfigured. Technical and Product Validation in `launch-gates.json` remain pending, and public main branch protection is verified in [the protection record](../validation/records/2026-10-26-main-protection.json). See [the publication checklist](publication.md) for the remaining steps.
 
 ## Reconstruct a candidate
 

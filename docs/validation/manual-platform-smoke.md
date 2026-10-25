@@ -4,8 +4,8 @@ Use this checklist for issue #26 on macOS, Windows and Linux separately. All thr
 
 ## Preparation
 
-1. Use a clean checkout of public commit `4ed925d7b99dc96b95691638754348f2081265b2`, the main merge containing PR #48's authorization correction, with exact Node from `.node-version` and pnpm from `packageManager`. Record any intentionally selected successor before the session. Run `pnpm install --frozen-lockfile` and `pnpm build`. The older `4a20806` record is historical baseline evidence, not the smoke candidate.
-2. Load `apps/extension/.output/chrome-mv3` as an unpacked extension in normal desktop Chrome stable. Record actual OS/browser versions, source SHA and SHA-256 of the manifest, background.js and document-runtime.js. Version 0.0.0 is a pre-release candidate, not an Official Distribution.
+1. Use a clean checkout of public commit `7b579c0662d1454ca92836761b9f85bb79748ad6`, the protected main merge containing PR #51 and the 1.0.0 candidate, with exact Node from `.node-version` and pnpm from `packageManager`. Record any intentionally selected successor before the session. Run `pnpm install --frozen-lockfile` and `pnpm build`. The older `4a20806` and `4ed925d` records are historical baseline evidence, not the smoke candidate.
+2. Load `apps/extension/.output/chrome-mv3` as an unpacked extension in normal desktop Chrome stable. Record actual OS/browser versions, source SHA and SHA-256 of the manifest, background.js and document-runtime.js. Version 1.0.0 is a release candidate; the Official Distribution is not yet published.
 3. Start `pnpm dev:fixtures` for original synthetic HTTP fixtures. For the eight static site routes, run `pnpm --filter @ui-torture-lab/site exec astro preview --host 127.0.0.1`. The public site is available at https://ui-torture-lab.pages.dev; record whether M9 uses that deployed build or a local preview. Local builds default to a local canonical unless SITE_URL is supplied. Close both processes afterward. Use only original synthetic pages for recorded evidence.
 
 ## Checklist

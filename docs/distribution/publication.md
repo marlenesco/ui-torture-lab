@@ -1,10 +1,10 @@
 # Chrome Web Store publication checklist
 
-Prepared on 2026-10-25 for the **1.0.0 candidate**. Assigning a version, building a
+Updated on 2026-10-26 for the **1.0.0 candidate**. Assigning a version, building a
 ZIP, or uploading a draft is separate from publishing the Official Distribution.
-No Store account setup, upload, submission, public tag, or release is recorded by
-this checklist. Keep the website's pre-release notice until the Store item is
-actually available.
+The owner reported that developer registration remains pending. No Store upload,
+submission, public tag, or release is recorded by this checklist. Keep the website's
+pre-release notice until the Store item is actually available.
 
 ## Candidate prepared in this repository
 
@@ -42,10 +42,16 @@ and draft preparation; generate the final package from the verified release comm
   [issue #26](https://github.com/marlenesco/ui-torture-lab/issues/26).
 - [ ] Complete [Product Validation, issue #28](https://github.com/marlenesco/ui-torture-lab/issues/28),
   documenting which evidence comes from people and which from simulated agents.
-- [ ] Enable and verify main branch protection. The GitHub branch API reported
-  `protected: false` on 2026-10-25; `sourceProtection` remains unverified.
-- [ ] Merge the reviewed candidate, verify CI and the corresponding production
-  website deployment, and retest the final built extension.
+- [x] Enable and verify main branch protection. PRs, the GitHub Actions `verify`
+  check, current base, linear history and resolved conversations are required,
+  including for administrators; force pushes and deletion are blocked. Independent
+  approvals are not required for the solo-maintainer workflow. See the
+  [2026-10-26 read-back record](../validation/records/2026-10-26-main-protection.json).
+- [x] Merge PR #51 as `7b579c0`, verify [main CI](https://github.com/marlenesco/ui-torture-lab/actions/runs/40243082548)
+  and production Pages deployment `1893f62f-821b-471d-b9e3-ba8d4788e91a`.
+  The built-extension screenshot capture additionally verifies one native toolbar
+  authorization, a live Text Clipping Finding and exact synthetic Restore. This
+  automated check does not clear manual platform validation.
 - [ ] Obtain the real Store item identity from a draft; record the canonical URL
   in `public-contract.json` without claiming public availability.
 - [ ] Record actual passing launch gates with evidence, create the intentional
@@ -91,5 +97,10 @@ publication and final installed-artifact validation in
    smoke checks, publish source/tag/hash/release notes and update availability on
    the website. Approval and review timing are controlled by Google.
 
-Screenshots and optional promotional graphics, publisher setup, questionnaire
-answers, review submission and the final Store-installed smoke check remain open.
+Three actual 1280×800 screenshots and their reproducible capture/provenance are
+prepared in [store-assets](store-assets/README.md). The 128×128 icon is already
+available in `apps/extension/public/icons/icon-128.png`; optional promotional
+graphics are not required to create a draft. Publisher registration, questionnaire
+completion, the real Store item identity, review submission and the final
+Store-installed smoke check remain open. [Reviewer instructions](reviewer-instructions.md)
+and [draft field guidance](store-fields.md) are prepared for the dashboard.
