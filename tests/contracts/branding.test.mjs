@@ -28,22 +28,30 @@ test("brand derivatives remain tied to the provided source and preserve the comp
   const original = await readFile("assets/branding/ui-torture-lab.svg");
   assert.equal(hash(original), manifest.sourceSha256);
   assert.equal(hash(await readFile("assets/branding/ui-torture-lab-light.svg")), manifest.lightSourceSha256);
+  assert.equal(manifest.lightAccent, "#769c1f");
   for (const [file, digest] of Object.entries(manifest.files)) assert.equal(hash(await readFile(file)), digest, file);
   const icon = await readFile("assets/branding/icon.svg", "utf8");
   assert.equal([...icon.matchAll(/<rect\b/gu)].length, 3, "green tile and both original white bars");
   assert.equal([...icon.matchAll(/<path\b/gu)].length, 3, "all three burst wedges");
   assert.equal([...icon.matchAll(/rotate\(-10\)/gu)].length, 3);
+  assert.equal([...icon.matchAll(/fill="#d7f36b"/gu)].length, 4, "the application mark retains the original lime");
   assert.doesNotMatch(icon, /#4f4f4f|<script|<image|href=|onload=/iu);
   const full = await readFile("apps/site/src/assets/brand-logo.svg", "utf8");
   assert.ok(full.includes('fill="#333"'));
   assert.ok(full.includes('fill="#999"'));
+  assert.equal([...full.matchAll(/fill="#769c1f"/gu)].length, 4, "the approved light-background accent covers the tile and three wedges");
+  assert.equal([...full.matchAll(/fill="#fff"/gu)].length, 2, "both white bars are preserved");
+  assert.doesNotMatch(full, /#d7f36b/iu);
   assert.doesNotMatch(full, /#4f4f4f/iu);
   assert.equal([...full.matchAll(/<path\b/gu)].length, 4, "complete mark includes the original outline");
   assert.equal(full, await readFile("assets/branding/logo-light.svg", "utf8"));
   const dark = await readFile("assets/branding/logo-dark.svg", "utf8");
+  assert.equal([...dark.matchAll(/fill="#d7f36b"/gu)].length, 4, "the dark-background variant retains the original lime");
   assert.equal(full.replace(/fill="[^"]+"/gu, ""), dark.replace(/fill="[^"]+"/gu, ""), "background variants preserve identical geometry");
   const panel = await readFile("apps/extension/src/document-runtime/brand-logo.tsx", "utf8");
   assert.ok(panel.includes('fill="#4f4f4f"'), "the dark extension panel retains the original light detail");
+  assert.ok(panel.includes('fill="#d7f36b"'));
+  assert.doesNotMatch(panel, /#769c1f/iu);
 });
 
 test("icon guard rejects truncated, substituted, incorrectly sized or opaque artifacts", async () => {
