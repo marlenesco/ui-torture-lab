@@ -85,3 +85,5 @@ Known limits: top-level HTTP(S) light-DOM HTML only; no iframe/Shadow traversal,
 Unsafe Restore, false attribution, undeclared retention, unexpected extension requests, hidden export data and artifact divergence remain non-waivable blockers. None was observed by the passing checks; strict CI on the merged correction passed and manual unknowns remain open. `launch-gates.json.technicalValidation` stays `pending`; **#26 must remain open**.
 
 Cloudflare deployment/preview/rollback evidence is recorded under #25. The participant study (#28) and Official Distribution (#29) remain open. GitHub reports main as unprotected; protection, canonical Store identity, version/tag and final release-record validation remain prerequisites. The Pages GitHub App was explicitly authorized for only this repository. No tags, Store submission or release publication were performed.
+
+The 2026-10-25 macOS session reported disconnected and overlapping control panels. [Runtime generation recovery](runtime-generation-recovery.md) records the synthetic reproduction, conservative admission correction, and manual retest requirement. This report does not complete a platform sign-off.

@@ -21,6 +21,7 @@ const rejectionMessages: Readonly<Record<TargetRejectionReason, string>> = {
   "invalid-bootstrap-response":
     "UI Torture Lab could not verify the current document. Click the toolbar action again.",
   "reload-required": "Reload required. Previous Mutations could not be safely restored.",
+  "unverified-control-surface": "An existing control surface could not be verified. Reload the page before authorizing again.",
   "missing-target": "UI Torture Lab could not identify the current tab.",
   "non-html-document":
     "This page is not supported. UI Torture Lab runs only on top-level HTML documents.",

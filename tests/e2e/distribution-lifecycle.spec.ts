@@ -146,6 +146,7 @@ test("worker suspension loses transport but preserves local Restore and reconnec
     await click(page, "Restore");
     expect(await page.$eval("#boundary", (element) => element.textContent)).toBe("Checkout");
     await expect.poll(() => preview(page)).toContain("Restore status: restored");
+    expect(await page.evaluate(() => [...(document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.querySelectorAll<HTMLButtonElement>("button") ?? [])].filter(button => button.textContent?.startsWith("Apply ")).map(button => button.disabled))).toEqual([true, true, true]);
     // A fresh driver connection must observe the restarted heap, even if Chrome retains a Target identity.
     await browser.disconnect();
     browser = await puppeteer.connect({ browserWSEndpoint: endpoint, defaultViewport: null });
