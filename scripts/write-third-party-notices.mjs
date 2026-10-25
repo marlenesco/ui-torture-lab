@@ -25,5 +25,7 @@ const sections = await Promise.all(directories.map(async (directory) => {
   if (license === undefined) throw new Error(`Missing license text for ${manifest.name}@${manifest.version}`);
   return `${manifest.name}@${manifest.version} (${manifest.license})\n\n${license.trim()}`;
 }));
+const notice = await readFile(path.join(root, "NOTICE"), "utf8");
+const license = await readFile(path.join(root, "LICENSE"), "utf8");
 await writeFile(path.join(extension, ".output/chrome-mv3/THIRD_PARTY_NOTICES.txt"),
-  "UI Torture Lab — third-party distribution notices\n\nIncludes runtime dependencies and WXT adapter code incorporated during build.\n\n" + sections.join("\n\n---\n\n") + "\n");
+  notice.trim() + "\n\n" + license.trim() + "\n\n---\n\nUI Torture Lab — third-party distribution notices\n\nIncludes runtime dependencies and WXT adapter code incorporated during build.\n\n" + sections.join("\n\n---\n\n") + "\n");

@@ -1,6 +1,6 @@
 # Chrome Web Store canonical copy
 
-Status: pre-release draft. No listing, submission, publication, hosting deployment, or publisher-account configuration has been performed. The official site origin and listing URL remain null in `public-contract.json` until verified. Do not submit placeholder URLs. Populate the actual privacy URL (`<official-origin>/privacy/`), site URL, listing identity, public source commit, and release version before publication.
+Status: pre-release draft for the 1.0.0 candidate. The official website is deployed at https://ui-torture-lab.pages.dev and the privacy URL is https://ui-torture-lab.pages.dev/privacy/. The Store listing remains null in `public-contract.json`; publisher-account readiness has not been verified. No Store publication is claimed. Follow [the publication checklist](publication.md), complete the remaining validation, and record the actual listing identity and public source before publication. Do not submit placeholder URLs.
 
 ## Name
 
@@ -23,6 +23,8 @@ The supported browser is current Google Chrome desktop stable on macOS, Windows,
 Mutations remain active until explicit Restore or a lifecycle/safety boundary. Restore preserves external changes; conflicts or unverified cleanup require a true reload. Page Exit and observed same-document navigation revoke authorization. Returning from BFCache never resumes a Run. Restore before private SPA transitions without an observable entry change, or before SPA route changes when observation is incomplete. Abrupt runtime termination can prevent cleanup or final result delivery.
 
 The Official Distribution's MVP is free. No account, registration, key, subscription, payment, advertising, usage limit, entitlement, or gated feature is required. The local workflow remains usable offline from project services on an already available page. Support is best-effort for the latest Official Distribution in Supported Scope, with no SLA or application-code consulting. Modified builds have no official support guarantee.
+
+Created by Marlenesco: https://github.com/marlenesco.
 
 Original code is Apache-2.0 in the complete public repository: https://github.com/marlenesco/ui-torture-lab. Third-party licenses remain applicable; branding and official endorsement are separate from the code license. Official releases identify their public source commit, tag, manifest version, build environment, lockfile, artifact, and release notes.
 

@@ -1,11 +1,20 @@
 # UI Torture Lab
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/branding/logo-dark.svg">
+  <img src="assets/branding/logo-light.svg" width="120" alt="UI Torture Lab logo">
+</picture>
+
 UI Torture Lab is a pre-release Chrome desktop extension for deterministic text
 stress testing with measurable before-and-after Evidence.
 
 > **Project status:** the development build implements the text stress workflow.
 > Manual platform and Product Validation remain pending; no Official Distribution
 > is published on Chrome Web Store.
+
+The workspace and Chrome manifest are versioned **1.0.0** as a release candidate.
+See the [publication checklist](docs/distribution/publication.md) for the remaining
+validation, Store assets, publisher setup, and final release steps.
 
 Website and usage documentation: https://ui-torture-lab.pages.dev.
 
@@ -69,7 +78,12 @@ Security vulnerabilities must use the private process in
 [SECURITY.md](SECURITY.md). General support boundaries are described in
 [SUPPORT.md](SUPPORT.md).
 
-## License
+## Credits and license
+
+Created by [Marlenesco](https://github.com/marlenesco).
+Source and contributions: [GitHub repository](https://github.com/marlenesco/ui-torture-lab).
+The [official brand assets](assets/branding/README.md) include separate full logos
+for light and dark backgrounds and the isolated green application mark.
 
 Original project code and materials are licensed under the
 [Apache License 2.0](LICENSE). Third-party dependencies and separately identified

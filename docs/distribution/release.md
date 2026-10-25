@@ -1,6 +1,6 @@
 # Release verification and reconstruction
 
-This procedure prepares evidence; it does not submit, upload, publish, create tags, or modify protection rules. The current 0.0.0 pre-release candidate is intentionally ineligible for publication. Site origin and Store listing remain unconfigured. Human launch gates in `launch-gates.json` are pending.
+This procedure prepares evidence; it does not submit, upload, publish, create tags, or modify protection rules. The workspace and manifest identify the 1.0.0 candidate; this version assignment does not establish an Official Distribution. The verified site origin is https://ui-torture-lab.pages.dev; the Store listing remains unconfigured. Technical and Product Validation in `launch-gates.json` remain pending, and public source protection is unverified. See [the publication checklist](publication.md) for the remaining steps.
 
 ## Reconstruct a candidate
 
@@ -10,12 +10,12 @@ Use a clean checkout of the intended public commit. Install exactly the Node ver
 corepack enable
 pnpm install --frozen-lockfile
 pnpm exec playwright install --with-deps chrome
-SITE_URL=https://actual-official-origin.example pnpm check
+SITE_URL=https://ui-torture-lab.pages.dev pnpm check
 ```
 
-Replace the example origin with the verified official origin. `pnpm check` runs lint, strict types, build, contracts, E2E, and the artifact gate. It never repairs or rewrites generated output to make checks pass. Chrome desktop stable must be installed; the validated minimum is 155, enforced by the manifest. Other browsers and channels are outside support. See `tests/benchmarks/` for measured lifecycle and geometry limits.
+`pnpm check` runs lint, strict types, build, contracts, E2E, and the artifact gate. It never repairs or rewrites generated output to make checks pass. Chrome desktop stable must be installed; the validated minimum is 155, enforced by the manifest. Other browsers and channels are outside support. See `tests/benchmarks/` for measured lifecycle and geometry limits.
 
-The extension output includes background.js, document-runtime.js, manifest.json, and THIRD_PARTY_NOTICES.txt. The site output is portable static HTML/CSS. Neither includes a service backend, account, entitlement, remote code, or project runtime service. Generated output stays outside Git; public source, the lockfile, build environment, manifest version, and validation record identify a candidate.
+The extension output includes background.js, document-runtime.js, manifest.json, THIRD_PARTY_NOTICES.txt (original project credits, Apache-2.0 license and dependency notices), and the four reviewed PNGs under icons/. The site output is portable static HTML/CSS. Neither includes a service backend, account, entitlement, remote code, or project runtime service. Generated output stays outside Git; public source, the lockfile, build environment, manifest version, and validation record identify a candidate.
 
 ## Artifact gate
 
@@ -34,7 +34,7 @@ After Technical Validation, Product Validation, site deployment, verified canoni
 From a clean checkout of the protected public main commit, with the matching `v<manifest-version>` tag and exact declared Node/pnpm:
 
 ```sh
-SITE_URL=https://actual-official-origin.example node scripts/create-release-record.mjs
+SITE_URL=https://ui-torture-lab.pages.dev node scripts/create-release-record.mjs
 ```
 
 The script fails closed on missing gates, placeholders, an untraceable tag, dirty source, wrong build environment, private/unprotected source, or a mismatched main commit. It verifies public GitHub source read-only, runs the complete gate, then writes `.scratch/release-record.json` containing commit, tag, manifest version, environment, build command, browser floor, permissions, canonical URLs, and SHA-256 hashes of the lockfile and every extension/site artifact. Preserve this record with the actual release evidence before submission. The script performs no publication.

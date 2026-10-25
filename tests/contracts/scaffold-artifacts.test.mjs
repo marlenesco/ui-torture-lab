@@ -7,6 +7,16 @@ import { pathToFileURL } from "node:url";
 
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
 
+test("candidate version is consistent across the workspace and Chrome manifest with packaged credits", async () => {
+  const root = await readJson("package.json");
+  assert.notEqual(root.version, "0.0.0");
+  for (const file of ["apps/extension/package.json", "apps/site/package.json", "packages/engine/package.json", "apps/extension/.output/chrome-mv3/manifest.json"]) {
+    assert.equal((await readJson(file)).version, root.version, file);
+  }
+  const notices = await readFile("apps/extension/.output/chrome-mv3/THIRD_PARTY_NOTICES.txt", "utf8");
+  for (const file of ["NOTICE", "LICENSE"]) assert.ok(notices.includes((await readFile(file, "utf8")).trim()), `${file} ships with the candidate`);
+});
+
 test("workspace builds the loadable Chrome MV3 scaffold", async () => {
   const manifest = await readJson(
     "apps/extension/.output/chrome-mv3/manifest.json",

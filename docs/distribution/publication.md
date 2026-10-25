@@ -1,0 +1,95 @@
+# Chrome Web Store publication checklist
+
+Prepared on 2026-10-25 for the **1.0.0 candidate**. Assigning a version, building a
+ZIP, or uploading a draft is separate from publishing the Official Distribution.
+No Store account setup, upload, submission, public tag, or release is recorded by
+this checklist. Keep the website's pre-release notice until the Store item is
+actually available.
+
+## Candidate prepared in this repository
+
+- All workspace packages and the Chrome manifest use 1.0.0. WXT reads the
+  extension package version directly.
+- Full official logos have light- and dark-background variants. The application
+  icon retains the green tilted tile, both white bars and all three burst wedges.
+- The website footer and README link the repository and credit
+  [Marlenesco](https://github.com/marlenesco). The packaged notices include the
+  original credits and Apache-2.0 license.
+- [Store copy](chrome-web-store.md), permission justifications and privacy
+  disclosures are prepared. The actual Store questionnaire still needs completion.
+- Website: https://ui-torture-lab.pages.dev/; privacy:
+  https://ui-torture-lab.pages.dev/privacy/; support:
+  https://ui-torture-lab.pages.dev/support/.
+
+After `pnpm check` passes with the declared Node/pnpm versions, create a local
+candidate ZIP with a standard ZIP utility:
+
+```sh
+mkdir -p .scratch
+(cd apps/extension/.output/chrome-mv3 && zip -X -r ../../../../.scratch/ui-torture-lab-1.0.0-candidate.zip .)
+```
+
+Start with a new archive; do not reuse an older ZIP that could retain stale files.
+The ZIP root must contain manifest.json, background.js, document-runtime.js,
+THIRD_PARTY_NOTICES.txt and icons/icon-{16,32,48,128}.png. Exclude source files,
+development bundles, credentials and the website. This candidate is for inspection
+and draft preparation; generate the final package from the verified release commit.
+
+## Remaining release gates
+
+- [ ] Complete and record the remaining installed-extension/manual Chrome stable
+  checks on macOS, Windows and Linux in
+  [issue #26](https://github.com/marlenesco/ui-torture-lab/issues/26).
+- [ ] Complete [Product Validation, issue #28](https://github.com/marlenesco/ui-torture-lab/issues/28),
+  documenting which evidence comes from people and which from simulated agents.
+- [ ] Enable and verify main branch protection. The GitHub branch API reported
+  `protected: false` on 2026-10-25; `sourceProtection` remains unverified.
+- [ ] Merge the reviewed candidate, verify CI and the corresponding production
+  website deployment, and retest the final built extension.
+- [ ] Obtain the real Store item identity from a draft; record the canonical URL
+  in `public-contract.json` without claiming public availability.
+- [ ] Record actual passing launch gates with evidence, create the intentional
+  `v1.0.0` tag on the final protected public main commit, and follow
+  [release verification](release.md) to generate the final release record.
+
+Do not mark pending checks passed or bypass `create-release-record.mjs`. Track
+publication and final installed-artifact validation in
+[issue #29](https://github.com/marlenesco/ui-torture-lab/issues/29).
+
+## Publisher and listing steps
+
+1. Choose the Google account that will own the extension. Register in the
+   [developer dashboard](https://chrome.google.com/webstore/devconsole), accept
+   the agreement and pay the one-time registration fee if required. Complete the
+   account/contact or identity fields the dashboard requests. These steps require
+   the owner's account and decisions. See [registration](https://developer.chrome.com/docs/webstore/register).
+2. Enable [2-Step Verification](https://developer.chrome.com/docs/webstore/program-policies/two-step-verification),
+   required before publishing or updating. Review the public publisher name and
+   contact details. Chrome [ignores manifest `author`](https://developer.chrome.com/docs/extensions/reference/manifest/author);
+   configure the public publisher credit in the dashboard.
+3. Add a new item and upload the candidate ZIP as a draft. Record its real item ID
+   and listing URL. Uploading a draft is separate from submitting for review.
+   See [publishing](https://developer.chrome.com/docs/webstore/publish).
+4. Fill the listing from the canonical copy: title, description, English language,
+   appropriate developer-tool category, homepage and support links. Preserve the
+   Marlenesco credit and repository URL. Supply the 128×128 PNG icon and at least
+   one actual 1280×800 screenshot (up to five) showing the final extension on
+   synthetic fixtures. A 440×280 small promo tile and 1400×560 marquee are optional.
+   Review icon spacing and legibility on light and dark surfaces before upload.
+   See [listing fields](https://developer.chrome.com/docs/webstore/cws-dashboard-listing)
+   and [image guidance](https://developer.chrome.com/docs/webstore/images).
+5. Complete the [Privacy practices](https://developer.chrome.com/docs/webstore/cws-dashboard-privacy)
+   tab: single purpose, minimum permission justifications, local page-data
+   processing, session retention, explicit Markdown downloads and the privacy URL.
+   Zero transmission to a project server does not mean no local data processing.
+6. Choose free distribution, audience and regions; add reviewer instructions for
+   toolbar authorization, applying one Scenario, inspecting a Finding, Restore
+   and Download Report. No product login or credentials are needed.
+7. After the release gates pass, upload the final verified ZIP, submit for review
+   and choose publication timing. Deferred publication allows a final check after
+   approval. Once live, install from the canonical listing, run the installed-build
+   smoke checks, publish source/tag/hash/release notes and update availability on
+   the website. Approval and review timing are controlled by Google.
+
+Screenshots and optional promotional graphics, publisher setup, questionnaire
+answers, review submission and the final Store-installed smoke check remain open.
