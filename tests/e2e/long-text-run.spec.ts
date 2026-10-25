@@ -32,9 +32,9 @@ let extension: Extension;
 let serviceWorker: WebWorker;
 
 const triggerToolbarAction = async (page: Page): Promise<void> => {
-  await page.bringToFront();
-  await page.triggerExtensionAction(extension);
-  await page.waitForSelector("[data-ui-torture-lab-root]");
+  await test.step("Activate Long Text fixture tab", () => page.bringToFront(), { timeout: 5000 });
+  await test.step("Authorize Long Text fixture", () => page.triggerExtensionAction(extension), { timeout: 5000 });
+  await test.step("Mount Long Text fixture panel", () => page.waitForSelector("[data-ui-torture-lab-root]", { timeout: 5000 }), { timeout: 5000 });
 };
 
 const clickPanelButton = async (page: Page, label: string): Promise<void> => {
@@ -97,9 +97,9 @@ test.afterAll(async () => {
 });
 
 test("Long Text remains active until exact Restore", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create Long Text fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await test.step("Navigate to Long Text fixture", () => page.goto("http://127.0.0.1:4173/long-text-run/"), { timeout: 5000 });
     await triggerToolbarAction(page);
 
     const observation = await executeAsyncInIsolated(serviceWorker, async () => {
@@ -175,9 +175,9 @@ test("Long Text remains active until exact Restore", async () => {
 });
 
 test("Long Text preserves supported nodes and excludes unsupported targets", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create Long Text fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await test.step("Navigate to Long Text fixture", () => page.goto("http://127.0.0.1:4173/long-text-run/"), { timeout: 5000 });
     await triggerToolbarAction(page);
 
     const observation = await executeAsyncInIsolated(serviceWorker, async () => {
@@ -352,9 +352,9 @@ test("Long Text preserves supported nodes and excludes unsupported targets", asy
 });
 
 test("the built panel exposes Apply, active inspection, Restore, and result", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create Long Text fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await test.step("Navigate to Long Text fixture", () => page.goto("http://127.0.0.1:4173/long-text-run/"), { timeout: 5000 });
     await triggerToolbarAction(page);
     const original = await page.$eval(
       "#primary-target",
@@ -396,9 +396,9 @@ test("the built panel exposes Apply, active inspection, Restore, and result", as
 });
 
 test("Restore conflict leaves external text untouched and blocks another Run", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create Long Text fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await test.step("Navigate to Long Text fixture", () => page.goto("http://127.0.0.1:4173/long-text-run/"), { timeout: 5000 });
     await triggerToolbarAction(page);
     await clickPanelButton(page, "Apply Long Text");
     await page.waitForFunction(
@@ -446,9 +446,9 @@ test("Restore conflict leaves external text untouched and blocks another Run", a
 });
 
 test("an Engine safety abort is distinct from Restore conflict in the built UI", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create Long Text fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await test.step("Navigate to Long Text fixture", () => page.goto("http://127.0.0.1:4173/long-text-run/"), { timeout: 5000 });
     await triggerToolbarAction(page);
     const originalText = await page.$eval("#primary-target", (target) => target.textContent);
 
@@ -515,9 +515,9 @@ test("an Engine safety abort is distinct from Restore conflict in the built UI",
 });
 
 test("an unverified cleanup is distinct from an external Restore conflict", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create Long Text fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await test.step("Navigate to Long Text fixture", () => page.goto("http://127.0.0.1:4173/long-text-run/"), { timeout: 5000 });
     await triggerToolbarAction(page);
     await clickPanelButton(page, "Apply Long Text");
     await page.waitForFunction(

@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import type { WebWorker } from "puppeteer-core";
 
 /** Starts work in ISOLATED, then collects its result through bounded synchronous injections. */
 export async function executeAsyncInIsolated<T, Args extends unknown[]>(worker: WebWorker, work: (...args: Args) => Promise<T>, ...args: Args): Promise<T> {
   const key = `ui-torture-lab/test-task/${crypto.randomUUID()}`;
-  const tabId = await worker.evaluate(async () => {
+  const tabId = await test.step("Resolve ISOLATED fixture tab", () => worker.evaluate(async () => {
     const api = (globalThis as unknown as { chrome: { tabs: { query(query: object): Promise<{ id?: number }[]> } } }).chrome;
     const [tab] = await api.tabs.query({ active: true, currentWindow: true });
     if (tab?.id === undefined) throw new Error("No active fixture tab");
     return tab.id;
-  });
-  await worker.evaluate(`chrome.scripting.executeScript({
+  }), { timeout: 5000 });
+  await test.step("Start ISOLATED fixture work", () => worker.evaluate(`chrome.scripting.executeScript({
     target: { tabId: ${tabId}, frameIds: [0] }, world: "ISOLATED",
     func: () => {
       const key = Symbol.for(${JSON.stringify(key)});
@@ -23,7 +23,7 @@ export async function executeAsyncInIsolated<T, Args extends unknown[]>(worker: 
         (error) => { globalThis[key] = { status: "failed", error: String(error) }; }
       );
     }
-  })`);
+  })`), { timeout: 5000 });
   type Result = { status: "pending" | "completed" | "failed"; value?: T; error?: string };
   let result: Result | undefined;
   try {
