@@ -202,6 +202,7 @@ test("a route transition with a Restore conflict blocks same-Document toolbar re
     expect(await page.$eval("#boundary", (element) => element.textContent)).toBe("External text");
     await page.reload();
     await triggerFixtureAction(page, extension);
+    await waitForExtensionPanel(page);
     await expect.poll(() => panelText(page)).toContain("Apply Long Text");
   } finally { await page.close(); }
 });

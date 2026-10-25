@@ -57,7 +57,13 @@ export const panelCss = `
     gap: 4px;
   }
   .panel-icon {
-    flex: 0 0 16px;
+    flex: 0 0 26px;
+    inline-size: 26px;
+    block-size: 26px;
+    padding: 5px;
+    border-radius: 7px;
+    background: var(--panel-accent);
+    color: #191d18;
   }
   .panel-toggle,
   .panel-action {
@@ -68,7 +74,7 @@ export const panelCss = `
   .panel-shell .panel-icon-button {
     inline-size: 30px;
     min-block-size: 30px;
-    padding: 6px;
+    padding: 2px;
     justify-content: center;
   }
   .panel-header strong {
@@ -129,15 +135,13 @@ export const panelCss = `
     min-block-size: 32px;
     color: #d7ded1;
     background: transparent;
-    padding: 6px 4px;
+    padding: 3px 4px;
     font-size: 12px;
     font-weight: 550;
   }
 
   .panel-toggle:hover:enabled {
     color: var(--panel-accent);
-    text-decoration: underline;
-    text-underline-offset: 4px;
   }
   .panel-toggle:active:enabled {
     color: #bddb60;
@@ -167,15 +171,13 @@ export const panelCss = `
     justify-self: stretch;
     color: var(--panel-accent);
     background: transparent;
-    padding: 10px 4px;
+    padding: 8px 4px;
     text-align: start;
     font-weight: 650;
   }
 
   .panel-action:hover:enabled {
     color: #e4ff87;
-    text-decoration: underline;
-    text-underline-offset: 4px;
   }
   .panel-action:active:enabled {
     color: #bddb60;
@@ -189,6 +191,14 @@ export const panelCss = `
     font-weight: 500;
     cursor: not-allowed;
     opacity: 1;
+  }
+
+  .panel-toggle:hover:enabled .panel-icon,
+  .panel-action:hover:enabled .panel-icon {
+    background: #e4ff87;
+  }
+  .panel-shell button:disabled .panel-icon {
+    background: #626e55;
   }
 
   .coverage-summary {
