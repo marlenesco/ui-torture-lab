@@ -1,0 +1,37 @@
+{
+  "sourceCommit": "7b579c0662d1454ca92836761b9f85bb79748ad6",
+  "version": "1.0.0",
+  "browser": "Chrome/155.0.8059.85",
+  "node": "24.13.1",
+  "viewport": {
+    "width": 1280,
+    "height": 800,
+    "deviceScaleFactor": 1
+  },
+  "method": "Built extension in isolated headless Chrome; one native simulated toolbar action and public panel controls; no UI patching or fabricated findings",
+  "fixtureSha256": "2bd0579f8b3ad21e8cc4a3eddb2b888ff28e89f26a1debd282d4aa3a632a3583",
+  "restoredExactly": true,
+  "hashes": {
+    "manifest.json": "67c6456a70e0ab3fc28fc0eb5fbe640b320890f4e6250b91cd53754cd0bd0d95",
+    "background.js": "908907958c94aeaeb7d29c945573973546d1d3d6a13f56fa152aa1a7789ae371",
+    "document-runtime.js": "524fdfd1d0f60922963ca6ddd53ee29dbb30760d617e54db43c09e969c57145f",
+    "THIRD_PARTY_NOTICES.txt": "a07adcdadecf99d61fac82c73ee9953c85588a8362d9d06969e3498ac3978939"
+  },
+  "images": [
+    {
+      "file": "docs/distribution/store-assets/01-authorize.png",
+      "state": "Authorized, before applying a Scenario",
+      "sha256": "2cdb187d9c11d154d24243144582ae743d25f24355d851f08e5f0fcec549ec72"
+    },
+    {
+      "file": "docs/distribution/store-assets/02-inspect.png",
+      "state": "Long Text active, measured Text Clipping Finding and highlighted subject",
+      "sha256": "e5a2e7878fad66336d035db39f417ddb154bf989b0aedb6347c5027efb5d8332"
+    },
+    {
+      "file": "docs/distribution/store-assets/03-report.png",
+      "state": "Restored, Download Report available, Markdown preview collapsed",
+      "sha256": "551c3dd94da411706c08a8bea85fb2dc9a41bc2356daa52f9e80f9d51a23e2f2"
+    }
+  ]
+}

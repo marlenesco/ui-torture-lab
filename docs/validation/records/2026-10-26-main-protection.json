@@ -1,0 +1,38 @@
+{
+  "repository": "https://github.com/marlenesco/ui-torture-lab",
+  "verifiedAt": "2026-10-25T23:15:11.732724+00:00",
+  "branch": "main",
+  "public": true,
+  "protected": true,
+  "observedCommit": "7b579c0662d1454ca92836761b9f85bb79748ad6",
+  "method": "GitHub REST branch and branch-protection read-back after configuration",
+  "configuration": {
+    "allow_deletions": false,
+    "allow_force_pushes": false,
+    "enforce_admins": true,
+    "required_conversation_resolution": true,
+    "required_linear_history": true,
+    "required_pull_request_reviews": {
+      "dismiss_stale_reviews": true,
+      "require_code_owner_reviews": false,
+      "require_last_push_approval": false,
+      "required_approving_review_count": 0,
+      "url": "https://api.github.com/repos/marlenesco/ui-torture-lab/branches/main/protection/required_pull_request_reviews"
+    },
+    "required_status_checks": {
+      "checks": [
+        {
+          "app_id": 15368,
+          "context": "verify"
+        }
+      ],
+      "contexts": [
+        "verify"
+      ],
+      "contexts_url": "https://api.github.com/repos/marlenesco/ui-torture-lab/branches/main/protection/required_status_checks/contexts",
+      "strict": true,
+      "url": "https://api.github.com/repos/marlenesco/ui-torture-lab/branches/main/protection/required_status_checks"
+    }
+  },
+  "independentHumanApprovalRequired": false
+}
