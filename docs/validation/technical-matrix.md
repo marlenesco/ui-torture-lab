@@ -63,3 +63,11 @@ Use the exact candidate artifact on current Chrome desktop stable in a normal co
 8. Open all eight site routes from an ordinary static server with JavaScript disabled; check keyboard focus, responsive layout, canonical paths, and installation status.
 
 Any failure records a blocker with a synthetic reproduction, affected gate, owner, and retest requirement. Leave unknowns unresolved until observed.
+
+## Clean local candidate reconstruction
+
+On 2026-10-25, an isolated clean local clone at candidate commit `aa9d49b958790c1f9b419a3567cec991019c02d2` installed dependencies with `pnpm install --offline --frozen-lockfile` and passed the complete `pnpm check` command. The source tree remained clean after verification. This candidate is not yet a published protected main commit.
+
+Results: lint passed; strict TypeScript/Astro checks reported zero errors, warnings, or hints; all three production workspaces built; 52 contract tests and 160 E2E tests passed; the release artifact gate passed. E2E used four workers and completed in 25.5 seconds on this machine. Environment: Node 24.22.1, pnpm 11.20.0, Chrome 155.0.8059.85/macOS. No retry or timeout increase was used to obtain this result.
+
+The temporary checkout and its processes were removed after verification. Local command logs remain under `.scratch/clean-install.log` and `.scratch/clean-check.log`; those logs are not public release evidence or participant data. Manual platform sign-off, the exact release Node reconstruction on a published candidate, Cloudflare deployment/rollback, Product Validation, and release publication remain unresolved. Technical Validation is therefore still pending as a launch gate.
