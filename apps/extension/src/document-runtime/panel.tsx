@@ -68,7 +68,7 @@ export function ExtensionPanel({
       <header className="panel-header">
         <div>
           <strong>UI Torture Lab</strong>
-          <span>{authorized ? "Target Page authorized" : "Target Page authorization ended"}</span>
+          <span className="panel-authorization" data-ready={canStartScenario}>{authorized ? "Target Page authorized" : "Target Page authorization ended"}</span>
         </div>
         <button
           aria-label="Collapse UI Torture Lab"
@@ -79,7 +79,7 @@ export function ExtensionPanel({
           Collapse
         </button>
       </header>
-      {liveFindingMessage === null ? null : <p role="status">{liveFindingMessage}</p>}
+      {liveFindingMessage === null ? null : <p className="panel-message" role="status">{liveFindingMessage}</p>}
       {!navigationComplete ? <p role="status">Navigation observation is incomplete. Restore before changing SPA routes.</p> : null}
       <RunControls
         authorized={authorized}
@@ -243,7 +243,7 @@ function FindingSummary({
         .map((group) => (
           <section aria-label={`${detectorLabel(group.detectorId)} Findings`} key={group.detectorId}>
             <strong>{detectorLabel(group.detectorId)}</strong>
-            <ul>
+            <ul className="finding-list">
               {group.findings.map((finding) => (
                 <FindingItem
                   finding={finding}
@@ -362,7 +362,7 @@ function ScenarioButtons({
   readonly onStartScenario: (scenarioId: ScenarioId) => void;
 }) {
   return (
-    <>
+    <div className="scenario-actions">
       <button
         className="panel-action"
         disabled={disabled}
@@ -387,7 +387,7 @@ function ScenarioButtons({
       >
         Apply Unbreakable Text
       </button>
-    </>
+    </div>
   );
 }
 
@@ -424,7 +424,7 @@ function CoverageSummary({
   readonly coverage: ReturnType<RunController["getSnapshot"]>["coverage"];
 }) {
   return (
-    <p>
+    <p className="coverage-summary">
       {coverage.eligibleTargets} eligible · {coverage.mutatedTargets} mutated ·{" "}
       {coverage.excludedTargets} excluded ·{" "}
       {coverage.skippedTargets} skipped · {coverage.safeFailedTargets} safe-failed ·{" "}
