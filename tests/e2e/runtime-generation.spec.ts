@@ -97,7 +97,12 @@ test("Scenario controls show an unavailable state until the current grant acknow
     const appearance = () => page.evaluate(() => [...(document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.querySelectorAll<HTMLButtonElement>("button") ?? [])]
       .filter(button => button.textContent?.startsWith("Apply ")).map(button => {
         const style = getComputedStyle(button);
-        return { background: style.backgroundColor, color: style.color, border: style.borderTopStyle, cursor: style.cursor };
+        const icon = button.querySelector("svg");
+        const panel = button.closest(".panel-shell");
+        if (icon === null || panel === null) throw new Error("Icon action unavailable");
+        const iconStyle = getComputedStyle(icon);
+        return { background: style.backgroundColor, color: style.color, border: style.borderTopStyle, cursor: style.cursor,
+          iconBackground: iconStyle.backgroundColor, iconInk: iconStyle.stroke, panelBackground: getComputedStyle(panel).backgroundColor };
       }));
     const disabledAppearance = await appearance();
     expect(disabledAppearance).toHaveLength(3);
@@ -105,6 +110,8 @@ test("Scenario controls show an unavailable state until the current grant acknow
       expect(style.cursor).toBe("not-allowed");
       expect(style.border).toBe("none");
       expect(style.background).toBe("rgba(0, 0, 0, 0)");
+      expect(style.iconBackground).not.toBe("rgba(0, 0, 0, 0)");
+      expect(style.iconInk).toBe(style.panelBackground);
     }
     await page.screenshot({ path: test.info().outputPath("panel-disabled.png") });
     expect(await page.$eval("#boundary", node => node.textContent)).toBe("Checkout");
@@ -125,7 +132,10 @@ test("Scenario controls show an unavailable state until the current grant acknow
       expect(style.cursor).toBe("pointer");
       expect(style.border).toBe("none");
       expect(style.background).toBe("rgba(0, 0, 0, 0)");
+      expect(style.iconBackground).not.toBe("rgba(0, 0, 0, 0)");
+      expect(style.iconInk).toBe(style.panelBackground);
       expect(style.color).not.toBe(disabledAppearance[index]?.color);
+      expect(style.iconBackground).not.toBe(disabledAppearance[index]?.iconBackground);
     }
     await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);
     expect(await page.$eval("[data-ui-torture-lab-root]", host => {
