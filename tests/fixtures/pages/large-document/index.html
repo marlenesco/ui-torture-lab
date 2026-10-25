@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Large synthetic document</title><style>body { margin: 24px; font: 16px/1.5 system-ui; } p { margin: 0; }</style></head>
+  <body><main></main><script>
+    const rows = document.createDocumentFragment();
+    for (let index = 0; index < 500; index++) {
+      const row = document.createElement("p");
+      row.textContent = `Synthetic account overview item ${index}`;
+      rows.append(row);
+    }
+    document.querySelector("main").append(rows);
+  </script></body>
+</html>

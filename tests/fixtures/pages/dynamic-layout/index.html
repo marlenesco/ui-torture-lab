@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Dynamic synthetic layout</title><style>
+    body { margin: 24px; font: 16px/1.5 system-ui; }
+    .boundary { width: 180px; overflow: hidden; white-space: nowrap; }
+    .boundary p { margin: 0; }
+  </style></head>
+  <body><main><div id="unstable" class="boundary"><p>Checkout today</p></div><div id="stable" class="boundary"><p>Checkout today</p></div></main><script>
+    let tick = 0;
+    function changeWidth() {
+      document.querySelector("#unstable").style.width = `${tick++ % 2 ? 180 : 260}px`;
+      requestAnimationFrame(changeWidth);
+    }
+    requestAnimationFrame(changeWidth);
+  </script></body>
+</html>
