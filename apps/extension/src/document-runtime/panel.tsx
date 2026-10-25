@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import type { MarkdownReportInput, RunController, ScenarioId } from "@ui-torture-lab/engine";
 import { MarkdownReport } from "./markdown-report";
+import { PanelIcon } from "./panel-icon";
 
 type ExtensionPanelProps = {
   readonly collapsed: boolean;
@@ -14,6 +15,7 @@ type ExtensionPanelProps = {
   readonly liveFindingMessage: string | null;
   readonly previousRunResult: MarkdownReportInput | null;
   readonly onCollapse: () => void;
+  readonly onClose: () => void;
   readonly onExpand: () => void;
   readonly onInspectFinding: (
     finding: ReturnType<RunController["getSnapshot"]>["findings"][number],
@@ -37,6 +39,7 @@ export function ExtensionPanel({
   liveFindingMessage,
   previousRunResult,
   onCollapse,
+  onClose,
   onExpand,
   onInspectFinding,
   isFindingActionEnabled,
@@ -58,7 +61,7 @@ export function ExtensionPanel({
         onClick={onExpand}
         type="button"
       >
-        UTL
+        <PanelIcon name="expand" />UTL
       </button>
     );
   }
@@ -70,14 +73,26 @@ export function ExtensionPanel({
           <strong>UI Torture Lab</strong>
           <span className="panel-authorization" data-ready={canStartScenario}>{authorized ? "Target Page authorized" : "Target Page authorization ended"}</span>
         </div>
-        <button
-          aria-label="Collapse UI Torture Lab"
-          className="panel-toggle"
-          onClick={onCollapse}
-          type="button"
-        >
-          Collapse
-        </button>
+        <div className="panel-window-actions">
+          <button
+            aria-label="Collapse UI Torture Lab"
+            className="panel-toggle panel-icon-button"
+            onClick={onCollapse}
+            title="Collapse panel"
+            type="button"
+          >
+            <PanelIcon name="collapse" />
+          </button>
+          <button
+            aria-label="Close UI Torture Lab"
+            className="panel-toggle panel-icon-button"
+            onClick={onClose}
+            title="Close panel; reopen from the browser toolbar"
+            type="button"
+          >
+            <PanelIcon name="close" />
+          </button>
+        </div>
       </header>
       {liveFindingMessage === null ? null : <p className="panel-message" role="status">{liveFindingMessage}</p>}
       {!navigationComplete ? <p role="status">Navigation observation is incomplete. Restore before changing SPA routes.</p> : null}
@@ -140,7 +155,7 @@ function RunControls({
             <p>{previousRunResult.result.summary}</p>
             <MarkdownReport report={previousRunResult} />
             <button className="panel-toggle" onClick={onClearPreviousRunResult} type="button">
-              Clear saved result
+              <PanelIcon name="clear" />Clear saved result
             </button>
           </section>
         )}
@@ -167,7 +182,7 @@ function RunControls({
           onInspectFinding={onInspectFinding}
         />
         <button className="panel-action" onClick={onRestore} type="button">
-          Restore
+          <PanelIcon name="restore" />Restore
         </button>
       </div>
     );
@@ -305,7 +320,7 @@ function FindingItem({
             onClick={() => onInspectFinding(finding, "highlight-subject")}
             type="button"
           >
-            Highlight subject
+            <PanelIcon name="highlight" />Highlight subject
           </button>
           <button
             aria-label={`Navigate to Finding Subject ${finding.locator}`}
@@ -314,7 +329,7 @@ function FindingItem({
             onClick={() => onInspectFinding(finding, "navigate")}
             type="button"
           >
-            Navigate
+            <PanelIcon name="navigate" />Navigate
           </button>
           {finding.detectorId === "text-clipping" ? (
             <button
@@ -324,7 +339,7 @@ function FindingItem({
               onClick={() => onInspectFinding(finding, "highlight-ranges")}
               type="button"
             >
-              Highlight ranges
+              <PanelIcon name="highlight" />Highlight ranges
             </button>
           ) : null}
           <button
@@ -333,7 +348,7 @@ function FindingItem({
             onClick={() => onInspectFinding(finding, "copy-locator")}
             type="button"
           >
-            Select locator to copy
+            <PanelIcon name="copy" />Select locator to copy
           </button>
         </div>}
       </article>
@@ -369,7 +384,7 @@ function ScenarioButtons({
         onClick={() => onStartScenario("large-text")}
         type="button"
       >
-        Apply Large Text
+        <PanelIcon name="large-text" />Apply Large Text
       </button>
       <button
         className="panel-action"
@@ -377,7 +392,7 @@ function ScenarioButtons({
         onClick={() => onStartScenario("long-text")}
         type="button"
       >
-        Apply Long Text
+        <PanelIcon name="long-text" />Apply Long Text
       </button>
       <button
         className="panel-action"
@@ -385,7 +400,7 @@ function ScenarioButtons({
         onClick={() => onStartScenario("unbreakable-text")}
         type="button"
       >
-        Apply Unbreakable Text
+        <PanelIcon name="unbreakable-text" />Apply Unbreakable Text
       </button>
     </div>
   );

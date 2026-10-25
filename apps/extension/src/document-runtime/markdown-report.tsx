@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState } from "react";
+import { PanelIcon } from "./panel-icon";
 import { formatMarkdownReport, type MarkdownReportInput } from "@ui-torture-lab/engine";
 
 export function MarkdownReport({ report }: { readonly report: MarkdownReportInput }) {
@@ -22,7 +23,7 @@ export function MarkdownReport({ report }: { readonly report: MarkdownReportInpu
   return (
     <section aria-label="Markdown Report" className="markdown-report">
       <button className="panel-toggle" onClick={() => { void copy(); }} type="button">
-        Copy Report as Markdown
+        <PanelIcon name="copy" />Copy Report as Markdown
       </button>
       {copyState?.markdown === markdown ? <p role="status">{copyState.message}</p> : null}
       <label>

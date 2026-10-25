@@ -7,56 +7,65 @@ import path from "node:path";
 import puppeteer from "puppeteer-core";
 import { triggerFixtureAction } from "../support/extension-action";
 
-test("a fresh isolated extension context refuses orphan UI until the page reloads", async () => {
-  const copy = await mkdtemp(path.join(tmpdir(), "ui-torture-runtime-"));
-  const browser = await puppeteer.launch({ executablePath: await puppeteer.executablePath("chrome"), headless: true, enableExtensions: true });
-  try {
-    const artifact = path.resolve("apps/extension/.output/chrome-mv3");
-    await cp(artifact, copy, { recursive: true });
-    const firstId = await browser.installExtension(artifact);
-    const first = (await browser.extensions()).get(firstId);
-    if (first === undefined) throw new Error("First extension context unavailable");
-    const page = await browser.newPage();
-    await page.goto("http://127.0.0.1:4173/page-exit/");
-    await page.bringToFront();
-    const text = () => page.evaluate(() => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent ?? "");
-    await triggerFixtureAction(page, first);
-    await expect.poll(text).toContain("Apply Long Text");
-    await browser.uninstallExtension(firstId);
-    await expect.poll(text).toContain("Extension connection lost");
+for (const surface of ["visible", "closed"] as const) {
+  test(`a fresh isolated extension context refuses ${surface} orphan controls until the page reloads`, async () => {
+    const copy = await mkdtemp(path.join(tmpdir(), "ui-torture-runtime-"));
+    const browser = await puppeteer.launch({ executablePath: await puppeteer.executablePath("chrome"), headless: true, enableExtensions: true });
+    try {
+      const artifact = path.resolve("apps/extension/.output/chrome-mv3");
+      await cp(artifact, copy, { recursive: true });
+      const firstId = await browser.installExtension(artifact);
+      const first = (await browser.extensions()).get(firstId);
+      if (first === undefined) throw new Error("First extension context unavailable");
+      const page = await browser.newPage();
+      await page.goto("http://127.0.0.1:4173/page-exit/");
+      await page.bringToFront();
+      const text = () => page.evaluate(() => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent ?? "");
+      await triggerFixtureAction(page, first);
+      await expect.poll(text).toContain("Apply Long Text");
+      if (surface === "closed") {
+        await page.locator("::-p-aria(Apply Long Text)").setTimeout(5000).click();
+        await expect.poll(text).toContain("Long Text Scenario active");
+        await page.locator("::-p-aria(Close UI Torture Lab)").setTimeout(5000).click();
+        await expect.poll(() => page.$$("[data-ui-torture-lab-root]").then(nodes => nodes.length)).toBe(0);
+      }
+      const boundaryBeforeReplacement = await page.$eval("#boundary", node => node.textContent);
+      await browser.uninstallExtension(firstId);
+      if (surface === "visible") await expect.poll(text).toContain("Extension connection lost");
 
-    // A distinct native extension ID gives a fresh ISOLATED context while retaining the actual orphan DOM.
-    const nextId = await browser.installExtension(copy);
-    expect(nextId).not.toBe(firstId);
-    const next = (await browser.extensions()).get(nextId);
-    if (next === undefined) throw new Error("Fresh extension context unavailable");
-    await triggerFixtureAction(page, next);
-    const workerTarget = await browser.waitForTarget(target => target.type() === "service_worker" && target.url().includes(nextId));
-    const worker = await workerTarget.worker();
-    if (worker === null) throw new Error("Fresh worker unavailable");
-    await expect.poll(() => worker.evaluate(async () => {
-      const api = (globalThis as unknown as { chrome: { tabs: { query(details: object): Promise<{ id: number }[]> }; action: { getTitle(details: { tabId: number }): Promise<string> } } }).chrome;
-      const [tab] = await api.tabs.query({ active: true, currentWindow: true });
-      if (tab === undefined) throw new Error("Active fixture tab unavailable");
-      return api.action.getTitle({ tabId: tab.id });
-    })).toContain("Reload the page");
-    expect(await page.$$("[data-ui-torture-lab-root]")).toHaveLength(1);
-    expect(await page.$$("[data-ui-torture-lab-overlay-root]")).toHaveLength(1);
-    expect(await page.$eval("#boundary", node => node.textContent)).toBe("Checkout");
+      // A distinct native extension ID gives a fresh ISOLATED context while retaining the actual orphan DOM.
+      const nextId = await browser.installExtension(copy);
+      expect(nextId).not.toBe(firstId);
+      const next = (await browser.extensions()).get(nextId);
+      if (next === undefined) throw new Error("Fresh extension context unavailable");
+      await triggerFixtureAction(page, next);
+      const workerTarget = await browser.waitForTarget(target => target.type() === "service_worker" && target.url().includes(nextId));
+      const worker = await workerTarget.worker();
+      if (worker === null) throw new Error("Fresh worker unavailable");
+      await expect.poll(() => worker.evaluate(async () => {
+        const api = (globalThis as unknown as { chrome: { tabs: { query(details: object): Promise<{ id: number }[]> }; action: { getTitle(details: { tabId: number }): Promise<string> } } }).chrome;
+        const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+        if (tab === undefined) throw new Error("Active fixture tab unavailable");
+        return api.action.getTitle({ tabId: tab.id });
+      })).toContain("Reload the page");
+      expect(await page.$$("[data-ui-torture-lab-root]")).toHaveLength(surface === "visible" ? 1 : 0);
+      expect(await page.$$("[data-ui-torture-lab-overlay-root]")).toHaveLength(surface === "visible" ? 1 : 0);
+      expect(await page.$eval("#boundary", node => node.textContent)).toBe(boundaryBeforeReplacement);
 
-    await page.reload();
-    await triggerFixtureAction(page, next);
-    await expect.poll(text).toContain("Apply Long Text");
-    expect(await page.$$("[data-ui-torture-lab-root]")).toHaveLength(1);
-    await page.locator("::-p-aria(Apply Long Text)").setTimeout(5000).click();
-    await expect.poll(text).toContain("Long Text Scenario active");
-    await page.locator("::-p-aria(Restore)").setTimeout(5000).click();
-    expect(await page.$eval("#boundary", node => node.textContent)).toBe("Checkout");
-  } finally {
-    await browser.close();
-    await rm(copy, { recursive: true, force: true });
-  }
-});
+      await page.reload();
+      await triggerFixtureAction(page, next);
+      await expect.poll(text).toContain("Apply Long Text");
+      expect(await page.$$("[data-ui-torture-lab-root]")).toHaveLength(1);
+      await page.locator("::-p-aria(Apply Long Text)").setTimeout(5000).click();
+      await expect.poll(text).toContain("Long Text Scenario active");
+      await page.locator("::-p-aria(Restore)").setTimeout(5000).click();
+      expect(await page.$eval("#boundary", node => node.textContent)).toBe("Checkout");
+    } finally {
+      await browser.close();
+      await rm(copy, { recursive: true, force: true });
+    }
+  });
+}
 
 test("Scenario controls show an unavailable state until the current grant acknowledgement", async () => {
   const browser = await puppeteer.launch({ executablePath: await puppeteer.executablePath("chrome"), headless: true, enableExtensions: true });
@@ -98,6 +107,13 @@ test("Scenario controls show an unavailable state until the current grant acknow
     }
     await page.screenshot({ path: test.info().outputPath("panel-disabled.png") });
     expect(await page.$eval("#boundary", node => node.textContent)).toBe("Checkout");
+    await page.locator("::-p-aria(Close UI Torture Lab)").setTimeout(5000).click();
+    await expect.poll(() => page.$$("[data-ui-torture-lab-root]").then(nodes => nodes.length)).toBe(0);
+    await worker.evaluate("globalThis.releaseGrantAcknowledgement()");
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    expect(await page.$$("[data-ui-torture-lab-root], [data-ui-torture-lab-overlay-root]")).toHaveLength(0);
+    await triggerFixtureAction(page, extension);
+    await expect.poll(controls).toEqual([true, true, true]);
     await worker.evaluate("globalThis.releaseGrantAcknowledgement()");
     await expect.poll(controls).toEqual([false, false, false]);
     await expect.poll(async () => (await appearance()).map((style, index) =>

@@ -88,7 +88,7 @@ export function bootstrapTargetPage(
     [key: symbol]: { document: Document; isExtensionOwnedNode(node: Node): boolean } | undefined;
   })[Symbol.for("ui-torture-lab/document-runtime")];
   // Markers cannot prove ownership. An unverified surface blocks admission; it is never removed.
-  for (const host of document.querySelectorAll("ui-torture-lab-root,ui-torture-lab-overlay-root,[data-ui-torture-lab-root],[data-ui-torture-lab-overlay-root]")) {
+  for (const host of document.querySelectorAll("ui-torture-lab-runtime,ui-torture-lab-root,ui-torture-lab-overlay-root,[data-ui-torture-lab-root],[data-ui-torture-lab-overlay-root]")) {
     if (runtime?.document !== document || typeof runtime.isExtensionOwnedNode !== "function" || !runtime.isExtensionOwnedNode(host)) {
       return reject("unverified-control-surface");
     }
