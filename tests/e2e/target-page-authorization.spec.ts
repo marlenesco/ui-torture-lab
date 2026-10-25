@@ -689,6 +689,11 @@ test("floating UI remains inside a small viewport without document overflow", as
     );
     const before = await readFixtureGeometry(page);
     await triggerToolbarAction(page);
+    await waitForExtensionPanel(page);
+    await expect.poll(() => page.$eval(
+      "[data-ui-torture-lab-root]",
+      (host) => Boolean(host.shadowRoot?.querySelector(".panel-shell")),
+    )).toBe(true);
 
     const surface = await page.$eval(
       "[data-ui-torture-lab-root]",
