@@ -56,7 +56,8 @@ export function inspectJavaScript(code, { requireInjection = false, firstParty =
     if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
       const expression = node.expression;
       const name = ts.isPropertyAccessExpression(expression) ? expression.name.text : ts.isIdentifier(expression) ? expression.text : ts.isElementAccessExpression(expression) ? literal(expression.argumentExpression) : "";
-      if (["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "WebTransport", "sendBeacon", "importScripts", "eval", "Function"].includes(name) || expression.kind === ts.SyntaxKind.ImportKeyword) report(node, `unauthorized runtime capability ${name || "dynamic import"}`);
+      if (["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "WebTransport", "sendBeacon", "importScripts", "eval", "Function", "captureVisibleTab", "captureTab", "chooseDesktopMedia", "getDisplayMedia", "getUserMedia", "captureStream"].includes(name) || expression.kind === ts.SyntaxKind.ImportKeyword) report(node, `unauthorized runtime capability ${name || "dynamic import"}`);
+      if (name === "capture" && /(?:tabCapture|desktopCapture|pageCapture)/u.test(expression.getText(source))) report(node, "media or page capture is not authorized");
       if (name === "CustomEvent") report(node, "CustomEvent page bridge is not authorized");
       if (name === "postMessage" && (!ts.isPropertyAccessExpression(expression) || /^(?:window|self|globalThis)$/u.test(expression.expression.getText(source)))) report(node, "window postMessage bridge is not authorized");
       if (["createElement", "createElementNS"].includes(name) && node.arguments?.some((argument) => literal(argument)?.toLowerCase() === "script")) {

@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import type { PageAuthorizationAttempt } from "./page-authorization";
+
 import type {
   SupportedTargetProtocol,
   TargetBootstrapResponse,
   TargetProbeResponse,
 } from "./messages";
 
-export function probeTargetPage(expectedUrl: string): TargetProbeResponse {
+export function probeTargetPage(expectedUrl: string, attemptId: string): TargetProbeResponse {
   const responseType = "target-probe-response" as const;
 
   if (window.top !== window) {
@@ -34,6 +36,30 @@ export function probeTargetPage(expectedUrl: string): TargetProbeResponse {
     };
   }
 
+  // This serialized function must install the attempt guard before any later injection or await.
+  const key = Symbol.for("ui-torture-lab/page-authorization-attempt");
+  const scope = globalThis as typeof globalThis & { [key: symbol]: PageAuthorizationAttempt | undefined };
+  const previous = scope[key];
+  previous?.stop();
+  const navigation = window.navigation;
+  const complete = navigation !== undefined && navigation.currentEntry !== null;
+  const attempt: PageAuthorizationAttempt = {
+    id: attemptId, expectedUrl, valid: true,
+    stop() {
+      attempt.valid = false;
+      attempt.expectedUrl = "";
+      if (scope[key] === attempt) delete scope[key];
+      if (complete) navigation.removeEventListener("currententrychange", invalidate);
+      else { window.removeEventListener("popstate", invalidate); window.removeEventListener("hashchange", invalidate); }
+      window.removeEventListener("pagehide", invalidate);
+    },
+  };
+  const invalidate = (): void => { attempt.valid = false; attempt.stop(); };
+  scope[key] = attempt;
+  if (complete) navigation.addEventListener("currententrychange", invalidate);
+  else { window.addEventListener("popstate", invalidate); window.addEventListener("hashchange", invalidate); }
+  window.addEventListener("pagehide", invalidate);
+
   return {
     type: responseType,
     status: "matched",
@@ -43,6 +69,7 @@ export function probeTargetPage(expectedUrl: string): TargetProbeResponse {
 
 export function bootstrapTargetPage(
   expectedUrl: string,
+  attemptId: string,
 ): TargetBootstrapResponse {
   const responseType = "target-bootstrap-response" as const;
 
@@ -69,6 +96,13 @@ export function bootstrapTargetPage(
       status: "rejected",
       reason: "document-changed",
     };
+  }
+
+  const attempt = (globalThis as typeof globalThis & { [key: symbol]: PageAuthorizationAttempt | undefined })[
+    Symbol.for("ui-torture-lab/page-authorization-attempt")
+  ];
+  if (attempt?.id !== attemptId || !attempt.valid) {
+    return { type: responseType, status: "rejected", reason: "document-changed" };
   }
 
   if (document.contentType !== "text/html") {

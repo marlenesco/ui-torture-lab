@@ -293,6 +293,7 @@ export function createRunController(
       const restore = journal?.restore() ?? { conflicts: [], restoredTargets: 0, status: "restored" as const };
       journal = null;
       liveFindingReferences.clear();
+      const completedEvidence = snapshot.phase === "ready-for-inspection" || snapshot.phase === "restoring";
       const completedReasons = activeInconclusiveReasons;
       activeFindings = [];
       activeInconclusiveReasons = [];
@@ -300,11 +301,11 @@ export function createRunController(
       const result: SerializedRunResult = snapshot.result === null
         ? Object.freeze({
             scenarioId: snapshot.scenarioId,
-            status: snapshot.phase === "ready-for-inspection" ? "completed" as const : "aborted" as const,
+            status: completedEvidence ? "completed" as const : "aborted" as const,
             terminationReason: reason,
-            coverage: snapshot.phase === "ready-for-inspection" ? snapshot.coverage : progressCoverage,
-            findings: snapshot.phase === "ready-for-inspection" ? snapshot.findings : [],
-            inconclusiveReasons: snapshot.phase === "ready-for-inspection" ? completedReasons : [],
+            coverage: completedEvidence ? snapshot.coverage : progressCoverage,
+            findings: completedEvidence ? snapshot.findings : [],
+            inconclusiveReasons: completedEvidence ? completedReasons : [],
             restore: serializeRestore(restore),
             summary: "The Target Page context ended. Only completed Evidence is retained. Reload is required if Restore was not verified.",
           })
@@ -587,9 +588,11 @@ export function createRunController(
       if (scenarioId === null) {
         throw new Error("Active Run has no Scenario");
       }
+      const activeJournal = journal;
       publish({ ...snapshot, phase: "restoring" });
+      if (targetEnded || journal !== activeJournal) return;
 
-      const restore = journal.restore();
+      const restore = activeJournal.restore();
       if (targetEnded) return;
       journal = null;
       const result = completedResult(

@@ -33,3 +33,9 @@ pnpm test:contracts
 ```
 
 Platform rationale and primary sources: [same-document-navigation-primary-sources.md](../../docs/research/same-document-navigation-primary-sources.md).
+
+## Pending authorization boundaries
+
+The first toolbar probe installs a one-shot ISOLATED attempt guard before subsequent injections or transport waits. Every observed entry commit, including same-URL state changes, and Page Exit invalidates that attempt. Bootstrap and final authorization validate the same attempt; reauthorization validates it again after snapshot storage acknowledges. Successful or invalidated attempts release the observer and transient full-URL comparison state. Only the minimized result metadata is serialized.
+
+Regressions commit same-URL navigation between each pair of the four native injections, and commit both a route change and a same-URL state update while a previous-snapshot acknowledgement is held. None can authorize the subsequent logical context. Late older toolbar responses cannot replace a newer session grant or feedback.

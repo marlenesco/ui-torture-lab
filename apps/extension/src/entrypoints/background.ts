@@ -100,6 +100,7 @@ const reconcileOrphans = async (): Promise<void> => {
   }
 };
 
+const toolbarAttempts = new Map<number, string>();
 const tabChains = new Map<number, Promise<void>>();
 const enqueueTab = (tabId: number, work: () => Promise<void>): Promise<void> => {
   const next = (tabChains.get(tabId) ?? Promise.resolve())
@@ -118,13 +119,16 @@ export default defineBackground(() => {
 
   browser.tabs.onCreated.addListener((tab) => {
     const tabId = tab.id;
-    if (tabId !== undefined) void enqueueTab(tabId, () => resetTabSession(tabId));
+    if (tabId !== undefined) { toolbarAttempts.delete(tabId); void enqueueTab(tabId, () => resetTabSession(tabId)); }
   });
   browser.tabs.onRemoved.addListener((tabId) => {
+    toolbarAttempts.delete(tabId);
     reachability.forget(tabId);
     void enqueueTab(tabId, () => clearTabSession(tabId));
   });
   browser.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
+    toolbarAttempts.delete(removedTabId);
+    toolbarAttempts.delete(addedTabId);
     reachability.forget(removedTabId);
     void enqueueTab(removedTabId, () => clearTabSession(removedTabId));
     void enqueueTab(addedTabId, () => resetTabSession(addedTabId));
@@ -252,32 +256,40 @@ export default defineBackground(() => {
   });
 
   browser.action.onClicked.addListener(async (tab) => {
+    const attemptId = crypto.randomUUID();
+    const tabId = tab.id;
+    if (tabId !== undefined) toolbarAttempts.set(tabId, attemptId);
+    const isLatest = (): boolean => tabId !== undefined && toolbarAttempts.get(tabId) === attemptId;
     await reconciled;
-    let response = await authorizeTargetPage(tab);
+    let response = await authorizeTargetPage(tab, attemptId);
+    if (!isLatest() || tabId === undefined) return;
     let grantId: string | null = null;
-    if (response.status === "authorized" && tab.id !== undefined) {
-      const session = await ensureTabSession(tab.id);
-      const result = await readRunResult(session.id);
-      if (result !== null && (result.documentId !== response.documentId || session.documentId === null)) {
-        await browser.storage.session.set({
-          [runResultStorageKey(session.id)]: { ...result, state: "previous" },
-        });
-      }
-      grantId = crypto.randomUUID();
-      await writeTabSession(tab.id, { ...session, documentId: response.documentId, grantId });
+    if (response.status === "authorized") {
+      const documentId = response.documentId;
+      await enqueueTab(tabId, async () => {
+        if (!isLatest()) return;
+        const session = await ensureTabSession(tabId);
+        const result = await readRunResult(session.id);
+        if (!isLatest()) return;
+        if (result !== null && (result.documentId !== documentId || session.documentId === null)) {
+          await browser.storage.session.set({ [runResultStorageKey(session.id)]: { ...result, state: "previous" } });
+        }
+        await writeTabSession(tabId, { ...session, documentId, grantId: attemptId });
+        grantId = attemptId;
+      });
     }
-    if (response.status === "authorized" && tab.id !== undefined && grantId !== null) {
-      const mounted = await mountTargetPageControlShell(tab.id, response.documentId, grantId);
+    if (!isLatest()) return;
+    if (response.status === "authorized" && grantId !== null) {
+      const mounted = await mountTargetPageControlShell(tabId, response.documentId, grantId);
       if (mounted !== "mounted") response = rejectTargetAuthorization(mounted === "reload-required" ? "reload-required" : "ui-mount-failed");
     }
-    if (tab.id !== undefined) {
-      if (grantId !== null && (await readTabSession(tab.id))?.grantId !== grantId) return;
-      if (response.status !== "authorized") {
-        const session = await readTabSession(tab.id);
-        if (session !== null) await writeTabSession(tab.id, { ...session, documentId: null });
-      }
-      if (response.status === "authorized" && grantId !== null && reachability.isActive(tab.id, grantId)) await showRunActivity(tab.id, true);
-      else await showAuthorizationFeedback(tab.id, response);
-    }
+    await enqueueTab(tabId, async () => {
+      const session = await readTabSession(tabId);
+      if (!isLatest() || (grantId !== null && session?.grantId !== grantId)) return;
+      if (response.status !== "authorized" && session !== null) await writeTabSession(tabId, { ...session, documentId: null });
+      if (!isLatest()) return;
+      if (response.status === "authorized" && grantId !== null && reachability.isActive(tabId, grantId)) await showRunActivity(tabId, true);
+      else await showAuthorizationFeedback(tabId, response);
+    });
   });
 });

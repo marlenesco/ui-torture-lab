@@ -285,9 +285,11 @@ test("toolbar authorizes one supported top-level Document in ISOLATED world", as
   assert.equal(probe.world, "ISOLATED");
   assert.equal(probe.injectImmediately, true);
   assert.deepEqual(JSON.parse(JSON.stringify(probe.args)), [
-    "http://127.0.0.1:4173/smoke/",
+    "http://127.0.0.1:4173/smoke/", probe.args[1],
   ]);
   assert.equal(typeof probe.func, "function");
+  assert.equal(typeof probe.args[1], "string");
+  assert.equal(background.scriptCalls[3].args[0], probe.args[1]);
 
   const bootstrap = background.scriptCalls[1];
   assert.deepEqual(JSON.parse(JSON.stringify(bootstrap.target)), {
@@ -297,7 +299,7 @@ test("toolbar authorizes one supported top-level Document in ISOLATED world", as
   assert.equal(bootstrap.world, "ISOLATED");
   assert.equal(bootstrap.injectImmediately, true);
   assert.deepEqual(JSON.parse(JSON.stringify(bootstrap.args)), [
-    "http://127.0.0.1:4173/smoke/",
+    "http://127.0.0.1:4173/smoke/", probe.args[1],
   ]);
   assert.equal(typeof bootstrap.func, "function");
 
@@ -865,4 +867,30 @@ test("a child frame cannot bind a top-level Run transport", async () => {
   await settled();
   assert.equal(background.feedback.length, count);
   assert.equal(port.messages.length, 0);
+});
+
+test("a late older toolbar probe cannot replace the newer grant or its feedback", async () => {
+  let releaseFirst;
+  let enteredFirst;
+  const firstEntered = new Promise((resolve) => { enteredFirst = resolve; });
+  let calls = 0;
+  const probe = { type: "target-probe-response", status: "matched", protocol: "http:" };
+  const background = await loadBackground({ executeScript: async (details) => {
+    if (++calls === 1) {
+      enteredFirst();
+      return new Promise((resolve) => { releaseFirst = () => resolve([{ frameId: 0, documentId: "document-1", result: probe }]); });
+    }
+    return [{ frameId: 0, documentId: "document-1", result: details.target.frameIds ? probe : {
+      type: "target-bootstrap-response", status: "bootstrapped", protocol: "http:", contentType: "text/html", topLevel: true,
+    } }];
+  } });
+  const old = background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
+  await firstEntered;
+  await background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
+  const current = JSON.stringify(background.session.get("ui-torture-lab:tab-session:42"));
+  const feedback = background.feedback.length;
+  releaseFirst();
+  await old;
+  assert.equal(JSON.stringify(background.session.get("ui-torture-lab:tab-session:42")), current);
+  assert.equal(background.feedback.length, feedback);
 });

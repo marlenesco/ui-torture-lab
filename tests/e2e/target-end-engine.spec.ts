@@ -131,3 +131,20 @@ test("Page Exit cleanup is synchronous even when a detachable client throws", as
   });
   expect(result).toMatchObject({ text: "Checkout", later: "Continue", result: { terminationReason: "page-exit", restore: { status: "restored" } } });
 });
+
+test("Restore tolerates reentrant target end from a synchronous state subscriber", async ({ page }) => {
+  await page.goto("/same-document-navigation/");
+  const result = await page.evaluate(async () => {
+    const moduleUrl = "/__engine__/index.js";
+    const engine = await import(moduleUrl) as typeof import("../../packages/engine/src/index.js");
+    const controller = engine.createRunController({ document, isExtensionOwnedNode: () => false });
+    await controller.startScenario("long-text");
+    const measured = controller.getSnapshot();
+    controller.subscribe(() => { if (controller.getSnapshot().phase === "restoring") controller.endTarget("page-exit"); });
+    controller.restore();
+    return { snapshot: controller.getSnapshot(), measured, text: document.querySelector("#boundary")?.textContent };
+  });
+  expect(result).toMatchObject({ text: "Checkout", snapshot: { result: { status: "completed", terminationReason: "page-exit", restore: { status: "restored" } } } });
+  expect(result.snapshot.result?.findings).toEqual(result.measured.findings);
+  expect(result.snapshot.result?.coverage).toEqual(result.measured.coverage);
+});

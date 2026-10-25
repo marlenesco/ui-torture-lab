@@ -61,6 +61,7 @@ test("Chrome ISOLATED world observes committed History, fragment, traversal and 
   const page = await browser.newPage();
   try {
     await open(page);
+    expect(await isolated(() => (globalThis as unknown as { [key: symbol]: unknown })[Symbol.for("ui-torture-lab/page-authorization-attempt")] === undefined)).toBe(true);
     // This probe observes platform events; application code remains in its normal fixture world.
     await isolated(() => {
       const scope = globalThis as unknown as { navigation: Navigation; navigationProbe?: string[] };
@@ -202,3 +203,75 @@ test("a route transition with a Restore conflict blocks same-Document toolbar re
     await expect.poll(() => panelText(page)).toContain("Apply Long Text");
   } finally { await page.close(); }
 });
+
+const activeBadge = (): Promise<string> => worker.evaluate(async () => {
+  const api = (globalThis as unknown as { chrome: {
+    tabs: { query(query: object): Promise<{ id: number }[]> };
+    action: { getBadgeText(details: { tabId: number }): Promise<string> };
+  } }).chrome;
+  const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+  if (tab === undefined) throw new Error("Fixture tab unavailable");
+  return api.action.getBadgeText({ tabId: tab.id });
+});
+
+for (const transition of ["push", "state"] as const) {
+  test(`a ${transition} commit during pending toolbar reauthorization cannot grant the subsequent context`, async () => {
+    const page = await browser.newPage();
+    try {
+      await open(page);
+      await clickPanel(page, "Apply Long Text");
+      await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
+      await page.$eval("#push", (element) => (element as HTMLElement).click());
+      await expect.poll(() => panelText(page)).toContain("Target Page authorization ended");
+      await isolated(() => {
+        const scope = globalThis as unknown as { releaseSnapshotAck?: () => void; chrome: { runtime: { sendMessage(message: { type: string }): Promise<unknown> } } };
+        const runtime = scope.chrome.runtime;
+        const send = runtime.sendMessage.bind(runtime);
+        runtime.sendMessage = (message) => message.type === "store-previous-run-result"
+          ? send(message).then((saved) => new Promise((resolve) => {
+            scope.releaseSnapshotAck = () => { runtime.sendMessage = send; resolve(saved); };
+          })) : send(message);
+        return true;
+      });
+      const action = page.triggerExtensionAction(extension);
+      await expect.poll(() => isolated(() => typeof (globalThis as unknown as { releaseSnapshotAck?: unknown }).releaseSnapshotAck)).toBe("function");
+      await page.$eval(`#${transition}`, (element) => (element as HTMLElement).click());
+      await isolated(() => { (globalThis as unknown as { releaseSnapshotAck(): void }).releaseSnapshotAck(); return true; });
+      await action;
+      await expect.poll(activeBadge).toBe("!");
+      expect(await panelText(page)).not.toContain("Apply Long Text");
+      expect(await page.$eval("#boundary", (element) => element.textContent)).toBe("Checkout");
+      await page.triggerExtensionAction(extension);
+      await expect.poll(() => panelText(page)).toContain("Apply Long Text");
+    } finally { await page.close(); }
+  });
+}
+
+for (const stage of [1, 2, 3]) {
+  test(`same-URL navigation between toolbar injections ${stage} and ${stage + 1} rejects the pending grant`, async () => {
+    const page = await browser.newPage();
+    try {
+      await page.goto("http://127.0.0.1:4173/same-document-navigation/");
+      await page.bringToFront();
+      await worker.evaluate(`(() => {
+        const original = chrome.scripting.executeScript.bind(chrome.scripting);
+        let count = 0;
+        globalThis.restoreInjectionProbe = () => { chrome.scripting.executeScript = original; };
+        chrome.scripting.executeScript = async (details) => {
+          const result = await original(details);
+          if (++count === ${stage}) {
+            await original({target: details.target, world: "ISOLATED", func: () => document.querySelector("#state").click()});
+          }
+          return result;
+        };
+      })()`);
+      await page.triggerExtensionAction(extension);
+      await expect.poll(activeBadge).toBe("!");
+      const text = await page.evaluate(() => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent ?? "");
+      expect(text).not.toContain("Apply Long Text");
+    } finally {
+      await worker.evaluate("globalThis.restoreInjectionProbe?.()");
+      await page.close();
+    }
+  });
+}

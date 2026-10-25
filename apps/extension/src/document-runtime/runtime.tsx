@@ -9,6 +9,7 @@ import {
   isStoredRunResult,
   pageMetadataFor,
 } from "../target-page/current-run-result";
+import { getPageAuthorizationAttempt } from "../target-page/page-authorization";
 import { observeSameDocumentNavigation } from "../target-page/navigation";
 import {
   bindGrantMessageType,
@@ -245,31 +246,37 @@ class DocumentRuntime {
   }
 
   async authorize(grantId: string): Promise<"mounted" | "reload-required" | "failed"> {
-    this.grantId = grantId;
-    if (this.targetEnded && this.previousRunResult !== null) {
-      const saved = await browser.runtime.sendMessage({ type: storePreviousRunResultMessageType, grantId, page: this.previousRunResult.page, result: this.previousRunResult.result }).catch(() => false);
-      if (saved !== true || this.grantId !== grantId) return "failed";
-    }
-    if (this.runController.getSnapshot().phase === "reload-required") {
+    const attempt = getPageAuthorizationAttempt();
+    const unchanged = (): boolean => attempt !== undefined && attempt === getPageAuthorizationAttempt() &&
+      attempt.id === grantId && attempt.valid && attempt.expectedUrl === window.location.href;
+    if (!unchanged()) { if (attempt?.id === grantId) attempt.stop(); return "failed"; }
+    try {
+      this.grantId = grantId;
+      if (this.targetEnded && this.previousRunResult !== null) {
+        const saved = await browser.runtime.sendMessage({ type: storePreviousRunResultMessageType, grantId, page: this.previousRunResult.page, result: this.previousRunResult.result }).catch(() => false);
+        if (saved !== true || this.grantId !== grantId || !unchanged()) return "failed";
+      }
+      if (this.runController.getSnapshot().phase === "reload-required") {
+        this.mountOrReveal();
+        return "reload-required";
+      }
+      if (this.targetEnded) {
+        this.unsubscribeEngine();
+        this.runController = this.createController();
+        this.storedResult = null;
+        this.currentRunReport = null;
+        this.reportedRunActivity = null;
+        this.navigationObserver = observeSameDocumentNavigation(window, () => this.endTarget("same-document-navigation"));
+      }
+      if (!this.authorized) this.page = pageMetadataFor(window.location);
+      this.grantId = grantId;
+      this.authorized = true;
+      this.targetEnded = false;
+      this.liveFindingMessage = null;
+      this.openReachability();
       this.mountOrReveal();
-      return "reload-required";
-    }
-    if (this.targetEnded) {
-      this.unsubscribeEngine();
-      this.runController = this.createController();
-      this.storedResult = null;
-      this.currentRunReport = null;
-      this.reportedRunActivity = null;
-      this.navigationObserver = observeSameDocumentNavigation(window, () => this.endTarget("same-document-navigation"));
-    }
-    if (!this.authorized) this.page = pageMetadataFor(window.location);
-    this.grantId = grantId;
-    this.authorized = true;
-    this.targetEnded = false;
-    this.liveFindingMessage = null;
-    this.openReachability();
-    this.mountOrReveal();
-    return "mounted";
+      return "mounted";
+    } finally { attempt?.stop(); }
   }
 
   private endTarget(reason: TargetEndReason): void {

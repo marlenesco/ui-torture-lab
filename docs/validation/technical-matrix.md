@@ -71,3 +71,7 @@ On 2026-10-25, an isolated clean local clone at candidate commit `aa9d49b958790c
 Results: lint passed; strict TypeScript/Astro checks reported zero errors, warnings, or hints; all three production workspaces built; 52 contract tests and 160 E2E tests passed; the release artifact gate passed. E2E used four workers and completed in 25.5 seconds on this machine. Environment: Node 24.22.1, pnpm 11.20.0, Chrome 155.0.8059.85/macOS. No retry or timeout increase was used to obtain this result.
 
 The temporary checkout and its processes were removed after verification. Local command logs remain under `.scratch/clean-install.log` and `.scratch/clean-check.log`; those logs are not public release evidence or participant data. Manual platform sign-off, the exact release Node reconstruction on a published candidate, Cloudflare deployment/rollback, Product Validation, and release publication remain unresolved. Technical Validation is therefore still pending as a launch gate.
+
+## Candidate review follow-up
+
+Independent standards/spec review found and corrected pending-authorization navigation races, reentrant Restore, stale pre-build release metadata, and a missing capture-API regression guard. See [candidate-review.md](candidate-review.md). The complete local `pnpm check` after these corrections passed 56 contract tests and 166 E2E tests (25.2 seconds), lint, strict types, build, and artifact checks. These follow-up results supersede the earlier automated test counts for the current code candidate; public CI and human launch gates are recorded separately.

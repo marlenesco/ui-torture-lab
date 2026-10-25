@@ -44,3 +44,5 @@ A Store listing identity can exist before approval; the website must continue to
 ## Guardrail milestone evidence
 
 On 2026-10-25, Chrome 155.0.8059.85/macOS: lint, strict types, production build, 52 contract tests, 145 E2E tests, and the read-only artifact gate passed. Adversarial policy tests reached 100% line/function and 96.32% branch coverage. These results establish the automated candidate gate; they do not mark the pending human or public-release gates passed.
+
+Release identity is checked again after `pnpm check` rebuilds the artifacts. The record uses the final manifest's version, matching tag, and permissions alongside the final hashes; stale generated metadata cannot describe a different rebuilt artifact. Explicit Chrome/media capture APIs are rejected independently of the permission budget, because temporary activeTab access can itself permit capture.

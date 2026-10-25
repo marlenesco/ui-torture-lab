@@ -69,6 +69,7 @@ const validateTargetUrl = (
 
 export async function authorizeTargetPage(
   tab: Pick<Browser.tabs.Tab, "id" | "url">,
+  attemptId: string,
 ): Promise<TargetAuthorizationResponse> {
   if (tab.id === undefined) {
     return rejectTargetAuthorization("missing-target");
@@ -86,7 +87,7 @@ export async function authorizeTargetPage(
       world: "ISOLATED",
       injectImmediately: true,
       func: probeTargetPage,
-      args: [target.url],
+      args: [target.url, attemptId],
     });
   } catch {
     return rejectTargetAuthorization("injection-failed");
@@ -117,7 +118,7 @@ export async function authorizeTargetPage(
       world: "ISOLATED",
       injectImmediately: true,
       func: bootstrapTargetPage,
-      args: [target.url],
+      args: [target.url, attemptId],
     });
   } catch {
     return rejectTargetAuthorization("document-changed");
