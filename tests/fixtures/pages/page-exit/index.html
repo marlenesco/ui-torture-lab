@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Page Exit and BFCache fixture</title>
+    <style>body { margin: 24px; font: 16px/1.5 system-ui, sans-serif; } #boundary { width: 170px; overflow: hidden; white-space: nowrap; }</style>
+  </head>
+  <body>
+    <p id="boundary">Checkout</p>
+    <p id="later-target">Continue</p>
+    <a id="leave" href="/smoke/">Leave page</a>
+    <script>
+      window.fixtureLifecycle = { restored: false, exits: 0, textAtExit: null };
+      addEventListener('pageshow', (event) => { window.fixtureLifecycle.restored = event.persisted; });
+      addEventListener('pagehide', () => { window.fixtureLifecycle.exits++; });
+    </script>
+  </body>
+</html>

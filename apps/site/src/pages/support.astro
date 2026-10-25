@@ -1,0 +1,12 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+import Page from "../layouts/Page.astro";
+import { repository } from "../content/product";
+---
+<Page title="Support & security" description="Best-effort support for the latest Official Distribution in Supported Scope, with private vulnerability reporting and no SLA.">
+  <p class="eyebrow">Public Product Contract / Support</p><h1>Useful reports.<br />Bounded support.</h1><p class="lead">Support is best-effort for reproducible product bugs in the latest Official Distribution within the Supported Scope.</p>
+  <p>There is no SLA, guaranteed individual assistance, response or resolution time, promised feature delivery, backward-compatibility promise, or application-code consulting. Modified builds, forks, and unsupported browsers are outside official support guarantees.</p>
+  <h2>Report a product bug</h2><p>Use <a href={`${repository}/issues`}>GitHub Issues</a> with the version, Chrome version, platform, expected outcome, actual outcome, and a minimal synthetic fixture. Review any Markdown Report before sharing. Remove private URLs, page text, Locators, credentials, personal data, and proprietary code. A Possible Cause is a hypothesis, not a diagnosis of your application.</p>
+  <h2>Report a vulnerability privately</h2><p>Do not open a public issue for a suspected vulnerability, data exposure, unsafe Restore, injection, or permission problem. Use <a href={`${repository}/security/advisories/new`}>GitHub Private Vulnerability Reporting</a> and the <a href={`${repository}/blob/main/SECURITY.md`}>Security Policy</a>. Send the smallest safe synthetic reproduction; no credentials, real authenticated pages, or complete unredacted reports.</p><p>Security handling is also best-effort, without a response-time promise, embargo agreement, or bug bounty commitment.</p>
+  <p><a href="/scope/">Supported Scope</a> · <a href="/privacy/">Privacy &amp; retention</a> · <a href="/license/">License &amp; distribution</a></p>
+</Page>

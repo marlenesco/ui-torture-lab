@@ -125,6 +125,10 @@ export function createMutationJournal(document: Document): MutationJournal {
         return entry.outcome;
       }
 
+      if (!writable) {
+        entry.outcome = "skipped";
+        return entry.outcome;
+      }
       let writeThrew = false;
       try {
         record.writeState(record.appliedState);
@@ -191,10 +195,13 @@ export function createMutationJournal(document: Document): MutationJournal {
         if (
           outcome !== "applied" &&
           outcome !== "applied-ineffective" &&
-          outcome !== "unknown"
+          outcome !== "unknown" &&
+          outcome !== "pending"
         ) {
           continue;
         }
+        // Reentrant navigation during a write cannot establish a verified cleanup.
+        cleanupUnverified ||= outcome === "pending";
         if (!record.target.isConnected) {
           cleanupUnverified ||= outcome === "unknown";
           conflicts.push({
@@ -281,6 +288,7 @@ export function createMutationJournal(document: Document): MutationJournal {
           });
           continue;
         }
+        if (outcome === "pending") conflicts.push({ kind: record.kind, reason: "restore-unverified", target: record.target });
         restoredTargets += 1;
       }
 
@@ -326,6 +334,7 @@ export function createStyleMutationRecord(options: {
   readonly property: string;
   readonly target: HTMLElement;
 }): MutationRecord<StyleState> {
+  const originallyHadStyleAttribute = options.target.hasAttribute("style");
   const readState = (): StyleState => ({
     value: options.target.style.getPropertyValue(options.property),
     priority: options.target.style.getPropertyPriority(options.property),
@@ -342,6 +351,9 @@ export function createStyleMutationRecord(options: {
     writeState: ({ value, priority }) => {
       if (value === "") {
         options.target.style.removeProperty(options.property);
+        if (!originallyHadStyleAttribute && options.target.getAttribute("style") === "") {
+          options.target.removeAttribute("style");
+        }
         return;
       }
       options.target.style.setProperty(options.property, value, priority);

@@ -1,65 +1,38 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
-
-const description =
-  "Deterministic text stress testing for measurable web layout regressions.";
+import Page from "../layouts/Page.astro";
+import { repository } from "../content/product";
 ---
-
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="description" content={description} />
-    <meta name="viewport" content="width=device-width" />
-    <title>UI Torture Lab</title>
-  </head>
-  <body>
-    <main>
-      <p class="eyebrow">Public workspace scaffold</p>
-      <h1>UI Torture Lab</h1>
-      <p>{description}</p>
-      <p>
-        Product capabilities are under active development and are not yet available
-        as an Official Distribution.
-      </p>
-    </main>
-  </body>
-</html>
-
-<style>
-  :global(*) {
-    box-sizing: border-box;
-  }
-
-  :global(body) {
-    min-height: 100vh;
-    margin: 0;
-    color: #151515;
-    background: #f4f1e8;
-    font-family: ui-sans-serif, system-ui, sans-serif;
-  }
-
-  main {
-    width: min(42rem, calc(100% - 2rem));
-    margin-inline: auto;
-    padding-block: clamp(4rem, 12vw, 9rem);
-  }
-
-  .eyebrow {
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  h1 {
-    margin-block: 0.25rem 1rem;
-    font-size: clamp(2.5rem, 9vw, 5rem);
-    line-height: 0.95;
-  }
-
-  p {
-    max-width: 62ch;
-    line-height: 1.6;
-  }
-</style>
+<Page title="UI Torture Lab" description="Stress text on your own web interface. Investigate measured layout regressions, Restore, and copy the Evidence as Markdown." home>
+  <section class="hero" aria-labelledby="product-title">
+    <p class="eyebrow">A field tool for frontend developers · Chrome desktop</p>
+    <h1 id="product-title">UI Torture Lab</h1>
+    <p class="promise">Stress text.<br />Investigate what breaks.</p>
+    <p>Apply a deterministic text Scenario to an interface you own or can modify. Inspect new or measurably worsened layout regressions, Restore, and copy the Evidence as Markdown.</p>
+    <div class="actions"><a class="button" href="/install/">Installation &amp; release status</a><a href="/docs/">Read the workflow</a></div>
+  </section>
+  <section class="home-section" aria-labelledby="evidence-title">
+    <p class="eyebrow">01 / Evidence before interpretation</p>
+    <h2 id="evidence-title">A measured change.<br />A place to investigate.</h2>
+    <div class="columns">
+      <figure class="specimen">
+        <p class="eyebrow">Baseline / synthetic example</p><div class="sample">Checkout</div>
+        <p class="eyebrow">Long Text / synthetic example</p><div class="sample" aria-label="Expanded checkout text clipped by its boundary">Checkout Checkout Checkout</div>
+        <figcaption>Illustration only. A Text Clipping Finding requires comparable geometry on the same connected element before and after Mutation.</figcaption>
+      </figure>
+      <div><h3>Read before and after</h3><p class="evidence">Subject: clipping boundary<br />Baseline: visible text<br />Mutated: a newly hidden range<br />Measured Delta: CSS pixels<br />Possible Cause: a hypothesis</p><p>Findings describe supported geometric regressions. They carry no severity, quality score, or accessibility verdict.</p></div>
+    </div>
+  </section>
+  <section class="home-section" aria-labelledby="workflow-title">
+    <p class="eyebrow">02 / One Scenario at a time</p><h2 id="workflow-title">Open. Stress. Inspect. Restore.</h2>
+    <ol class="steps"><li>Open your interface in Google Chrome desktop stable and click the extension toolbar action.</li><li>Choose one Scenario. The Run captures a Baseline, applies temporary Mutations, and compares supported Evidence.</li><li>Inspect a Finding Subject or Primary Contributor. Investigate the relevant HTML and CSS in your own tools.</li><li>Use explicit Restore, then Copy Report as Markdown. Reload if cleanup cannot be verified.</li></ol>
+    <p><a href="/docs/">Understand coverage, inconclusive results, and safe Restore →</a></p>
+  </section>
+  <section class="home-section" aria-labelledby="capabilities-title">
+    <p class="eyebrow">03 / Current build</p><h2 id="capabilities-title">Three Scenarios.<br />Three geometric Detectors.</h2>
+    <div class="columns"><div><h3>Scenarios</h3><dl><dt><strong>Long Text</strong></dt><dd>Repeats eligible text three times while preserving target identity.</dd><dt><strong>Unbreakable Text</strong></dt><dd>Appends one fixed 64-character token without adding wrapping opportunities.</dd><dt><strong>Large Text</strong></dt><dd>Doubles stable computed font sizes on eligible Text Scaling Targets.</dd></dl></div><div><h3>Detectors</h3><dl><dt><strong>Text Clipping</strong></dt><dd>New or worsened text hidden by a proven clipping boundary.</dd><dt><strong>Horizontal Containment Overflow</strong></dt><dd>New or worsened excess beyond a proven containing boundary.</dd><dt><strong>Viewport Overflow</strong></dt><dd>New or worsened page-level horizontal extent with a stable contributor.</dd></dl></div></div>
+    <p>The Official Distribution’s MVP is free, needs no account, and has no gated features. <a href="/license/">Read the distribution contract.</a></p>
+    <p>No Findings does not establish that the page has no layout problems. <a href="/scope/">Read the Supported Scope.</a></p>
+  </section>
+  <section class="home-section"><h2>Know the boundary before you install.</h2><p>Chrome desktop stable, Manifest V3, top-level light-DOM HTML over HTTP or HTTPS. Localhost is supported. Read the usage guide before changing routes or navigating during a Run.</p><div class="actions"><a class="button" href="/install/">Check installation status</a><a href={repository}>Inspect the public source</a></div></section>
+</Page>

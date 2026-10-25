@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Same-document navigation fixture</title>
+    <style>
+      body { margin: 24px; font: 16px/1.5 system-ui, sans-serif; }
+      #boundary { width: 170px; overflow: hidden; white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <p id="boundary">Checkout</p>
+    <p id="later-target">Continue</p>
+    <button id="push" type="button">History push</button>
+    <button id="replace" type="button">History replace</button>
+    <button id="state" type="button">Same URL state</button>
+    <a id="fragment" href="#section">Fragment</a>
+    <button id="router" type="button">Router transition</button>
+    <section id="section">Section</section>
+    <iframe title="Child frame" src="/smoke/"></iframe>
+    <script>
+      document.querySelector('#push').onclick = () => history.pushState({}, '', '/smoke/?route=second');
+      document.querySelector('#replace').onclick = () => history.replaceState({}, '', '?route=replaced');
+      document.querySelector('#state').onclick = () => history.replaceState({ route: 'state-only' }, '');
+      document.querySelector('#router').onclick = () => {
+        history.pushState({}, '', '/smoke/?route=router');
+        document.querySelector('#boundary').textContent = 'Router-owned content';
+      };
+    </script>
+  </body>
+</html>

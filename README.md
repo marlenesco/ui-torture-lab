@@ -47,6 +47,14 @@ pnpm dev:fixtures
 The repository intentionally has no generic shared package, per-Scenario
 package, per-Detector package, backend, analytics service, or Turborepo setup.
 
+## Navigation safety
+
+Observed top-level History, fragment, Navigation API, and back/forward entry changes end the current Target Page authorization. The extension attempts conflict-aware Restore, retains only a non-live Previous-Target Snapshot, and requires another toolbar action. Conflicts or unverified cleanup require a true reload. Navigation is never intercepted or prevented.
+
+Stable-route SPAs remain supported. Private router transitions with no observable history entry change are outside this guarantee: Restore before those transitions. When Navigation API entries are unavailable, the UI warns that observation is incomplete; Restore before changing SPA routes. See the [Chrome observation benchmark](tests/benchmarks/same-document-navigation.md).
+
+Page Exit (`pagehide`) synchronously revokes the context, cancels pending work, and attempts conflict-aware Restore without waiting for UI or messaging. A BFCache return never resumes the old grant. Use the toolbar again after verified cleanup; conflicts require a true reload. A lost extension connection clears the Run indicator but does not prove Page Exit or automatically end a live Run. Abrupt process termination cannot guarantee cleanup or final snapshot delivery. See the [Page Exit benchmark](tests/benchmarks/page-exit-bfcache.md).
+
 ## Contributing and support
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change. Public bug

@@ -206,13 +206,14 @@ const explainsDocumentExtent = (
 
 export async function captureViewportOverflowBaseline(options: {
   readonly document: Document;
+  readonly signal?: AbortSignal;
   readonly targets: readonly Text[];
 }): Promise<ViewportOverflowBaseline> {
   const view = options.document.defaultView;
   if (view === null || !isTopLevel(view)) {
     return { geometry: null, inconclusiveReasons: ["viewport-overflow-view-unavailable"], inconclusiveTargets: 1, snapshots: [] };
   }
-  if (!(await nextMeasurementFrame(view))) {
+  if (!(await nextMeasurementFrame(view, options.signal))) {
     return { geometry: null, inconclusiveReasons: ["viewport-overflow-sampling-timeout"], inconclusiveTargets: 1, snapshots: [] };
   }
   const geometry = documentGeometry(options.document);
@@ -223,7 +224,7 @@ export async function captureViewportOverflowBaseline(options: {
     seen.add(element);
     return [{ direction: directionFor(element, view), element, geometry: elementGeometry(element, view), target }];
   });
-  if (!(await nextMeasurementFrame(view))) {
+  if (!(await nextMeasurementFrame(view, options.signal))) {
     return { geometry: null, inconclusiveReasons: ["viewport-overflow-sampling-timeout"], inconclusiveTargets: 1, snapshots: [] };
   }
   const stableDocument = stable(geometry, documentGeometry(options.document));
@@ -255,6 +256,7 @@ export async function captureViewportOverflowBaseline(options: {
 export async function detectViewportOverflow(options: {
   readonly baseline: ViewportOverflowBaseline;
   readonly document: Document;
+  readonly signal?: AbortSignal;
   readonly expectedAppliedValues: ReadonlyMap<Text, string>;
   readonly isTargetMutationCurrent: (target: Text) => boolean;
   readonly scenarioId: ScenarioId;
@@ -271,12 +273,12 @@ export async function detectViewportOverflow(options: {
     };
   }
   const baselineGeometry = options.baseline.geometry;
-  if (!(await nextMeasurementFrame(view))) {
+  if (!(await nextMeasurementFrame(view, options.signal))) {
     return { comparableTargets: [], contributorTargets: [], findings: [], liveReferences: new Map(), inconclusiveReasons: ["viewport-overflow-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
   }
   const geometry = documentGeometry(options.document);
   const candidates = options.baseline.snapshots.map((snapshot) => ({ snapshot, geometry: elementGeometry(snapshot.element, view) }));
-  if (!(await nextMeasurementFrame(view))) {
+  if (!(await nextMeasurementFrame(view, options.signal))) {
     return { comparableTargets: [], contributorTargets: [], findings: [], liveReferences: new Map(), inconclusiveReasons: ["viewport-overflow-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
   }
   const stableDocument = stable(geometry, documentGeometry(options.document));

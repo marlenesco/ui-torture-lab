@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { triggerFixtureAction } from "../support/extension-action";
+import { waitForExtensionPanel } from "../support/extension-panel";
 import path from "node:path";
 import puppeteer, {
   type Browser,
@@ -81,7 +83,7 @@ const readActiveTabActionState = async (): Promise<ActionState> =>
 
 const triggerToolbarAction = async (page: Page): Promise<void> => {
   await page.bringToFront();
-  await page.triggerExtensionAction(extension);
+  await triggerFixtureAction(page, extension);
 };
 
 const readFixtureGeometry = async (page: Page): Promise<FixtureGeometry> =>
@@ -105,8 +107,8 @@ const exerciseMeasurementSafeRuntime = async (): Promise<{
   readonly after: RuntimeDiagnostics;
   readonly before: RuntimeDiagnostics;
   readonly during: RuntimeDiagnostics;
-}> =>
-  serviceWorker.evaluate(async () => {
+}> => {
+  await serviceWorker.evaluate(async () => {
     const chromeApi = (globalThis as unknown as { chrome: ExtensionChromeApi })
       .chrome;
     const [tab] = await chromeApi.tabs.query({
@@ -120,7 +122,7 @@ const exerciseMeasurementSafeRuntime = async (): Promise<{
     const [injection] = await chromeApi.scripting.executeScript({
       target: { tabId: tab.id, frameIds: [0] },
       world: "ISOLATED",
-      func: async () => {
+      func: () => {
         type RuntimeProbe = {
           clearDiagnosticHighlights(): void;
           getDiagnostics(): RuntimeDiagnostics;
@@ -148,20 +150,38 @@ const exerciseMeasurementSafeRuntime = async (): Promise<{
           height: 40,
         });
         const before = runtime.getDiagnostics();
-        const during = await runtime.withMeasurementSafeUi(() =>
-          runtime.getDiagnostics(),
-        );
-        const after = runtime.getDiagnostics();
-        runtime.clearDiagnosticHighlights();
-        return { before, during, after };
+        const probe = globalThis as typeof globalThis & { measurementProbe?: { before: RuntimeDiagnostics; during: RuntimeDiagnostics; after: RuntimeDiagnostics } };
+        delete probe.measurementProbe;
+        void runtime.withMeasurementSafeUi(() => runtime.getDiagnostics()).then((during) => {
+          const after = runtime.getDiagnostics();
+          runtime.clearDiagnosticHighlights();
+          probe.measurementProbe = { before, during, after };
+        });
+        return true;
       },
     });
 
     if (injection?.result === undefined) {
       throw new Error("Document Runtime probe returned no result");
     }
-    return injection.result;
   });
+  let observed: { before: RuntimeDiagnostics; during: RuntimeDiagnostics; after: RuntimeDiagnostics } | null = null;
+  await expect.poll(async () => {
+    observed = await serviceWorker.evaluate(async () => {
+      const api = (globalThis as unknown as { chrome: ExtensionChromeApi }).chrome;
+      const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+      if (tab?.id === undefined) throw new Error("No active fixture tab");
+      const [injection] = await api.scripting.executeScript({
+        target: { tabId: tab.id, frameIds: [0] }, world: "ISOLATED",
+        func: () => (globalThis as typeof globalThis & { measurementProbe?: { before: RuntimeDiagnostics; during: RuntimeDiagnostics; after: RuntimeDiagnostics } }).measurementProbe ?? null,
+      });
+      return injection?.result ?? null;
+    });
+    return observed;
+  }).not.toBeNull();
+  if (observed === null) throw new Error("Measurement-safe UI probe did not complete");
+  return observed;
+};
 
 test.beforeAll(async () => {
   browser = await puppeteer.launch({
@@ -219,7 +239,7 @@ test("toolbar mounts one floating control shell without geometry contamination",
     const before = await readFixtureGeometry(page);
 
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
     await page.waitForFunction(() =>
       document
         .querySelector("[data-ui-torture-lab-root]")
@@ -322,7 +342,7 @@ test("Document Runtime excludes owned UI and hides diagnostics during capture", 
       "http://127.0.0.1:4173/extension-ui-contamination/",
     );
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
 
     const probe = await exerciseMeasurementSafeRuntime();
 
@@ -352,7 +372,7 @@ test("floating UI loss and remount preserve one active Document Runtime without 
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
 
     const initialRuntimeId = await page.$eval(
       "[data-ui-torture-lab-root]",
@@ -419,7 +439,7 @@ test("floating UI loss and remount preserve one active Document Runtime without 
       await devTools.send("DOM.removeNode", { nodeId });
     }
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
     await expect
       .poll(() =>
         page.$eval(
@@ -434,7 +454,7 @@ test("floating UI loss and remount preserve one active Document Runtime without 
       document.querySelector("[data-ui-torture-lab-overlay-root]")?.remove();
     });
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
 
     const remounted = await page.evaluate(() => ({
       hostCount: document.querySelectorAll("[data-ui-torture-lab-root]").length,
@@ -458,12 +478,12 @@ test("floating UI loss and remount preserve one active Document Runtime without 
   }
 });
 
-test("toolbar marks an active Run while collapsed and clears after Restore", async () => {
+test("toolbar marks an active Run while collapsed and clears on Page Exit and explicit Restore", async () => {
   const page = await browser.newPage();
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
 
     await page.evaluate(() => {
       const root = document.querySelector("[data-ui-torture-lab-root]");
@@ -513,6 +533,13 @@ test("toolbar marks an active Run while collapsed and clears after Restore", asy
           .querySelector("[data-ui-torture-lab-root]")
           ?.shadowRoot?.querySelector('[aria-label="Expand UI Torture Lab"]') === null,
     );
+    const ended = await page.$eval("[data-ui-torture-lab-root]", (host) => host.shadowRoot?.textContent ?? "");
+    expect(ended).toContain("Target Page authorization ended");
+    expect(ended).toContain("Previous Target Snapshot");
+    expect(await page.$eval("#clipping-boundary", (element) => element.textContent)).toBe("Checkout");
+    await triggerToolbarAction(page);
+    await page.locator('::-p-aria(Apply Long Text)').click();
+    await page.waitForFunction(() => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent?.includes("Long Text Scenario active") === true);
     await page.evaluate(() => {
       const restore = [...(
         document
@@ -550,7 +577,7 @@ test("a replacement Document creates a fresh runtime only after a new toolbar ac
     expect(await page.$$("[data-ui-torture-lab-root]")).toHaveLength(0);
 
     await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await waitForExtensionPanel(page);
     const nextRuntimeId = await page.$eval(
       "[data-ui-torture-lab-root]",
       (host) => (host as HTMLElement).dataset.uiTortureLabRuntimeId,
@@ -564,11 +591,11 @@ test("a replacement Document creates a fresh runtime only after a new toolbar ac
 });
 
 test("a completed Run survives reload only as a non-live Previous Target Snapshot", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create snapshot fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment");
-    await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await test.step("Navigate to snapshot fixture", () => page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment"), { timeout: 5000 });
+    await test.step("Authorize snapshot fixture", () => triggerToolbarAction(page), { timeout: 5000 });
+    await test.step("Mount snapshot fixture panel", () => waitForExtensionPanel(page), { timeout: 5000 });
     await page.evaluate(() => {
       const start = [...(
         document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
@@ -592,8 +619,8 @@ test("a completed Run survives reload only as a non-live Previous Target Snapsho
       () => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent?.includes("Run completed") === true,
     );
 
-    await page.reload();
-    await triggerToolbarAction(page);
+    await test.step("Reload snapshot fixture", () => page.reload(), { timeout: 5000 });
+    await test.step("Authorize snapshot fixture", () => triggerToolbarAction(page), { timeout: 5000 });
     await page.waitForFunction(
       () => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent?.includes("Previous Target Snapshot") === true,
     );
@@ -745,7 +772,7 @@ test("toolbar rejects a same-URL reload between probe and bootstrap", async () =
         resolve();
       });
     });
-    const toolbarAction = page.triggerExtensionAction(extension);
+    const toolbarAction = triggerFixtureAction(page, extension);
     await paused;
 
     await page.reload();

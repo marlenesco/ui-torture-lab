@@ -1,0 +1,37 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+import "../styles/site.css";
+import { navigation, repository } from "../content/product";
+interface Props { title: string; description: string; home?: boolean }
+const { title, description, home = false } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="color-scheme" content="light" />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:type" content="website" />
+    <title>{home ? title : `${title} · UI Torture Lab`}</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <a class="wordmark" href="/" aria-label="UI Torture Lab home">UI Torture Lab<span aria-hidden="true">↗</span></a>
+      <nav aria-label="Primary"><ul>{navigation.map(({ href, label }) => <li><a href={href} aria-current={Astro.url.pathname === href ? "page" : undefined}>{label}</a></li>)}</ul></nav>
+    </header>
+    <p class="release-note">Pre-release build. The Official Distribution is not yet published on Chrome Web Store.</p>
+    <main id="content" tabindex="-1" class:list={[home ? "home" : "article"]}><slot /></main>
+    <footer class="site-footer">
+      <p>Measured regressions. Explicit limits.</p>
+      <nav aria-label="Project"><ul><li><a href="/support/">Support &amp; security</a></li><li><a href="/license/">License &amp; distribution</a></li><li><a href={repository}>Public source</a></li><li><a href={`${repository}/blob/main/SECURITY.md`}>Security reporting</a></li><li><a href={`${repository}/blob/main/LICENSE`}>Apache License 2.0</a></li></ul></nav>
+      <p class="fine">Original code and documentation · © 2026 UI Torture Lab contributors.</p>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "package": "react-dom",
+  "version": "19.2.8",
+  "description": "Three upstream hoistable script-resource helpers; never called or rendered by first-party code. Full enclosing function fingerprints with identifier spelling normalized.",
+  "scriptCreators": [
+    "db5162ae7b10a2e71abc26da181a2725d4c5ff11bd5c0a34d98a178585962e87",
+    "6b266d5a6775fc4def67342fed6aad3450a254f64ac3cf686a2c1f39b24cd882",
+    "63a037cc20d393bac3889de8cd0152018847a7970c019dd372d14c7df30768d3"
+  ]
+}

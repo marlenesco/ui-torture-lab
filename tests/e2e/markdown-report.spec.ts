@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { triggerFixtureAction } from "../support/extension-action";
+import { waitForExtensionPanel } from "../support/extension-panel";
+import { executeAsyncInIsolated } from "../support/extension-script";
 import path from "node:path";
 import puppeteer, { type Browser, type Extension, type Page, type WebWorker } from "puppeteer-core";
 
@@ -9,14 +12,7 @@ type ClipboardProbe = { readonly writes: readonly string[]; readonly gestures: r
 type ChromeApi = {
   readonly storage: { readonly session: { get(key: null): Promise<Record<string, unknown>> } };
   readonly tabs: { query(details: { active: true; currentWindow: true }): Promise<{ id?: number }[]> };
-  readonly scripting: {
-    executeScript(details: {
-      target: { tabId: number; frameIds: number[] };
-      world: "ISOLATED";
-      args: ClipboardMode[];
-      func: (mode: ClipboardMode) => ClipboardProbe;
-    }): Promise<{ result?: ClipboardProbe }[]>;
-  };
+
 };
 
 test.describe.configure({ mode: "serial" });
@@ -41,64 +37,61 @@ test.beforeAll(async () => {
 test.afterAll(async () => { await browser?.close(); });
 
 // Replace only the external Clipboard API in the same world as the installed extension.
-const clipboardProbe = (mode: ClipboardMode): Promise<ClipboardProbe> => worker.evaluate(async (mode) => {
-  const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-  const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
-  if (tab?.id === undefined) throw new Error("Fixture tab unavailable");
-  const [injection] = await chromeApi.scripting.executeScript({
-    target: { tabId: tab.id, frameIds: [0] }, world: "ISOLATED", args: [mode],
-    func: (mode) => {
-      const scope = globalThis as unknown as { clipboardProbe?: { writes: string[]; gestures: boolean[] } };
-      const probe = scope.clipboardProbe ??= { writes: [], gestures: [] };
-      Object.defineProperty(navigator, "clipboard", {
-        configurable: true,
-        value: mode === "unavailable" ? undefined : {
-          writeText: async (value: string) => {
-            probe.writes.push(value);
-            probe.gestures.push(navigator.userActivation.isActive);
-            if (mode === "denied") throw new DOMException("Clipboard denied", "NotAllowedError");
-          },
+const clipboardProbe = (mode: ClipboardMode): Promise<ClipboardProbe> => test.step(`Clipboard probe: ${mode}`, () =>
+  executeAsyncInIsolated(worker, async (mode: ClipboardMode) => {
+    const scope = globalThis as unknown as { clipboardProbe?: { writes: string[]; gestures: boolean[] } };
+    const probe = scope.clipboardProbe ??= { writes: [], gestures: [] };
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: mode === "unavailable" ? undefined : {
+        writeText: async (value: string) => {
+          probe.writes.push(value);
+          probe.gestures.push(navigator.userActivation.isActive);
+          if (mode === "denied") throw new DOMException("Clipboard denied", "NotAllowedError");
         },
-      });
-      return probe;
-    },
-  });
-  if (injection?.result === undefined) throw new Error("Clipboard probe unavailable");
-  return injection.result;
-}, mode);
+      },
+    });
+    return probe;
+  }, mode),
+);
 
 const preview = (page: Page): Promise<string> => page.$eval(
   '[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]',
   (element) => (element as HTMLTextAreaElement).value,
 );
+const waitForPreview = (page: Page): Promise<void> => expect.poll(() => page.evaluate(() =>
+  document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
+    ?.querySelector('[aria-label="Markdown preview"]') instanceof HTMLTextAreaElement
+)).toBe(true);
+
 const panelText = (page: Page): Promise<string | null> => page.$eval(
   "[data-ui-torture-lab-root]", (host) => host.shadowRoot?.textContent ?? null,
 );
-const click = (page: Page, name: string): Promise<void> => page.locator(`::-p-aria(${name})`).setTimeout(5000).click();
+const click = (page: Page, name: string): Promise<void> => test.step(`Panel click: ${name}`, () => page.locator(`::-p-aria(${name})`).setTimeout(5000).click());
 
 async function completedRun(page: Page): Promise<void> {
-  await page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment");
-  await page.bringToFront();
-  await page.triggerExtensionAction(extension);
-  await page.waitForSelector("[data-ui-torture-lab-root]");
+  await test.step("Navigate to clipboard fixture", () => page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment"), { timeout: 5000 });
+  await test.step("Activate clipboard fixture tab", () => page.bringToFront(), { timeout: 5000 });
+  await test.step("Authorize clipboard fixture by toolbar", () => triggerFixtureAction(page, extension), { timeout: 5000 });
+  await test.step("Mount clipboard fixture panel", () => waitForExtensionPanel(page), { timeout: 5000 });
   await click(page, "Apply Long Text");
   await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
   await click(page, "Restore");
-  await page.waitForSelector('[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]');
+  await waitForPreview(page);
 }
 
 test("built extension copies the exact visible Markdown only on a user click after Restore", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await page.bringToFront();
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await clipboardProbe("success");
     await click(page, "Apply Long Text");
     await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
     expect((await clipboardProbe("success")).writes).toEqual([]);
     await click(page, "Restore");
-    await page.waitForSelector('[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]');
+    await waitForPreview(page);
     const markdown = await preview(page);
     expect(markdown).toContain("### Text Clipping");
     expect(markdown).toContain("Restore status: restored");
@@ -116,7 +109,7 @@ test("built extension copies the exact visible Markdown only on a user click aft
 
 for (const mode of ["denied", "unavailable"] as const) {
   test(`built extension keeps full selectable Markdown when clipboard is ${mode}`, async () => {
-    const page = await browser.newPage();
+    const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
     try {
       await completedRun(page);
       const markdown = await preview(page);
@@ -146,22 +139,25 @@ for (const mode of ["denied", "unavailable"] as const) {
 }
 
 test("Previous-Target Snapshot remains copyable after reload with no live Finding actions", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
     await completedRun(page);
     const current = await preview(page);
-    // Establish that the asynchronous session write completed before replacing its Document.
+    // Wait for this tab's result, rather than a result still being removed for a closed tab.
     await expect.poll(() => worker.evaluate(async () => {
       const api = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      return Object.keys(await api.storage.session.get(null))
-        .filter((key) => key.startsWith("ui-torture-lab:current-run-result:")).length;
-    })).toBe(1);
+      const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+      const stored = await api.storage.session.get(null);
+      const session = stored[`ui-torture-lab:tab-session:${tab?.id}`] as { id?: string } | undefined;
+      const result = stored[`ui-torture-lab:current-run-result:${session?.id}`] as { state?: string } | undefined;
+      return result?.state;
+    })).toBe("current");
     await page.reload();
-    await page.triggerExtensionAction(extension);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
-    await page.waitForSelector('[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]', { timeout: 5000 });
+    await triggerFixtureAction(page, extension);
+    await waitForExtensionPanel(page);
+    await waitForPreview(page);
     const markdown = await preview(page);
-    expect(markdown).toBe(current.replace("Lifecycle: Current Run Result", "Lifecycle: Previous-Target Snapshot") + "This Previous-Target Snapshot has no live DOM actions; elements are not rematched.\n");
+    expect(markdown.replace("- Termination reason: page\\-exit\n", "")).toBe(current.replace("Lifecycle: Current Run Result", "Lifecycle: Previous-Target Snapshot") + "This Previous-Target Snapshot has no live DOM actions; elements are not rematched.\n");
     expect(await panelText(page)).not.toContain("Highlight subject");
     expect(await panelText(page)).not.toContain("Navigate");
     await clipboardProbe("success");
@@ -175,7 +171,7 @@ test("Previous-Target Snapshot remains copyable after reload with no live Findin
 });
 
 test("Chrome copies the report through its native permissionless Clipboard API", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
     await completedRun(page);
     const markdown = await preview(page);
@@ -186,16 +182,16 @@ test("Chrome copies the report through its native permissionless Clipboard API",
 });
 
 test("Restore conflicts keep the reload-required result available for copying", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await page.bringToFront();
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await click(page, "Apply Long Text");
     await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
     await page.$eval("#clipping-boundary", (element) => { element.textContent = "External change"; });
     await click(page, "Restore");
-    await page.waitForSelector('[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]');
+    await waitForPreview(page);
     const markdown = await preview(page);
     expect(markdown).toContain("Restore status: conflict");
     expect(markdown).toContain("Reload required: yes");

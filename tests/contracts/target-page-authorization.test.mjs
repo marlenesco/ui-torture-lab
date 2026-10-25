@@ -11,8 +11,10 @@ const loadBackground = async ({
   executeScript,
   liveTabs = [{ id: 42 }],
   session = new Map(),
+  afterAuthorization = async () => undefined,
 }) => {
   const messageListeners = [];
+  const connectListeners = [];
   const tabCreatedListeners = [];
   const tabRemovedListeners = [];
   const tabReplacedListeners = [];
@@ -50,10 +52,15 @@ const loadBackground = async ({
           messageListeners.push(listener);
         },
       },
+      onConnect: { addListener(listener) { connectListeners.push(listener); } },
     },
     scripting: {
       async executeScript(details) {
         scriptCalls.push(details);
+        if (details.args?.[0]?.startsWith("tab-session-")) {
+          await afterAuthorization();
+          return [{ documentId: details.target.documentIds[0], frameId: 0, result: "mounted" }];
+        }
         return executeScript(details);
       },
     },
@@ -133,7 +140,26 @@ const loadBackground = async ({
       await new Promise((resolve) => setImmediate(resolve));
     },
     invokeToolbar: toolbarListeners[0],
+    bindGrant(sender, active = false) {
+      const messages = [];
+      const disconnect = [];
+      const incoming = [];
+      let closed = false;
+      const port = {
+        name: "ui-torture-lab/document-reachability", sender, messages,
+        onMessage: { addListener(callback) { incoming.push(callback); } },
+        onDisconnect: { addListener(callback) { disconnect.push(callback); } },
+        postMessage(message) { messages.push(message); },
+        disconnect() { if (!closed) { closed = true; for (const callback of disconnect) callback(); } },
+      };
+      connectListeners[0](port);
+      for (const callback of incoming) callback({ type: "bind-page-grant", grantId: session.get(`ui-torture-lab:tab-session:${sender.tab?.id}`)?.grantId, active });
+      return port;
+    },
     invokeMessage: messageListeners[0],
+    invokeGrantedMessage(message, sender) {
+      return messageListeners[0]({ ...message, grantId: session.get(`ui-torture-lab:tab-session:${sender.tab?.id}`)?.grantId }, sender);
+    },
     invokeTabCreated: tabCreatedListeners[0],
     invokeTabRemoved: tabRemovedListeners[0],
     invokeTabReplaced: tabReplacedListeners[0],
@@ -198,14 +224,12 @@ const authorizedBackground = async ({
   liveTabs,
   session,
 } = {}) => {
-  let injectionNumber = 0;
   const background = await loadBackground({
-    executeScript: async () => {
-      injectionNumber += 1;
+    executeScript: async (details) => {
       return [{
         documentId,
         frameId: 0,
-        result: injectionNumber % 2 === 1
+        result: details.target.frameIds !== undefined
           ? { type: "target-probe-response", status: "matched", protocol: "https:" }
           : { type: "target-bootstrap-response", status: "bootstrapped", protocol: "https:", contentType: "text/html", topLevel: true },
       }];
@@ -214,6 +238,8 @@ const authorizedBackground = async ({
     session,
   });
   await background.invokeToolbar({ id: 42, url: "https://fixture.test/path?token=secret#fragment" });
+  background.bindGrant({ documentId, frameId: 0, tab: { id: 42 } });
+  await new Promise((resolve) => setImmediate(resolve));
   return background;
 };
 
@@ -252,7 +278,7 @@ test("toolbar authorizes one supported top-level Document in ISOLATED world", as
     url: "http://127.0.0.1:4173/smoke/",
   });
 
-  assert.equal(background.scriptCalls.length, 3);
+  assert.equal(background.scriptCalls.length, 4);
   const probe = background.scriptCalls[0];
   assert.deepEqual(JSON.parse(JSON.stringify(probe.target)), {
     frameIds: [0],
@@ -261,9 +287,11 @@ test("toolbar authorizes one supported top-level Document in ISOLATED world", as
   assert.equal(probe.world, "ISOLATED");
   assert.equal(probe.injectImmediately, true);
   assert.deepEqual(JSON.parse(JSON.stringify(probe.args)), [
-    "http://127.0.0.1:4173/smoke/",
+    "http://127.0.0.1:4173/smoke/", probe.args[1],
   ]);
   assert.equal(typeof probe.func, "function");
+  assert.equal(typeof probe.args[1], "string");
+  assert.equal(background.scriptCalls[3].args[0], probe.args[1]);
 
   const bootstrap = background.scriptCalls[1];
   assert.deepEqual(JSON.parse(JSON.stringify(bootstrap.target)), {
@@ -273,7 +301,7 @@ test("toolbar authorizes one supported top-level Document in ISOLATED world", as
   assert.equal(bootstrap.world, "ISOLATED");
   assert.equal(bootstrap.injectImmediately, true);
   assert.deepEqual(JSON.parse(JSON.stringify(bootstrap.args)), [
-    "http://127.0.0.1:4173/smoke/",
+    "http://127.0.0.1:4173/smoke/", probe.args[1],
   ]);
   assert.equal(typeof bootstrap.func, "function");
 
@@ -318,7 +346,9 @@ test("Run activity survives a service-worker restart for its authorized Document
     },
     session: initialWorker.session,
   });
-  restartedWorker.invokeMessage(
+  restartedWorker.bindGrant({ documentId: "document-1", frameId: 0, tab: { id: 42 } });
+  await settled();
+  restartedWorker.invokeGrantedMessage(
     { active: true, type: "run-activity-changed" },
     { documentId: "document-1", frameId: 0, tab: { id: 42 } },
   );
@@ -346,14 +376,16 @@ test("Run activity only accepts the currently authorized Document", async () => 
   });
 
   await background.invokeToolbar({ id: 42, url: "https://fixture.test/" });
+  background.bindGrant({ documentId: "document-1", frameId: 0, tab: { id: 42 } });
+  await settled();
   const feedbackBeforeStaleMessage = background.feedback.length;
-  background.invokeMessage(
+  background.invokeGrantedMessage(
     { active: true, type: "run-activity-changed" },
     { documentId: "document-previous", frameId: 0, tab: { id: 42 } },
   );
   assert.equal(background.feedback.length, feedbackBeforeStaleMessage);
 
-  background.invokeMessage(
+  background.invokeGrantedMessage(
     { active: true, type: "run-activity-changed" },
     { documentId: "document-1", frameId: 0, tab: { id: 42 } },
   );
@@ -401,7 +433,7 @@ test("authorization is rejected when the floating control shell cannot mount", a
     url: "https://fixture.test/",
   });
 
-  assert.equal(background.scriptCalls.length, 3);
+  assert.equal(background.scriptCalls.length, 4);
   assert.ok(
     background.feedback.some(
       ([kind, details]) =>
@@ -498,7 +530,7 @@ test("toolbar rejects a same-URL Document replacement between probe and bootstra
     url: "https://fixture.test/same-url",
   });
 
-  assert.equal(background.scriptCalls.length, 2);
+  assert.equal(background.scriptCalls.length, 3);
   assert.deepEqual(
     JSON.parse(JSON.stringify(background.scriptCalls[1].target)),
     { documentIds: ["document-2"], tabId: 42 },
@@ -562,7 +594,7 @@ test("worker keeps one validated current result and clear removes it", async () 
   const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
   const page = { origin: "https://fixture.test", pathname: "/path" };
 
-  background.invokeMessage(
+  background.invokeGrantedMessage(
     { page, result: completedResult("first"), type: "store-current-run-result" },
     sender,
   );
@@ -571,7 +603,7 @@ test("worker keeps one validated current result and clear removes it", async () 
   assert.ok(resultKey, "completion stores one result under tab-session identity");
   assert.equal(background.session.get(resultKey).result.summary, "first");
 
-  background.invokeMessage(
+  background.invokeGrantedMessage(
     { page, result: completedResult("replacement"), type: "store-current-run-result" },
     sender,
   );
@@ -579,7 +611,7 @@ test("worker keeps one validated current result and clear removes it", async () 
   assert.equal(currentResultKey(background.session), resultKey);
   assert.equal(background.session.get(resultKey).result.summary, "replacement");
 
-  background.invokeMessage({ type: "clear-current-run-result" }, sender);
+  background.invokeGrantedMessage({ type: "clear-current-run-result" }, sender);
   await settled();
   assert.equal(currentResultKey(background.session), undefined);
 });
@@ -596,7 +628,7 @@ test("worker rejects forbidden fields and unredacted or unbounded valid-schema t
   ];
 
   for (const result of rejectedResults) {
-    background.invokeMessage(
+    background.invokeGrantedMessage(
       {
         page: { origin: "https://fixture.test", pathname: "/path" },
         result,
@@ -608,16 +640,13 @@ test("worker rejects forbidden fields and unredacted or unbounded valid-schema t
   }
 
   assert.equal(currentResultKey(background.session), undefined);
-  assert.deepEqual(
-    [...background.session.values()].map((value) => JSON.parse(JSON.stringify(value))),
-    [{ documentId: "document-1", id: "tab-session-" + nextSessionId }],
-  );
+  assert.equal(background.session.size, 1, "only the tab's authorization metadata is retained");
 });
 
 test("close after worker suspension clears session state before tab identifier reuse", async () => {
   const initialWorker = await authorizedBackground();
   const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
-  initialWorker.invokeMessage(
+  initialWorker.invokeGrantedMessage(
     {
       page: { origin: "https://fixture.test", pathname: "/path" },
       result: completedResult(),
@@ -649,7 +678,7 @@ test("close after worker suspension clears session state before tab identifier r
 test("replacement after worker suspension discards removed-tab state and gives added tab a new session", async () => {
   const initialWorker = await authorizedBackground();
   const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
-  initialWorker.invokeMessage(
+  initialWorker.invokeGrantedMessage(
     {
       page: { origin: "https://fixture.test", pathname: "/path" },
       result: completedResult(),
@@ -731,11 +760,11 @@ test("concurrent completions in separate tabs retain both session-scoped results
   await background.invokeToolbar({ id: 42, url: "https://fixture.test/one" });
   await background.invokeToolbar({ id: 43, url: "https://fixture.test/two" });
 
-  background.invokeMessage(
+  background.invokeGrantedMessage(
     { page: { origin: "https://fixture.test", pathname: "/one" }, result: completedResult("one"), type: "store-current-run-result" },
     { documentId: "document-42", frameId: 0, tab: { id: 42 } },
   );
-  background.invokeMessage(
+  background.invokeGrantedMessage(
     { page: { origin: "https://fixture.test", pathname: "/two" }, result: completedResult("two"), type: "store-current-run-result" },
     { documentId: "document-43", frameId: 0, tab: { id: 43 } },
   );
@@ -746,4 +775,178 @@ test("concurrent completions in separate tabs retain both session-scoped results
     .map(([, value]) => value.result.summary)
     .sort();
   assert.deepEqual(results, ["one", "two"]);
+});
+
+test("navigation invalidates the live grant and retains one non-live result atomically", async () => {
+  const background = await authorizedBackground();
+  const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
+  const grantId = background.session.get("ui-torture-lab:tab-session:42").grantId;
+  const result = { ...completedResult(), terminationReason: "same-document-navigation" };
+  await background.invokeMessage({ type: "invalidate-page-grant", grantId, page: { origin: "https://fixture.test", pathname: "/path" }, result }, sender);
+  const session = background.session.get("ui-torture-lab:tab-session:42");
+  assert.equal(session.documentId, null);
+  assert.equal(background.session.get(currentResultKey(background.session)).state, "previous");
+  const feedbackCount = background.feedback.length;
+  background.invokeMessage({ type: "run-activity-changed", grantId, active: true }, sender);
+  await settled();
+  assert.equal(background.feedback.length, feedbackCount, "expired live activity must not restore the toolbar Run indicator");
+  background.invokeMessage({ type: "clear-current-run-result", grantId }, sender);
+  await settled();
+  assert.equal(currentResultKey(background.session), undefined, "manual clear remains available on the ended context");
+});
+
+test("old logical-context messages cannot overwrite or revoke a reauthorized same Document", async () => {
+  const background = await authorizedBackground();
+  const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
+  const oldGrant = background.session.get("ui-torture-lab:tab-session:42").grantId;
+  const page = { origin: "https://fixture.test", pathname: "/path" };
+  await background.invokeMessage({ type: "invalidate-page-grant", grantId: oldGrant, page, result: completedResult("previous") }, sender);
+  await background.invokeToolbar({ id: 42, url: "https://fixture.test/new-route" });
+  const newGrant = background.session.get("ui-torture-lab:tab-session:42").grantId;
+  assert.notEqual(newGrant, oldGrant);
+  background.invokeMessage({ type: "store-current-run-result", grantId: newGrant, page, result: completedResult("new") }, sender);
+  await settled();
+  for (const message of [
+    { type: "invalidate-page-grant", page, result: completedResult("stale") },
+    { type: "store-current-run-result", page, result: completedResult("stale") },
+    { type: "clear-current-run-result" },
+    { type: "run-activity-changed", active: true },
+  ]) {
+    await background.invokeMessage({ ...message, grantId: oldGrant }, sender);
+  }
+  await settled();
+  assert.equal(background.session.get("ui-torture-lab:tab-session:42").grantId, newGrant);
+  assert.equal(background.session.get("ui-torture-lab:tab-session:42").documentId, "document-1");
+  assert.equal(background.session.get(currentResultKey(background.session)).result.summary, "new");
+});
+
+test("live messages require their exact toolbar grant token", async () => {
+  const background = await authorizedBackground();
+  const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
+  const count = background.feedback.length;
+  for (const grantId of [undefined, "", "wrong-grant"]) {
+    background.invokeMessage({ type: "run-activity-changed", grantId, active: true }, sender);
+  }
+  await settled();
+  assert.equal(background.feedback.length, count);
+});
+
+test("port loss clears reachability and Run feedback without revoking the live page grant", async () => {
+  const background = await authorizedBackground();
+  const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
+  const grantId = background.session.get("ui-torture-lab:tab-session:42").grantId;
+  const port = background.bindGrant(sender, true);
+  await settled();
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "RUN");
+  port.disconnect();
+  await settled();
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "");
+  assert.equal(background.session.get("ui-torture-lab:tab-session:42").documentId, "document-1");
+  background.invokeMessage({ type: "run-activity-changed", grantId, active: true }, sender);
+  await settled();
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "");
+  background.bindGrant(sender, true);
+  await settled();
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "RUN");
+});
+
+test("an older port disconnect cannot clear a newer connection's Run indicator", async () => {
+  const background = await authorizedBackground();
+  const sender = { documentId: "document-1", frameId: 0, tab: { id: 42 } };
+  const old = background.bindGrant(sender, true);
+  await settled();
+  background.bindGrant(sender, true);
+  await settled();
+  old.disconnect();
+  await settled();
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "RUN");
+});
+
+test("a child frame cannot bind a top-level Run transport", async () => {
+  const background = await authorizedBackground();
+  const count = background.feedback.length;
+  const port = background.bindGrant({ documentId: "document-1", frameId: 1, tab: { id: 42 } }, true);
+  await settled();
+  assert.equal(background.feedback.length, count);
+  assert.equal(port.messages.length, 0);
+});
+
+test("a late older toolbar probe cannot replace the newer grant or its feedback", async () => {
+  let releaseFirst;
+  let enteredFirst;
+  const firstEntered = new Promise((resolve) => { enteredFirst = resolve; });
+  let calls = 0;
+  const probe = { type: "target-probe-response", status: "matched", protocol: "http:" };
+  const background = await loadBackground({ executeScript: async (details) => {
+    if (++calls === 1) {
+      enteredFirst();
+      return new Promise((resolve) => { releaseFirst = () => resolve([{ frameId: 0, documentId: "document-1", result: probe }]); });
+    }
+    return [{ frameId: 0, documentId: "document-1", result: details.target.frameIds ? probe : {
+      type: "target-bootstrap-response", status: "bootstrapped", protocol: "http:", contentType: "text/html", topLevel: true,
+    } }];
+  } });
+  const old = background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
+  await firstEntered;
+  await background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
+  const current = JSON.stringify(background.session.get("ui-torture-lab:tab-session:42"));
+  const feedback = background.feedback.length;
+  releaseFirst();
+  await old;
+  assert.equal(JSON.stringify(background.session.get("ui-torture-lab:tab-session:42")), current);
+  assert.equal(background.feedback.length, feedback);
+});
+
+test("a context ended before toolbar feedback cannot be reported as authorized", async () => {
+  let injection = 0;
+  const background = await loadBackground({
+    executeScript: async () => [{ frameId: 0, documentId: "document-1", result: ++injection === 1
+      ? { type: "target-probe-response", status: "matched", protocol: "http:" }
+      : { type: "target-bootstrap-response", status: "bootstrapped", protocol: "http:", contentType: "text/html", topLevel: true } }],
+    afterAuthorization: async () => {
+      await background.invokeGrantedMessage({ type: "invalidate-page-grant", page: { origin: "http://127.0.0.1:4173", pathname: "/smoke/" }, result: null }, { tab: { id: 42 }, frameId: 0, documentId: "document-1" });
+    },
+  });
+  await background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
+  assert.equal(background.session.get("ui-torture-lab:tab-session:42").documentId, null);
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "");
+});
+
+test("one toolbar event tolerates a transient activeTab permission failure before the first probe", async () => {
+  let probes = 0;
+  const background = await loadBackground({ executeScript: async (details) => {
+    if (details.target.frameIds && ++probes === 1) throw new Error("Cannot access contents of the page. Extension manifest must request permission to access the respective host.");
+    return [{ frameId: 0, documentId: "document-1", result: details.target.frameIds
+      ? { type: "target-probe-response", status: "matched", protocol: "http:" }
+      : { type: "target-bootstrap-response", status: "bootstrapped", protocol: "http:", contentType: "text/html", topLevel: true } }];
+  } });
+  await background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
+  assert.equal(probes, 2);
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "OK");
+  assert.deepEqual(JSON.parse(JSON.stringify(background.scriptCalls[0].args)), JSON.parse(JSON.stringify(background.scriptCalls[1].args)));
+  assert.deepEqual(JSON.parse(JSON.stringify(background.scriptCalls[0].target)), JSON.parse(JSON.stringify(background.scriptCalls[1].target)));
+});
+
+test("persistent denied access stays bounded and never mounts a runtime", async () => {
+  let probes = 0;
+  const background = await loadBackground({ executeScript: async () => {
+    probes++;
+    throw new Error("Cannot access contents of the page. Extension manifest must request permission to access the respective host.");
+  } });
+  await background.invokeToolbar({ id: 42, url: "https://fixture.test/" });
+  assert.equal(probes, 2);
+  assert.equal(background.scriptCalls.some((call) => call.files), false);
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "!");
+});
+
+test("navigation discovered by the repeated initial probe still rejects the original attempt", async () => {
+  let probes = 0;
+  const background = await loadBackground({ executeScript: async () => {
+    if (++probes === 1) throw new Error("Cannot access contents of the page");
+    return [{ frameId: 0, documentId: "document-1", result: { type: "target-probe-response", status: "rejected", reason: "document-changed" } }];
+  } });
+  await background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
+  assert.equal(probes, 2);
+  assert.equal(background.scriptCalls.some((call) => call.files), false);
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "!");
 });

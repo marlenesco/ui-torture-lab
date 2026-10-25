@@ -239,11 +239,12 @@ const appendCoveredInterval = (
 
 export async function captureTextClippingBaseline(options: {
   readonly document: Document;
+  readonly signal?: AbortSignal;
   readonly targets: readonly Text[];
 }): Promise<TextClippingBaseline> {
   const view = options.document.defaultView;
   if (view === null) return { excludedTargets: 0, inconclusiveReasons: ["text-clipping-view-unavailable"], inconclusiveTargets: 1, snapshots: [] };
-  if (!(await nextMeasurementFrame(view))) {
+  if (!(await nextMeasurementFrame(view, options.signal))) {
     return { excludedTargets: 0, inconclusiveReasons: ["text-clipping-sampling-timeout"], inconclusiveTargets: 1, snapshots: [] };
   }
   const excludedTargets = new Set<Text>();
@@ -283,7 +284,7 @@ export async function captureTextClippingBaseline(options: {
       geometry !== null && visibleInside(geometry) ? [{ boundary, first: geometry, target }] : [],
     );
   });
-  if (!(await nextMeasurementFrame(view))) {
+  if (!(await nextMeasurementFrame(view, options.signal))) {
     return { excludedTargets: excludedTargets.size, inconclusiveReasons: ["text-clipping-sampling-timeout"], inconclusiveTargets: 1, snapshots: [] };
   }
   const inconclusiveReasons: string[] =
@@ -318,6 +319,7 @@ export async function captureTextClippingBaseline(options: {
 export async function detectTextClipping(options: {
   readonly baseline: TextClippingBaseline;
   readonly document: Document;
+  readonly signal?: AbortSignal;
   readonly expectedAppliedValues: ReadonlyMap<Text, string>;
   readonly isTargetMutationCurrent: (target: Text) => boolean;
   readonly scenarioId: ScenarioId;
@@ -325,14 +327,14 @@ export async function detectTextClipping(options: {
 }): Promise<TextClippingDetection> {
   const view = options.document.defaultView;
   if (view === null) return { comparableTargets: [], contributorTargets: [], excludedTargets: options.baseline.excludedTargets, findings: [], liveReferences: new Map(), inconclusiveReasons: ["text-clipping-view-unavailable"], inconclusiveTargets: 1 };
-  if (!(await nextMeasurementFrame(view))) {
+  if (!(await nextMeasurementFrame(view, options.signal))) {
     return { comparableTargets: [], contributorTargets: [], excludedTargets: options.baseline.excludedTargets, findings: [], liveReferences: new Map(), inconclusiveReasons: ["text-clipping-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
   }
   const candidates = options.baseline.snapshots.map((snapshot) => ({
     first: geometryFor(options.document, snapshot.range, snapshot.boundary),
     snapshot,
   }));
-  if (!(await nextMeasurementFrame(view))) {
+  if (!(await nextMeasurementFrame(view, options.signal))) {
     return { comparableTargets: [], contributorTargets: [], excludedTargets: options.baseline.excludedTargets, findings: [], liveReferences: new Map(), inconclusiveReasons: ["text-clipping-sampling-timeout"], inconclusiveTargets: options.baseline.inconclusiveTargets + 1 };
   }
   const inconclusiveReasons = [...options.baseline.inconclusiveReasons];

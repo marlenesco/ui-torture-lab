@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { nextMeasurementFrame } from "../detectors/measurement-window.js";
 import {
   createStyleMutationRecord,
   type MutationRecord,
@@ -31,7 +32,7 @@ export type LargeTextMutation = MutationRecord<{
   readonly value: string;
 }>;
 
-export type LargeTextPreparationOptions = TextScenarioPreparationOptions;
+export type LargeTextPreparationOptions = TextScenarioPreparationOptions & { readonly signal?: AbortSignal };
 
 type BaselineFont = {
   readonly fontFamily: string;
@@ -94,10 +95,9 @@ export function prepareLargeTextMutations(
     }
   });
 
-  return new Promise((resolve) => {
-    view.requestAnimationFrame(() => {
-      resolve(
-        candidates.flatMap(({ baseline, target }) => {
+  return nextMeasurementFrame(view, options.signal).then((observed) => {
+      if (!observed) return [];
+      return candidates.flatMap(({ baseline, target }) => {
           let appliedValue: string | null;
           try {
             const repeatedBaseline = readBaselineFont(target, view);
@@ -127,8 +127,6 @@ export function prepareLargeTextMutations(
               },
             }),
           ];
-        }),
-      );
-    });
+        });
   });
 }

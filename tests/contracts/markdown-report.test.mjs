@@ -185,3 +185,11 @@ test("formatter omits unknown fields and never serializes hidden operational dat
   input.result.findings[0].affectedRange.baselineRects[0].hiddenValue = "private source";
   assert.equal(formatMarkdownReport(input), expected);
 });
+
+
+test("completed Evidence retains its navigation termination reason in a Previous-Target Snapshot", async () => {
+  const input = base();
+  input.state = "previous";
+  input.result.terminationReason = "same-document-navigation";
+  assert.equal(formatMarkdownReport(input), await golden("navigation"));
+});

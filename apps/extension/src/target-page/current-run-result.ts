@@ -10,6 +10,7 @@ export const runResultStorageKey = (sessionId: string): string =>
 
 export type TabSession = {
   readonly documentId: string | null;
+  readonly grantId: string | null;
   readonly id: string;
 };
 
@@ -172,10 +173,12 @@ export const isSerializedRunResult = (
 ): value is SerializedRunResult =>
   isRecord(value) &&
   (value.status === "completed"
-    ? hasExactKeys(value, ["coverage", "findings", "inconclusiveReasons", "restore", "scenarioId", "status", "summary"])
+    ? (hasExactKeys(value, ["coverage", "findings", "inconclusiveReasons", "restore", "scenarioId", "status", "summary"]) ||
+       hasExactKeys(value, ["coverage", "findings", "inconclusiveReasons", "restore", "scenarioId", "status", "summary", "terminationReason"]) &&
+       (value.terminationReason === "same-document-navigation" || value.terminationReason === "page-exit"))
     : value.status === "aborted" &&
       hasExactKeys(value, ["coverage", "findings", "inconclusiveReasons", "restore", "scenarioId", "status", "summary", "terminationReason"]) &&
-      value.terminationReason === "unknown-mutation-state") &&
+      (value.terminationReason === "unknown-mutation-state" || value.terminationReason === "same-document-navigation" || value.terminationReason === "page-exit")) &&
   isScenarioId(value.scenarioId) && isCoverage(value.coverage) &&
   Array.isArray(value.findings) && value.findings.every((finding) =>
     isRecord(finding) && (isTextClippingFinding(finding) || isHorizontalFinding(finding) || isViewportFinding(finding)),

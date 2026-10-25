@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "build": "wxt build --browser chrome",
+    "build": "wxt build --browser chrome && node ../../scripts/write-third-party-notices.mjs",
     "dev": "wxt --browser chrome",
     "postinstall": "wxt prepare",
     "typecheck": "wxt prepare && tsc --noEmit"

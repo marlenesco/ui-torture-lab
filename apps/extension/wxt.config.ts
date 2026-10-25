@@ -12,6 +12,7 @@ export default defineConfig({
       "Deterministic text stress testing for measurable layout regressions.",
     version: "0.0.0",
     incognito: "not_allowed",
+    minimum_chrome_version: "155",
     permissions: ["activeTab", "scripting", "storage"],
     action: {
       default_title: "Open UI Torture Lab",

@@ -1,0 +1,23 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+import Page from "../layouts/Page.astro";
+---
+<Page title="Supported Scope" description="Chrome desktop stable, top-level light-DOM HTML, HTTP and HTTPS, explicit page access, and the MVP's documented exclusions.">
+  <p class="eyebrow">Field guide / Supported Scope</p><h1>Measure within the boundary.</h1><p class="lead">The supported browser is the current stable desktop release of Google Chrome on macOS, Windows, and Linux, with Manifest V3 in a normal browsing context.</p>
+  <div class="table-scroll"><table><caption>Supported targets and explicit exclusions</caption><thead><tr><th scope="col">Surface</th><th scope="col">Boundary</th></tr></thead><tbody>
+    <tr><th scope="row">HTTP and HTTPS</th><td>Top-level rendered HTML; localhost and local web servers are supported.</td></tr>
+    <tr><th scope="row">Traversal</th><td>Top-level light DOM only. iframe documents, embedded content, and open or closed Shadow DOM are excluded. Extension UI is excluded.</td></tr>
+    <tr><th scope="row">Protected pages</th><td>Chrome internal pages, extension pages, Chrome Web Store surfaces, and other browser-protected documents cannot be analyzed.</td></tr>
+    <tr><th scope="row">Direct files and other protocols</th><td><code>file:</code>, <code>data:</code>, <code>blob:</code>, non-HTML documents, and built-in viewers are unsupported. Serve local HTML through localhost.</td></tr>
+    <tr><th scope="row">Incognito</th><td>Not allowed by the manifest. No private-browsing workflow is supported.</td></tr>
+    <tr><th scope="row">Other browsers</th><td>Edge and other Chromium browsers may work but are unsupported. Firefox, Safari, mobile, and non-stable Chrome channels are unsupported.</td></tr>
+    <tr><th scope="row">Application behavior</th><td>No framework, router, or application-state inspection; no click, form, behavioral, or workflow testing.</td></tr>
+  </tbody></table></div>
+  <h2>Eligibility is narrower than traversal.</h2><p>Rendered eligible text is stressed without replacing its Text node identity. Editable content, form controls, script/style content, hidden or excluded targets are not mutated. Large Text excludes unsupported writing modes, icon-like text, and unstable font sizes. Detector-specific exclusions can make individual comparisons inconclusive.</p>
+  <h2>Supported regressions</h2><p>The build implements Long Text, Unbreakable Text, and Large Text with Text Clipping, Horizontal Containment Overflow, and Viewport Overflow. Findings require comparable before/after Evidence. Active explicit ellipsis or line clamp is excluded from Text Clipping; intentional horizontal scrolling is excluded from containment Findings.</p>
+  <h2>Limits of the result</h2><p>This is not accessibility auditing, visual regression, cross-browser testing, a full application test, or a quality score. Findings have no severity, confidence percentage, or product-impact ranking. Pre-existing defects that do not measurably worsen are not reported as Scenario-caused Findings.</p>
+  <details><summary>Dynamic pages and route changes</summary><p>A stable-route SPA can be inspected, but rendering instability and node replacement reduce coverage. Observed same-document navigation and Page Exit end the grant. Private transitions without an observable entry change are unsupported during a Run. Restore before those transitions; follow any incomplete-observation warning.</p></details>
+  <details><summary>Restore and runtime interruption</summary><p>Restore is conflict-aware and best effort. Conflicts or unverified cleanup require an explicit true reload. Abrupt process termination can prevent cleanup and final snapshot delivery. BFCache return does not resume a grant.</p></details>
+  <h2>Validation status</h2><p>The current build was tested on Chrome 155.0.8059.85 on macOS. This is the validated floor for the pre-release candidate, not a compatibility promise for older versions. Manual Windows and Linux smoke checks remain a launch gate. Always use current Chrome desktop stable.</p>
+  <p><a href="/docs/">Read the operational workflow →</a></p>
+</Page>

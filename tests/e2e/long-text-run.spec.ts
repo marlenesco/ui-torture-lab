@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { triggerFixtureAction } from "../support/extension-action";
+import { waitForExtensionPanel } from "../support/extension-panel";
 import path from "node:path";
+import { executeAsyncInIsolated } from "../support/extension-script";
 import puppeteer, {
   type Browser,
   type Extension,
@@ -31,9 +34,9 @@ let extension: Extension;
 let serviceWorker: WebWorker;
 
 const triggerToolbarAction = async (page: Page): Promise<void> => {
-  await page.bringToFront();
-  await page.triggerExtensionAction(extension);
-  await page.waitForSelector("[data-ui-torture-lab-root]");
+  await test.step("Activate Long Text fixture tab", () => page.bringToFront(), { timeout: 5000 });
+  await test.step("Authorize Long Text fixture", () => triggerFixtureAction(page, extension), { timeout: 5000 });
+  await test.step("Mount Long Text fixture panel", () => waitForExtensionPanel(page), { timeout: 5000 });
 };
 
 const clickPanelButton = async (page: Page, label: string): Promise<void> => {
@@ -96,25 +99,12 @@ test.afterAll(async () => {
 });
 
 test("Long Text remains active until exact Restore", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create Long Text fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await test.step("Navigate to Long Text fixture", () => page.goto("http://127.0.0.1:4173/long-text-run/"), { timeout: 5000 });
     await triggerToolbarAction(page);
 
-    const observation = await serviceWorker.evaluate(async () => {
-      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      const [tab] = await chromeApi.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (tab?.id === undefined) {
-        throw new Error("No active fixture tab was available");
-      }
-
-      const [injection] = await chromeApi.scripting.executeScript({
-        target: { tabId: tab.id, frameIds: [0] },
-        world: "ISOLATED",
-        func: async () => {
+    const observation = await executeAsyncInIsolated(serviceWorker, async () => {
           type Snapshot = {
             readonly coverage: {
               readonly eligibleTargets: number;
@@ -162,13 +152,7 @@ test("Long Text remains active until exact Restore", async () => {
               document.querySelector("#primary-target")?.firstChild === target,
             sameNodeWhileActive,
           };
-        },
-      });
-      if (injection?.result === undefined) {
-        throw new Error("Long Text observation returned no result");
-      }
-      return injection.result;
-    });
+        });
 
     expect(observation.original).toBe("  Checkout now!  ");
     expect(observation.expanded).toBe(
@@ -193,25 +177,12 @@ test("Long Text remains active until exact Restore", async () => {
 });
 
 test("Long Text preserves supported nodes and excludes unsupported targets", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create Long Text fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await test.step("Navigate to Long Text fixture", () => page.goto("http://127.0.0.1:4173/long-text-run/"), { timeout: 5000 });
     await triggerToolbarAction(page);
 
-    const observation = await serviceWorker.evaluate(async () => {
-      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      const [tab] = await chromeApi.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (tab?.id === undefined) {
-        throw new Error("No active fixture tab was available");
-      }
-
-      const [injection] = await chromeApi.scripting.executeScript({
-        target: { tabId: tab.id, frameIds: [0] },
-        world: "ISOLATED",
-        func: async () => {
+    const observation = await executeAsyncInIsolated(serviceWorker, async () => {
           type Controller = {
             getSnapshot(): {
               readonly coverage: Record<string, number>;
@@ -329,13 +300,7 @@ test("Long Text preserves supported nodes and excludes unsupported targets", asy
             originalPrimary,
             secondRunError,
           };
-        },
-      });
-      if (injection?.result === undefined) {
-        throw new Error("Long Text eligibility observation returned no result");
-      }
-      return injection.result;
-    });
+        });
 
     expect(observation.excludedWhileActive).toEqual([
       true,
@@ -389,9 +354,9 @@ test("Long Text preserves supported nodes and excludes unsupported targets", asy
 });
 
 test("the built panel exposes Apply, active inspection, Restore, and result", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create Long Text fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await test.step("Navigate to Long Text fixture", () => page.goto("http://127.0.0.1:4173/long-text-run/"), { timeout: 5000 });
     await triggerToolbarAction(page);
     const original = await page.$eval(
       "#primary-target",
@@ -433,9 +398,9 @@ test("the built panel exposes Apply, active inspection, Restore, and result", as
 });
 
 test("Restore conflict leaves external text untouched and blocks another Run", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create Long Text fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await test.step("Navigate to Long Text fixture", () => page.goto("http://127.0.0.1:4173/long-text-run/"), { timeout: 5000 });
     await triggerToolbarAction(page);
     await clickPanelButton(page, "Apply Long Text");
     await page.waitForFunction(
@@ -462,19 +427,7 @@ test("Restore conflict leaves external text untouched and blocks another Run", a
       await page.$eval("#minimum-target", (target) => target.textContent),
     ).toBe("OK");
 
-    const blockedMessage = await serviceWorker.evaluate(async () => {
-      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      const [tab] = await chromeApi.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (tab?.id === undefined) {
-        throw new Error("No active fixture tab was available");
-      }
-      const [injection] = await chromeApi.scripting.executeScript({
-        target: { tabId: tab.id, frameIds: [0] },
-        world: "ISOLATED",
-        func: async () => {
+    const blockedMessage = await executeAsyncInIsolated(serviceWorker, async () => {
           type Controller = {
             startScenario(scenarioId: "long-text"): Promise<void>;
           };
@@ -487,10 +440,7 @@ test("Restore conflict leaves external text untouched and blocks another Run", a
           } catch (error) {
             return error instanceof Error ? error.message : "unknown";
           }
-        },
-      });
-      return injection?.result;
-    });
+        });
     expect(blockedMessage).toContain("requires reload");
   } finally {
     await page.close();
@@ -498,9 +448,9 @@ test("Restore conflict leaves external text untouched and blocks another Run", a
 });
 
 test("an Engine safety abort is distinct from Restore conflict in the built UI", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create Long Text fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await test.step("Navigate to Long Text fixture", () => page.goto("http://127.0.0.1:4173/long-text-run/"), { timeout: 5000 });
     await triggerToolbarAction(page);
     const originalText = await page.$eval("#primary-target", (target) => target.textContent);
 
@@ -567,9 +517,9 @@ test("an Engine safety abort is distinct from Restore conflict in the built UI",
 });
 
 test("an unverified cleanup is distinct from an external Restore conflict", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create Long Text fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/long-text-run/");
+    await test.step("Navigate to Long Text fixture", () => page.goto("http://127.0.0.1:4173/long-text-run/"), { timeout: 5000 });
     await triggerToolbarAction(page);
     await clickPanelButton(page, "Apply Long Text");
     await page.waitForFunction(

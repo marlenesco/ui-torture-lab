@@ -373,3 +373,27 @@ test("Restore uses reverse identity-safe best effort across conflicts", async ({
     "target-moved",
   ]);
 });
+
+test("style Restore removes only an introduced empty attribute and preserves external properties", async ({ page }) => {
+  await page.goto("/long-text-run/");
+  const result = await page.evaluate(async (moduleUrl) => {
+    const { createMutationJournal, createStyleMutationRecord } = await import(moduleUrl) as JournalModule;
+    return ["absent", "empty", "external", "existing"].map((mode) => {
+      const target = document.createElement("p");
+      if (mode === "empty") target.setAttribute("style", "");
+      if (mode === "existing") target.style.setProperty("font-size", "14px", "important");
+      document.body.append(target);
+      const journal = createMutationJournal(document);
+      journal.apply(createStyleMutationRecord({ target, property: "font-size", appliedValue: "32px", appliedPriority: "important" }));
+      if (mode === "external") target.style.setProperty("color", "red");
+      const restore = journal.restore();
+      return { mode, status: restore.status, style: target.getAttribute("style") };
+    });
+  }, journalModuleUrl);
+  expect(result).toEqual([
+    { mode: "absent", status: "restored", style: null },
+    { mode: "empty", status: "restored", style: "" },
+    { mode: "external", status: "restored", style: "color: red;" },
+    { mode: "existing", status: "restored", style: "font-size: 14px !important;" },
+  ]);
+});

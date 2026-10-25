@@ -1,0 +1,13 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+import Page from "../layouts/Page.astro";
+import { repository } from "../content/product";
+---
+<Page title="Installation & release status" description="Check the Official Distribution status and inspect the source before installing a UI Torture Lab development build.">
+  <p class="eyebrow">Distribution / Pre-release</p><h1>Inspect before installing.</h1><p class="lead">The Official Distribution is not yet published on Chrome Web Store. There is no official store installation link to follow today.</p>
+  <p>The documented capabilities describe the implemented pre-release build. Technical Validation, Product Validation, and publication gates must pass before an Official Distribution is announced. No account or payment is required by the build.</p>
+  <h2>Evaluate a development build</h2><p>Use only a source checkout you trust, on synthetic fixtures or interfaces you are authorized to inspect. A locally loaded or modified build is not an Official Distribution.</p>
+  <ol><li>Clone the <a href={repository}>Public Source Repository</a> and use its declared Node and pnpm versions.</li><li>Run <code>corepack enable</code>, <code>pnpm install --frozen-lockfile</code>, and <code>pnpm build</code> from the workspace root.</li><li>In Chrome desktop stable, open <code>chrome://extensions</code>, enable Developer mode, and choose Load unpacked.</li><li>Select <code>apps/extension/.output/chrome-mv3</code>. Pin the extension if useful.</li><li>Open an HTTP or HTTPS HTML page you own or can modify. Click the toolbar action, choose one Scenario, inspect, and Restore.</li></ol>
+  <p>Review the exact permissions in the generated manifest: <code>activeTab</code>, <code>scripting</code>, and <code>storage</code>. There is no persistent host permission or automatic content script.</p>
+  <div class="actions"><a href="/docs/">Read the usage guide</a><a href={`${repository}/releases`}>Check public releases</a></div>
+</Page>

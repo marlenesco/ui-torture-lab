@@ -36,5 +36,21 @@ jobs:
       - name: Install Google Chrome for Playwright
         run: pnpm exec playwright install --with-deps chrome
 
+      - name: Record validation environment
+        run: |
+          node --version
+          pnpm --version
+          google-chrome --version
+          node --input-type=module -e 'import os from "node:os"; console.log(JSON.stringify({parallelism:os.availableParallelism(),memoryGiB:Math.round(os.totalmem()/2**30)}))'
+
       - name: Verify workspace
         run: pnpm check
+
+      - name: Retain synthetic failure evidence
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: synthetic-failure-evidence
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

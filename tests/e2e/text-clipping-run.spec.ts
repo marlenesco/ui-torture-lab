@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { triggerFixtureAction } from "../support/extension-action";
+import { waitForExtensionPanel } from "../support/extension-panel";
 import path from "node:path";
+import { executeAsyncInIsolated } from "../support/extension-script";
 import puppeteer, {
   type Browser,
   type Extension,
@@ -13,21 +16,6 @@ test.describe.configure({ mode: "serial" });
 let browser: Browser;
 let extension: Extension;
 let serviceWorker: WebWorker;
-
-type ChromeApi = {
-  readonly scripting: {
-    executeScript<TResult>(details: {
-      readonly func: () => TResult | Promise<TResult>;
-      readonly target: { readonly frameIds: number[]; readonly tabId: number };
-      readonly world: "ISOLATED";
-    }): Promise<Array<{ readonly result?: TResult }>>;
-  };
-  readonly tabs: {
-    query(details: { readonly active: true; readonly currentWindow: true }): Promise<
-      Array<{ readonly id?: number }>
-    >;
-  };
-};
 
 test.beforeAll(async () => {
   browser = await puppeteer.launch({
@@ -63,72 +51,21 @@ test("built extension groups the completed Finding under Text Clipping", async (
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await page.bringToFront();
-    await page.triggerExtensionAction(extension);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
-    await serviceWorker.evaluate(async () => {
-      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id === undefined) {
-        throw new Error("No active fixture tab was available");
-      }
-      const [injection] = await chromeApi.scripting.executeScript({
-        target: { tabId: tab.id, frameIds: [0] },
-        world: "ISOLATED",
-        func: async () => {
-          type Controller = {
-            getSnapshot(): {
-              readonly findings: readonly { readonly locator: string }[];
-              readonly result: { readonly findings: readonly { readonly locator: string }[] } | null;
-            };
-            restore(): void;
-            startScenario(scenarioId: "long-text"): Promise<void>;
-          };
-          const runtime = (globalThis as typeof globalThis & {
-            [key: symbol]: { readonly runController?: Controller } | undefined;
-          })[Symbol.for("ui-torture-lab/document-runtime")];
-          if (runtime?.runController === undefined) {
-            throw new Error("Run Controller was not available");
-          }
-          await runtime.runController.startScenario("long-text");
-          return runtime.runController.getSnapshot().findings;
-        },
-      });
-      return injection?.result;
+    await triggerFixtureAction(page, extension);
+    await waitForExtensionPanel(page);
+    const panelText = () => page.evaluate(() => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent ?? "");
+    await test.step("Apply Long Text through the built panel", async () => {
+      await page.locator("::-p-aria(Apply Long Text)").setTimeout(5000).click();
+      await expect.poll(panelText).toContain("Long Text Scenario active");
     });
-    const activePanelText = await page.evaluate(
-      () =>
-        document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
-          ?.textContent ?? "",
-    );
-    expect(activePanelText).toContain("Text Clipping");
-    expect(activePanelText).toContain("Boundary p#clipping-boundary");
-    const result = await serviceWorker.evaluate(async () => {
-      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id === undefined) throw new Error("No active fixture tab was available");
-      const [injection] = await chromeApi.scripting.executeScript({
-        target: { tabId: tab.id, frameIds: [0] },
-        world: "ISOLATED",
-        func: () => {
-          type Controller = {
-            getSnapshot(): {
-              readonly result: { readonly findings: readonly { readonly locator: string }[] } | null;
-            };
-            restore(): void;
-          };
-          const runtime = (globalThis as typeof globalThis & {
-            [key: symbol]: { readonly runController?: Controller } | undefined;
-          })[Symbol.for("ui-torture-lab/document-runtime")];
-          if (runtime?.runController === undefined) throw new Error("Run Controller was not available");
-          runtime.runController.restore();
-          return runtime.runController.getSnapshot().result;
-        },
-      });
-      return injection?.result;
+    expect(await panelText()).toContain("Text Clipping");
+    expect(await panelText()).toContain("Boundary p#clipping-boundary");
+    await test.step("Restore through the built panel and retain grouped Evidence", async () => {
+      await page.locator("::-p-aria(Restore)").setTimeout(5000).click();
+      await expect.poll(panelText).toContain("Run completed");
+      expect(await panelText()).toContain("Text Clipping");
+      expect(await panelText()).toContain("Boundary p#clipping-boundary");
     });
-    expect(result?.findings).toContainEqual(
-      expect.objectContaining({ locator: "p#clipping-boundary" }),
-    );
   } finally {
     await page.close();
   }
@@ -139,8 +76,8 @@ test("built extension inspects a live Finding without rematching a disconnected 
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await page.bringToFront();
-    await page.triggerExtensionAction(extension);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await triggerFixtureAction(page, extension);
+    await waitForExtensionPanel(page);
 
     await page.evaluate(() => {
       const button = [...(
@@ -268,25 +205,16 @@ test("built extension shows containment and Viewport Overflow from Unbreakable T
   try {
     await page.goto("http://127.0.0.1:4173/horizontal-containment-run/");
     await page.bringToFront();
-    await page.triggerExtensionAction(extension);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
-    await serviceWorker.evaluate(async () => {
-      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id === undefined) throw new Error("No active fixture tab was available");
-      await chromeApi.scripting.executeScript({
-        target: { tabId: tab.id, frameIds: [0] },
-        world: "ISOLATED",
-        func: async () => {
+    await triggerFixtureAction(page, extension);
+    await waitForExtensionPanel(page);
+    await executeAsyncInIsolated(serviceWorker, async () => {
           type Controller = { startScenario(scenarioId: "unbreakable-text"): Promise<void> };
           const runtime = (globalThis as typeof globalThis & {
             [key: symbol]: { readonly runController?: Controller } | undefined;
           })[Symbol.for("ui-torture-lab/document-runtime")];
           if (runtime?.runController === undefined) throw new Error("Run Controller was unavailable");
           await runtime.runController.startScenario("unbreakable-text");
-        },
-      });
-    });
+        });
     await page.waitForFunction(
       () =>
         document

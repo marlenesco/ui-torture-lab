@@ -1,19 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createRoot, type Root } from "react-dom/client";
-import { createRunController, type MarkdownReportInput, type RunController } from "@ui-torture-lab/engine";
-import { browser } from "wxt/browser";
+import { createRunController, type MarkdownReportInput, type TargetEndReason, type RunController } from "@ui-torture-lab/engine";
+import { browser, type Browser } from "wxt/browser";
 import { ExtensionPanel } from "./panel";
+import { panelCss } from "./panel-style";
 import {
   isStoredRunResult,
   pageMetadataFor,
-  type StoredRunResult,
 } from "../target-page/current-run-result";
+import { getPageAuthorizationAttempt } from "../target-page/page-authorization";
+import { observeSameDocumentNavigation } from "../target-page/navigation";
 import {
+  bindGrantMessageType,
+  runtimePortName,
+  unreachableMessageType,
+  invalidateGrantMessageType,
   clearRunResultMessageType,
   readRunResultMessageType,
   runActivityMessageType,
   storeRunResultMessageType,
+  storePreviousRunResultMessageType,
 } from "../target-page/messages";
 
 const runtimeKey = Symbol.for("ui-torture-lab/document-runtime");
@@ -58,140 +65,7 @@ const isolatedUiEventTypes = [
   "wheel",
 ] as const;
 
-const panelCss = `
-  :host {
-    all: initial;
-  }
 
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
-
-  button {
-    font: inherit;
-  }
-
-  .panel-shell,
-  .panel-toggle--expand {
-    position: fixed;
-    inset-block-start: 12px;
-    inset-inline-end: 12px;
-    z-index: 2147483647;
-    color: #f7f7f2;
-    background: #191a17;
-    border: 1px solid #41433c;
-    box-shadow: 0 16px 48px rgb(0 0 0 / 35%);
-    font: 14px/1.4 system-ui, sans-serif;
-    pointer-events: auto;
-  }
-
-  .panel-shell {
-    inline-size: min(360px, calc(100vw - 24px));
-    max-block-size: calc(100vh - 24px);
-    overflow: auto;
-    border-radius: 12px;
-    padding: 16px;
-  }
-
-  .panel-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-  }
-
-  .panel-header div {
-    display: grid;
-    gap: 2px;
-  }
-
-  .panel-header span,
-  .panel-shell p {
-    color: #b9bbb2;
-  }
-
-  .panel-shell p {
-    margin: 16px 0 0;
-  }
-
-  .panel-toggle {
-    appearance: none;
-    border: 1px solid #65685f;
-    border-radius: 7px;
-    color: inherit;
-    background: #2a2c27;
-    padding: 6px 9px;
-    cursor: pointer;
-  }
-
-  .panel-toggle:focus-visible {
-    outline: 2px solid #d7f36b;
-    outline-offset: 2px;
-  }
-
-  .run-controls {
-    display: grid;
-    gap: 12px;
-    margin-block-start: 16px;
-  }
-
-  .run-controls p {
-    margin: 0;
-  }
-
-  .markdown-report {
-    display: grid;
-    gap: 12px;
-    margin-block-start: 16px;
-  }
-
-  .markdown-report textarea {
-    display: block;
-    inline-size: 100%;
-    margin-block-start: 8px;
-    color: inherit;
-    background: #2a2c27;
-    font: 12px/1.4 monospace;
-    white-space: pre;
-    resize: vertical;
-    user-select: text;
-  }
-
-  .markdown-report textarea:focus-visible {
-    outline: 2px solid #d7f36b;
-    outline-offset: 2px;
-  }
-
-  .panel-action {
-    appearance: none;
-    justify-self: start;
-    border: 1px solid #d7f36b;
-    border-radius: 7px;
-    color: #191a17;
-    background: #d7f36b;
-    padding: 8px 12px;
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .panel-action:focus-visible {
-    outline: 2px solid #f7f7f2;
-    outline-offset: 2px;
-  }
-
-  .finding-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .panel-toggle--expand {
-    margin: 0;
-    padding: 9px 11px;
-    border-radius: 999px;
-  }
-`;
 
 type MountedPanel = {
   readonly host: HTMLElement;
@@ -318,7 +192,7 @@ type DocumentRuntimeGlobal = typeof globalThis & {
 class DocumentRuntime {
   readonly document = document;
   readonly runtimeId = crypto.randomUUID();
-  readonly runController: RunController;
+  runController: RunController;
   private readonly ownership = new ExtensionDomOwnership();
   private readonly diagnosticHighlights = new Set<HTMLElement>();
   private readonly invalidLiveFindings = new Set<
@@ -326,32 +200,105 @@ class DocumentRuntime {
   >();
   private storedResult: ReturnType<RunController["getSnapshot"]>["result"] = null;
   private currentRunReport: MarkdownReportInput | null = null;
-  private previousRunResult: StoredRunResult | null = null;
+  private previousRunResult: MarkdownReportInput | null = null;
+  private grantId: string | null = null;
+  private authorized = false;
+  private targetEnded = false;
+  private ending = false;
+  private page = pageMetadataFor(window.location);
+  private unsubscribeEngine: () => void = () => undefined;
+  private reachabilityPort: Browser.runtime.Port | null = null;
+  private navigationObserver: ReturnType<typeof observeSameDocumentNavigation>;
   private reportedRunActivity: boolean | null = null;
   private liveFindingMessage: string | null = null;
   private overlay: MountedOverlay | undefined;
   private panel: MountedPanel | undefined;
 
   constructor() {
-    this.runController = createRunController({
+    this.runController = this.createController();
+    this.navigationObserver = observeSameDocumentNavigation(window, () => this.endTarget("same-document-navigation"));
+    this.document.defaultView?.addEventListener("pagehide", () => this.endTarget("page-exit"));
+    this.document.defaultView?.addEventListener("pageshow", (event) => {
+      if (!event.persisted) return;
+      this.endTarget("page-exit");
+      this.panel?.render(false);
+    });
+  }
+
+  private createController(): RunController {
+    const controller = createRunController({
       document: this.document,
       isExtensionOwnedNode: (node) => this.isExtensionOwnedNode(node),
     });
-    this.runController.subscribe(() => {
-      const snapshot = this.runController.getSnapshot();
+    this.unsubscribeEngine = controller.subscribe(() => {
+      const snapshot = controller.getSnapshot();
       if (snapshot.phase !== "ready-for-inspection") {
         this.invalidLiveFindings.clear();
       }
-      if (snapshot.result !== null && snapshot.result !== this.storedResult) {
+      if (!this.ending && this.authorized && snapshot.result !== null && snapshot.result !== this.storedResult) {
         this.storedResult = snapshot.result;
         this.storeCurrentRunResult(snapshot.result);
         this.panel?.render(this.panel.host.dataset.uiTortureLabCollapsed === "true");
       }
       this.reportRunActivity();
     });
-    this.document.defaultView?.addEventListener("pagehide", () =>
-      this.clearRunActivity(),
-    );
+    return controller;
+  }
+
+  async authorize(grantId: string): Promise<"mounted" | "reload-required" | "failed"> {
+    const attempt = getPageAuthorizationAttempt();
+    const unchanged = (): boolean => attempt !== undefined && attempt === getPageAuthorizationAttempt() &&
+      attempt.id === grantId && attempt.valid && attempt.expectedUrl === window.location.href;
+    if (!unchanged()) { if (attempt?.id === grantId) attempt.stop(); return "failed"; }
+    try {
+      this.grantId = grantId;
+      if (this.targetEnded && this.previousRunResult !== null) {
+        const saved = await browser.runtime.sendMessage({ type: storePreviousRunResultMessageType, grantId, page: this.previousRunResult.page, result: this.previousRunResult.result }).catch(() => false);
+        if (saved !== true || this.grantId !== grantId || !unchanged()) return "failed";
+      }
+      if (this.runController.getSnapshot().phase === "reload-required") {
+        this.mountOrReveal();
+        return "reload-required";
+      }
+      if (this.targetEnded) {
+        this.unsubscribeEngine();
+        this.runController = this.createController();
+        this.storedResult = null;
+        this.currentRunReport = null;
+        this.reportedRunActivity = null;
+        this.navigationObserver = observeSameDocumentNavigation(window, () => this.endTarget("same-document-navigation"));
+      }
+      if (!this.authorized) this.page = pageMetadataFor(window.location);
+      this.grantId = grantId;
+      this.authorized = true;
+      this.targetEnded = false;
+      this.liveFindingMessage = null;
+      this.openReachability();
+      this.mountOrReveal();
+      return "mounted";
+    } finally { attempt?.stop(); }
+  }
+
+  private endTarget(reason: TargetEndReason): void {
+    this.navigationObserver.stop();
+    if (this.targetEnded) return;
+    this.targetEnded = true;
+    this.authorized = false;
+    this.ending = true;
+    const result = this.runController.endTarget(reason);
+    this.ending = false;
+    this.storedResult = result;
+    if (result !== null) this.previousRunResult = { page: this.page, result, state: "previous" };
+    this.currentRunReport = null;
+    this.clearDiagnosticHighlights();
+    this.invalidLiveFindings.clear();
+    this.liveFindingMessage = "Target Page authorization ended. Click the toolbar action again after verified Restore.";
+    this.reportedRunActivity = false;
+    const port = this.reachabilityPort;
+    this.reachabilityPort = null;
+    try { port?.disconnect(); } catch { /* The local cleanup is already complete. */ }
+    if (reason !== "page-exit") this.panel?.render(this.panel.host.dataset.uiTortureLabCollapsed === "true");
+    if (this.grantId !== null) this.notifyRuntime({ type: invalidateGrantMessageType, grantId: this.grantId, page: this.page, result });
   }
 
   mountOrReveal(): void {
@@ -402,6 +349,7 @@ class DocumentRuntime {
     finding: ReturnType<RunController["getSnapshot"]>["findings"][number],
     action: FindingAction,
   ): void {
+    if (!this.authorized) return;
     if (action === "copy-locator") {
       this.selectDiagnosticLocator(finding.locator);
       return;
@@ -517,14 +465,17 @@ class DocumentRuntime {
       root.render(
         <ExtensionPanel
           collapsed={collapsed}
+          authorized={this.authorized}
+          navigationComplete={this.navigationObserver.complete}
           currentRunReport={this.currentRunReport}
           onClearPreviousRunResult={() => this.clearPreviousRunResult()}
           onCollapse={() => render(true)}
           onExpand={() => render(false)}
           onInspectFinding={(finding, action) => this.inspectFinding(finding, action)}
           isFindingActionEnabled={(finding) => !this.invalidLiveFindings.has(finding)}
-          onRestore={() => this.runController.restore()}
+          onRestore={() => { if (this.authorized) this.runController.restore(); }}
           onStartScenario={(scenarioId) => {
+            if (!this.authorized) return;
             void this.withMeasurementSafeUi(() =>
               this.runController.startScenario(scenarioId)
             );
@@ -579,24 +530,19 @@ class DocumentRuntime {
   private storeCurrentRunResult(
     result: NonNullable<ReturnType<RunController["getSnapshot"]>["result"]>,
   ): void {
-    const location = this.document.defaultView?.location;
-    if (location === undefined) return;
-    const page = pageMetadataFor(location);
+    if (!this.authorized || this.grantId === null) return;
+    const page = this.page;
     this.currentRunReport = { page, result, state: "current" };
-    void browser.runtime
-      .sendMessage({
-        page,
-        result,
-        type: storeRunResultMessageType,
-      })
-      .catch(() => undefined);
+    this.notifyRuntime({ page, result, type: storeRunResultMessageType, grantId: this.grantId });
   }
 
   private loadPreviousRunResult(): void {
+    if (this.grantId === null) return;
+    const grantId = this.grantId;
     void browser.runtime
-      .sendMessage({ type: readRunResultMessageType })
+      .sendMessage({ type: readRunResultMessageType, grantId })
       .then((response) => {
-        if (!isStoredRunResult(response)) return;
+        if (!this.authorized || this.grantId !== grantId || !isStoredRunResult(response)) return;
         this.previousRunResult = response;
         this.panel?.render(false);
       })
@@ -606,12 +552,11 @@ class DocumentRuntime {
   private clearPreviousRunResult(): void {
     this.previousRunResult = null;
     this.panel?.render(false);
-    void browser.runtime
-      .sendMessage({ type: clearRunResultMessageType })
-      .catch(() => undefined);
+    this.notifyRuntime({ type: clearRunResultMessageType, grantId: this.grantId });
   }
 
   private reportRunActivity(): void {
+    if (!this.authorized || this.grantId === null || this.ending) return;
     const phase = this.runController.getSnapshot().phase;
     const active =
       phase === "applying-mutations" ||
@@ -620,17 +565,43 @@ class DocumentRuntime {
     if (!active && this.reportedRunActivity === null) return;
     if (this.reportedRunActivity === active) return;
     this.reportedRunActivity = active;
-    void browser.runtime
-      .sendMessage({ active, type: runActivityMessageType })
-      .catch(() => undefined);
+    this.notifyRuntime({ active, type: runActivityMessageType, grantId: this.grantId });
   }
 
-  private clearRunActivity(): void {
-    if (this.reportedRunActivity !== true) return;
-    this.reportedRunActivity = false;
-    void browser.runtime
-      .sendMessage({ active: false, type: runActivityMessageType })
-      .catch(() => undefined);
+  private notifyRuntime(message: unknown): void {
+    try { void browser.runtime.sendMessage(message).catch(() => undefined); }
+    catch { /* An interrupted extension runtime cannot be required for local Restore. */ }
+  }
+
+  private openReachability(): void {
+    const old = this.reachabilityPort;
+    this.reachabilityPort = null;
+    try { old?.disconnect(); } catch { /* The previous transport may already be gone. */ }
+    if (this.grantId === null) return;
+    const grantId = this.grantId;
+    try {
+      const port = browser.runtime.connect({ name: runtimePortName });
+      this.reachabilityPort = port;
+      port.onMessage.addListener((message) => {
+        if (message?.type !== "grant-bound" || message.grantId !== grantId || this.reachabilityPort !== port) return;
+        this.reportedRunActivity = null;
+        this.reportRunActivity();
+      });
+      port.onDisconnect.addListener(() => {
+        if (this.reachabilityPort !== port) return;
+        this.reachabilityPort = null;
+        this.reportedRunActivity = false;
+        this.notifyRuntime({ type: unreachableMessageType, grantId });
+        if (!this.targetEnded) {
+          this.liveFindingMessage = "Extension connection lost. Restore remains available; reopen the toolbar to reconnect.";
+          this.panel?.render(this.panel.host.dataset.uiTortureLabCollapsed === "true");
+        }
+      });
+      const phase = this.runController.getSnapshot().phase;
+      port.postMessage({ type: bindGrantMessageType, grantId, active: phase === "applying-mutations" || phase === "ready-for-inspection" || phase === "restoring" });
+    } catch {
+      this.notifyRuntime({ type: unreachableMessageType, grantId });
+    }
   }
 
   private ensureOverlay(): MountedOverlay {
@@ -666,16 +637,14 @@ class DocumentRuntime {
   }
 }
 
-export function mountOrRevealDocumentRuntime(): void {
+export function prepareDocumentRuntime(): void {
   const runtimeGlobal = globalThis as DocumentRuntimeGlobal;
   const existingRuntime = runtimeGlobal[runtimeKey];
 
   if (existingRuntime?.document === document) {
-    existingRuntime.mountOrReveal();
     return;
   }
 
   const runtime = new DocumentRuntime();
   runtimeGlobal[runtimeKey] = runtime;
-  runtime.mountOrReveal();
 }

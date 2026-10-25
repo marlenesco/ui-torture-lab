@@ -5,6 +5,8 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: true,
+  workers: process.env.CI ? 2 : 4,
+  failOnFlakyTests: Boolean(process.env.CI),
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
@@ -12,7 +14,7 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:4173",
     browserName: "chromium",
     channel: "chrome",
-    trace: "on-first-retry",
+    trace: { mode: "retain-on-failure", screenshots: false, snapshots: true, sources: true },
   },
   webServer: {
     command: "pnpm dev:fixtures",
