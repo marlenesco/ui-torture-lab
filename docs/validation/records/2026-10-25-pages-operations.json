@@ -47,5 +47,30 @@
     "webAnalytics": "disabled",
     "addedWorkerOrStorageResources": false
   },
-  "validationBoundary": "Read-only HTTPS artifact comparison plus actual provider UI operations; no manual Chrome platform acceptance or participant study is claimed."
+  "validationBoundary": "Read-only HTTPS artifact comparison plus actual provider UI operations; no manual Chrome platform acceptance or participant study is claimed.",
+  "watchPathControl": {
+    "commit": "f74b5580b3ce0a726f7fdf895ba74bdefbdbba6d",
+    "changedPaths": [
+      "docs/validation/records/2026-10-25-pages-operations.json"
+    ],
+    "providerRecord": "cd92d6ee-21cf-4e3a-afcf-fb9755981a3d",
+    "observedStatus": "skipped",
+    "observedDeployment": "No deployment available"
+  },
+  "portability": {
+    "date": "2026-10-25",
+    "server": "Python stdlib SimpleHTTPRequestHandler",
+    "routesPassed": [
+      "/",
+      "/docs/",
+      "/scope/",
+      "/install/",
+      "/privacy/",
+      "/permissions/",
+      "/license/",
+      "/support/"
+    ],
+    "exactArtifactByteMatch": true,
+    "providerRuntimeRequired": false
+  }
 }

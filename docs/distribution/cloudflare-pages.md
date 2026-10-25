@@ -1,6 +1,6 @@
 # Static Cloudflare Pages deployment
 
-Status recorded 2026-10-25: the static pre-release website is deployed at https://ui-torture-lab.pages.dev. The maintainer authorized the native GitHub App for only `marlenesco/ui-torture-lab`. Production payload checks pass; preview and rollback validation are being completed for issue #25. No Official Distribution or Chrome Web Store availability is implied.
+Status recorded 2026-10-25: the static pre-release website is deployed at https://ui-torture-lab.pages.dev. The maintainer authorized the native GitHub App for only `marlenesco/ui-torture-lab`. Production and preview payload checks pass, and a live rollback to a prior successful production deployment has been demonstrated for issue #25. No Official Distribution or Chrome Web Store availability is implied.
 
 ## Actual project settings
 
@@ -37,11 +37,15 @@ Include `apps/site/*`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, 
 - Output: eight static HTML files, with local CSS inlined by Astro. Every HTTPS route returns 200, the correct canonical URL, no script and no Set-Cookie header, and matches the equivalent local `SITE_URL` build byte for byte. See [HTTP evidence](../validation/records/2026-10-25-pages-production.json).
 - No functions directory was found or uploaded. Production and Preview have no bindings or secrets; only NODE_VERSION, PNPM_VERSION and SITE_URL text variables. No Worker application, storage/database resource, adapter, analytics snippet or Zaraz configuration was added. The Metrics screen explicitly reports Web Analytics disabled.
 - Build filters are configured with the seven include entries above and an empty exclude set. Production automatic builds and all non-production branch previews are enabled.
-- Actual preview build, unrelated-change filtering and rollback outcome: pending final evidence in this follow-up.
+- Preview: `a37dce60-c68a-4138-8cb5-7800fbfe6a23` from `444845d8eeecda1aa6e00b12315621e3a3272eb8` on `issue-25-pages-deployment`; native Cloudflare check on PR #49 succeeded. All eight routes match the local static payload and keep production canonical URLs.
+- Rollback: the native Roll back action returned production from `8a5adccc` to `ac7488a1`; the active deployment was confirmed in the dashboard and all eight production routes were rechecked. Both deployments have the same source and bytes, so this tests the real production pointer without introducing faulty content. The extension was unchanged.
+- Portability: all eight routes also returned the exact artifact bytes from Python's ordinary `SimpleHTTPRequestHandler`; that temporary server was stopped. No provider runtime is required.
+- Filter control: `f74b558` changes only `docs/validation/records/2026-10-25-pages-operations.json`, outside the include set. The provider explicitly recorded it as `skipped` with `No deployment available` (`cd92d6ee-21cf-4e3a-afcf-fb9755981a3d`), confirming that this unrelated change did not trigger a rebuild. Platform exceptions for empty/oversized pushes still apply.
+- [Operational evidence](../validation/records/2026-10-25-pages-operations.json) records repository scope, production/preview identities, rollback and resource boundaries.
 
 The hosting image bootstraps Corepack 0.36.0 and emits a non-fatal Node engine warning before activating the requested pnpm version. Both deployments nevertheless used the declared Node/pnpm and produced the verified static payload. This provider bootstrap warning is retained as a known build-image caveat; no workspace version was silently changed.
 
-The website keeps its pre-release Store notice. `public-contract.json.siteOrigin` records the verified production origin; `storeListing` remains null and technical/product validation remain pending. `launch-gates.json.siteDeployment` stays pending until the preview/rollback record is complete.
+The website keeps its pre-release Store notice. `public-contract.json.siteOrigin` records the verified production origin; `storeListing` remains null and technical/product validation remain pending. `launch-gates.json.siteDeployment` records the completed hosting gate independently of the still-pending Technical and Product Validation gates.
 
 ## Rollback and escape path
 

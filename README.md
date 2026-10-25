@@ -1,10 +1,13 @@
 # UI Torture Lab
 
-UI Torture Lab is a planned Chrome desktop extension for deterministic text
+UI Torture Lab is a pre-release Chrome desktop extension for deterministic text
 stress testing with measurable before-and-after Evidence.
 
-> **Project status:** public workspace scaffold. No Official Distribution or
-> Target Page analysis workflow is available yet.
+> **Project status:** the development build implements the text stress workflow.
+> Manual platform and Product Validation remain pending; no Official Distribution
+> is published on Chrome Web Store.
+
+Website and usage documentation: https://ui-torture-lab.pages.dev.
 
 The repository keeps the browser-DOM-aware Engine, Chrome Extension Adapter,
 Official Website, synthetic fixtures, tests, and product documentation in one
@@ -14,13 +17,13 @@ place so implementation and public claims can evolve together.
 
 - Node.js 24.13.1
 - pnpm 11.20.0 through Corepack
-- Google Chrome desktop stable for future Official Distribution validation
+- Google Chrome desktop stable for installed-extension validation
 
 ## Setup
 
 ```sh
 corepack enable
-pnpm install
+pnpm install --frozen-lockfile
 pnpm exec playwright install chrome
 pnpm check
 ```
