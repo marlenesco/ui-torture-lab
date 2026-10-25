@@ -23,6 +23,14 @@ export function inspectManifest(manifest, contract) {
   return errors;
 }
 
+export function inspectPngIcon(data, size) {
+  if (data.length < 33 || data.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a") return ["icon is not a PNG"];
+  const errors = [];
+  if (data.readUInt32BE(16) !== size || data.readUInt32BE(20) !== size) errors.push("icon dimensions differ from the declared size");
+  if (data[25] !== 6) errors.push("icon must retain an RGBA alpha channel");
+  return errors;
+}
+
 // Fingerprint a complete enclosing renderer function, preserving properties, literals, and control flow.
 // Normalize only local/minified identifier spelling so unrelated application edits do not change the review.
 export function scriptCreatorFingerprint(node) {

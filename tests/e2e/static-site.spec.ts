@@ -42,11 +42,14 @@ for (const width of [360, 800, 1280]) {
     for (const route of ["/", "/docs/", "/scope/", "/install/", "/privacy/", "/permissions/", "/license/", "/support/"]) {
       await page.goto(`/__site__${route}`);
       await expect(page.locator("h1")).toBeVisible();
+      await expect(page.locator(".wordmark svg.site-logo")).toBeVisible();
+      await expect(page.locator(".wordmark svg.site-logo")).toHaveAttribute("aria-hidden", "true");
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       expect(await page.locator("body").evaluate((element) => getComputedStyle(element).fontSize)).not.toBe("0px");
     }
     expect(requests.every((url) => new URL(url).origin === "http://127.0.0.1:4173")).toBe(true);
     await page.goto("/__site__/");
+    if (width === 1280) await page.screenshot({ path: test.info().outputPath("site-brand.png") });
     expect(await page.locator(".specimen").evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
   });
 }

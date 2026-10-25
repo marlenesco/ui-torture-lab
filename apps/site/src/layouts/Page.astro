@@ -1,6 +1,7 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
 import "../styles/site.css";
+import BrandLogo from "../assets/brand-logo.svg";
 import { navigation, repository } from "../content/product";
 interface Props { title: string; description: string; home?: boolean }
 const { title, description, home = false } = Astro.props;
@@ -14,6 +15,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta name="description" content={description} />
     <meta name="color-scheme" content="light" />
     <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
@@ -23,7 +25,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
   <body>
     <a class="skip-link" href="#content">Skip to content</a>
     <header class="site-header">
-      <a class="wordmark" href="/" aria-label="UI Torture Lab home">UI Torture Lab<span aria-hidden="true">↗</span></a>
+      <a class="wordmark" href="/" aria-label="UI Torture Lab home"><span class="brand-emblem"><BrandLogo class="site-logo" width="40" height="44" aria-hidden="true" focusable="false" /></span><span>UI Torture Lab</span></a>
       <nav aria-label="Primary"><ul>{navigation.map(({ href, label }) => <li><a href={href} aria-current={Astro.url.pathname === href ? "page" : undefined}>{label}</a></li>)}</ul></nav>
     </header>
     <p class="release-note">Pre-release build. The Official Distribution is not yet published on Chrome Web Store.</p>
