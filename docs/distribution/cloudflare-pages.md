@@ -1,6 +1,6 @@
 # Static Cloudflare Pages deployment plan
 
-Status: not deployed. Account ownership, Pages project, GitHub App authorization, public domain, preview build, and rollback demonstration are unresolved. The requested account selection is pending. No Cloudflare resource, integration, token, secret, custom domain, or deployment has been created. Issue #25 remains open.
+Status: not deployed. Account ownership, Pages project, GitHub App authorization, public domain, preview build, and rollback demonstration are unresolved. Account and domain selection have been explicitly deferred by the maintainer. No Cloudflare resource, integration, token, secret, custom domain, or deployment has been created. Issue #25 remains open.
 
 ## Proposed settings
 
