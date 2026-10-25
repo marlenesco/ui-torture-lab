@@ -11,16 +11,17 @@ const paths = {
   highlight: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M9 12h6",
   navigate: "m4 11 16-7-7 16-2-7-7-2Z",
   download: "M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5",
+  preview: "M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Zm7 0a3 3 0 1 0 6 0 3 3 0 0 0-6 0",
   copy: "M8 8h12v13H8ZM4 16V3h12",
   clear: "M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7",
 } as const;
 
 /** Decorative glyphs live inside native buttons; their labels and handlers own the action. */
-export function PanelIcon({ name }: { readonly name: keyof typeof paths }) {
+export function PanelIcon({ name, plain = false }: { readonly name: keyof typeof paths; readonly plain?: boolean }) {
   return (
     <svg
       aria-hidden="true"
-      className="panel-icon"
+      className={plain ? "panel-symbol" : "panel-icon"}
       fill="none"
       focusable="false"
       height="16"

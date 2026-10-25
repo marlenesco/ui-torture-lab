@@ -257,6 +257,35 @@ export const panelCss = `
     padding-block-start: 16px;
     border-block-start: 1px solid var(--panel-line);
   }
+  .markdown-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .markdown-preview-toggle {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 30px;
+    block-size: 30px;
+    padding: 6px;
+    border: 0;
+    background: transparent;
+    color: var(--panel-muted);
+    cursor: pointer;
+  }
+  .markdown-preview-toggle:hover,
+  .markdown-preview-toggle[aria-expanded="true"] {
+    color: var(--panel-accent);
+  }
+  .panel-symbol {
+    display: block;
+    inline-size: 16px;
+    block-size: 16px;
+    flex: 0 0 16px;
+  }
   .markdown-report label {
     font-size: 11px;
     color: var(--panel-muted);
