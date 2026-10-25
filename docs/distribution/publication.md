@@ -40,8 +40,11 @@ and draft preparation; generate the final package from the verified release comm
 - [ ] Complete and record the remaining installed-extension/manual Chrome stable
   checks on macOS, Windows and Linux in
   [issue #26](https://github.com/marlenesco/ui-torture-lab/issues/26).
-- [ ] Complete [Product Validation, issue #28](https://github.com/marlenesco/ui-torture-lab/issues/28),
-  documenting which evidence comes from people and which from simulated agents.
+- [x] Complete [Product Validation, issue #28](https://github.com/marlenesco/ui-torture-lab/issues/28)
+  using the owner's explicitly adopted six-profile agent criterion. The
+  [simulation report](../validation/product/2026-10-26-simulated-review.md) records
+  six scoped passes and no confirmed unresolved blocker; actual human usability
+  remains unverified. Technical Validation is not waived.
 - [x] Enable and verify main branch protection. PRs, the GitHub Actions `verify`
   check, current base, linear history and resolved conversations are required,
   including for administrators; force pushes and deletion are blocked. Independent

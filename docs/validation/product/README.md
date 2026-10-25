@@ -1,6 +1,12 @@
 # Formative Product Validation kit
 
-Status: kit prepared; no recruitment, participant session, observed outcome, or launch decision has been completed. This material implements issue #27. Issue #28 requires actual independent participants and remains open. Do not treat passing fixture tests as usability evidence.
+Status: no human recruitment, participant session or observed human outcome has been completed. On 2026-10-26 the owner adopted six professional-role AI reviews as the 1.0.0 launch criterion for issue #28; see [ADR-0032](../../adr/0032-adopt-explicitly-simulated-product-validation-for-launch.md). The human study kit from issue #27 remains available for a future optional study. Neither fixture tests nor AI reviews are observed human usability evidence.
+
+## Current launch method
+
+The six simulated perspectives are frontend engineering, QA/lifecycle, privacy and trust, UX/content, keyboard/accessibility of the Extension UI, and release/integration engineering. Each review must identify its materials and assisted method, record task observations, separate confirmed blockers from optional improvements and give a scoped pass/iterate/blocked recommendation. Reviewers must not fabricate browser execution, human task completion, participant-owned interfaces, quotes or OS sign-offs. The aggregate decision requires all six reports and no unresolved confirmed blocker; Technical Validation remains a separate gate. Review results and the final decision are recorded in the dated simulated-review report in this directory.
+
+The protocol below concerns **optional future human research**. Its recruitment counts and uncoached success thresholds no longer determine the 1.0.0 launch gate.
 
 ## Objective and recruitment
 
@@ -38,7 +44,7 @@ Record confusions explicitly: Finding versus inconclusive; Evidence versus sever
 
 Before recruitment, use this minimum interpretation threshold: at least 80% rounded up of six to eight qualifying participants must complete the core workflow correctly without substantive coaching (5/6, 6/7, or 7/8). More than half must meaningfully attempt the participant-owned phase (4/6, 4/7, or 5/8), with exclusions reported transparently. These are formative decision rules, not statistical reliability or market-demand claims.
 
-Any systematic terminology, trust, workflow, inspection, Restore, report, or UI interference problem triggers iteration and focused retesting with new qualifying participants. A safety/privacy/attribution defect blocks release regardless of counts. The final report must choose launch, iterate, or blocked, link the redacted evidence, preserve unresolved gates, and explain exclusions. `launch-gates.json.productValidation` stays pending until actual evidence supports a passed outcome.
+For a future human study, any systematic terminology, trust, workflow, inspection, Restore, report, or UI interference problem triggers iteration and focused retesting with new qualifying participants. A safety/privacy/attribution defect blocks release regardless of counts. A human study report must choose launch, iterate, or blocked, link the redacted evidence, preserve unresolved gates, and explain exclusions. Human outcomes remain unverified until observed; the current launch Product Validation gate follows the explicitly simulated method above.
 
 ## Fixture verification
 

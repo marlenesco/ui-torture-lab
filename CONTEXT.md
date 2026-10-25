@@ -92,8 +92,12 @@ The fixture, benchmark, lifecycle, privacy, and browser validation that demonstr
 _Avoid_: Usability validation
 
 **Product Validation**:
-Observed, formative evaluation with independent frontend developers that demonstrates whether the Primary User can complete the primary workflow, correctly interpret the result, investigate the relevant code area, Restore safely, and produce a useful Markdown Report without substantive assistance. It collects only voluntary, redacted feedback and is not measured by Finding count.
+Formative assessment of whether the Primary User's workflow, result interpretation, investigation, Restore and Markdown Report are coherent and useful, using an explicitly declared evaluation method. Human observations and simulated reviews remain distinct evidence and are not measured by Finding count.
 _Avoid_: Analytics, telemetry, technical benchmark
+
+**Simulated Product Validation**:
+A review of the primary workflow by professional-role AI agents using declared product artifacts and supporting materials. It can identify comprehension, contract and workflow risks but does not establish unassisted human use, participant-owned adoption or native platform compatibility.
+_Avoid_: Human usability study, independent developer participants
 
 **Target Page**:
 The top-level HTML document currently open over HTTP or HTTPS that the Primary User owns or can modify and has explicitly chosen to stress-test. Local development is supported through localhost or another local web server, not through direct file access.

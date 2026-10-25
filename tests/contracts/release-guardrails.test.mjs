@@ -99,6 +99,7 @@ test("publication gate rejects placeholders, missing validation, dirty source, a
     version: "1.0.0", clean: true, node: "24.13.1", declaredNode: "24.13.1", siteOrigin: "https://official.example.com", tagMatches: true,
   };
   assert.deepEqual(inspectReleaseReadiness(ready), []);
+  assert.ok(inspectReleaseReadiness({ ...ready, gates: { ...ready.gates, technicalValidation: "pending" } }).some(error => error.includes("technicalValidation")), "passing the adopted simulated Product Validation criterion cannot waive manual Technical Validation");
   for (const change of [{ version: "0.0.0" }, { clean: false }, { node: "24.22.1" }, { tagMatches: false }, { siteOrigin: "http://localhost:4321" }, { contract }, { gates: {} }, { contract: { siteOrigin: "https://localhost", storeListing: null } }]) assert.ok(inspectReleaseReadiness({ ...ready, ...change }).length > 0);
 });
 
