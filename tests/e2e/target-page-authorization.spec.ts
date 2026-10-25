@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { triggerFixtureAction } from "../support/extension-action";
 import { waitForExtensionPanel } from "../support/extension-panel";
 import path from "node:path";
 import puppeteer, {
@@ -82,7 +83,7 @@ const readActiveTabActionState = async (): Promise<ActionState> =>
 
 const triggerToolbarAction = async (page: Page): Promise<void> => {
   await page.bringToFront();
-  await page.triggerExtensionAction(extension);
+  await triggerFixtureAction(page, extension);
 };
 
 const readFixtureGeometry = async (page: Page): Promise<FixtureGeometry> =>
@@ -771,7 +772,7 @@ test("toolbar rejects a same-URL reload between probe and bootstrap", async () =
         resolve();
       });
     });
-    const toolbarAction = page.triggerExtensionAction(extension);
+    const toolbarAction = triggerFixtureAction(page, extension);
     await paused;
 
     await page.reload();

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { triggerFixtureAction } from "../support/extension-action";
 import { waitForExtensionPanel } from "../support/extension-panel";
 import path from "node:path";
 import puppeteer, {
@@ -16,7 +17,7 @@ let extension: Extension;
 
 const triggerToolbarAction = async (page: Page): Promise<void> => {
   await page.bringToFront();
-  await page.triggerExtensionAction(extension);
+  await triggerFixtureAction(page, extension);
   await waitForExtensionPanel(page);
 };
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { triggerFixtureAction } from "../support/extension-action";
 import path from "node:path";
 import puppeteer, { type Browser, type Extension, type Page } from "puppeteer-core";
 
@@ -31,7 +32,7 @@ for (const fixture of ["a", "b", "c"] as const) {
         await page.goto(`http://127.0.0.1:4173/product-validation/${fixture}/`);
         await page.bringToFront();
         const original = await page.$eval("main", (element) => element.innerHTML);
-        await page.triggerExtensionAction(extension);
+        await triggerFixtureAction(page, extension);
         await expect.poll(() => panelText(page)).toContain(`Apply ${scenario}`);
         await click(page, `Apply ${scenario}`);
         await expect.poll(() => panelText(page)).toContain(`${scenario} Scenario active`);

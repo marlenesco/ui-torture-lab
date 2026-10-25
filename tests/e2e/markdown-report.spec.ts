@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { triggerFixtureAction } from "../support/extension-action";
 import { waitForExtensionPanel } from "../support/extension-panel";
 import { executeAsyncInIsolated } from "../support/extension-script";
 import path from "node:path";
@@ -71,7 +72,7 @@ const click = (page: Page, name: string): Promise<void> => test.step(`Panel clic
 async function completedRun(page: Page): Promise<void> {
   await test.step("Navigate to clipboard fixture", () => page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment"), { timeout: 5000 });
   await test.step("Activate clipboard fixture tab", () => page.bringToFront(), { timeout: 5000 });
-  await test.step("Authorize clipboard fixture by toolbar", () => page.triggerExtensionAction(extension), { timeout: 5000 });
+  await test.step("Authorize clipboard fixture by toolbar", () => triggerFixtureAction(page, extension), { timeout: 5000 });
   await test.step("Mount clipboard fixture panel", () => waitForExtensionPanel(page), { timeout: 5000 });
   await click(page, "Apply Long Text");
   await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
@@ -84,7 +85,7 @@ test("built extension copies the exact visible Markdown only on a user click aft
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await page.bringToFront();
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await clipboardProbe("success");
     await click(page, "Apply Long Text");
     await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
@@ -152,7 +153,7 @@ test("Previous-Target Snapshot remains copyable after reload with no live Findin
       return result?.state;
     })).toBe("current");
     await page.reload();
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await waitForExtensionPanel(page);
     await waitForPreview(page);
     const markdown = await preview(page);
@@ -185,7 +186,7 @@ test("Restore conflicts keep the reload-required result available for copying", 
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await page.bringToFront();
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await click(page, "Apply Long Text");
     await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
     await page.$eval("#clipping-boundary", (element) => { element.textContent = "External change"; });

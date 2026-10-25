@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { triggerFixtureAction } from "../support/extension-action";
 import path from "node:path";
 import puppeteer, { type Browser, type Extension, type Page, type WebWorker } from "puppeteer-core";
 
@@ -70,7 +71,7 @@ for (const scenario of ["Long Text", "Unbreakable Text", "Large Text"] as const)
         await session.send("Network.enable");
         session.on("Network.requestWillBeSent", (event) => requests.push(event.request.url));
       }
-      await page.triggerExtensionAction(extension);
+      await triggerFixtureAction(page, extension);
       await expect.poll(() => panelText(page)).toContain(`Apply ${scenario}`);
       expect(await geometry(page)).toEqual(baselineGeometry);
       await click(page, `Apply ${scenario}`);
@@ -90,7 +91,7 @@ for (const scenario of ["Long Text", "Unbreakable Text", "Large Text"] as const)
         document.querySelector("[data-ui-torture-lab-overlay-root]")?.remove();
       });
       expect(await geometry(page)).toEqual(mutatedGeometry);
-      await page.triggerExtensionAction(extension);
+      await triggerFixtureAction(page, extension);
       await expect.poll(() => panelText(page)).toContain(`${scenario} Scenario active`);
       expect(await geometry(page)).toEqual(mutatedGeometry);
       await click(page, "Restore");
@@ -131,7 +132,7 @@ test("worker suspension loses transport but preserves local Restore and reconnec
   try {
     await page.goto("http://127.0.0.1:4173/page-exit/");
     await page.bringToFront();
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await expect.poll(() => panelText(page)).toContain("Apply Long Text");
     await click(page, "Apply Long Text");
     await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
@@ -156,7 +157,7 @@ test("worker suspension loses transport but preserves local Restore and reconnec
     extension = installed;
     await connectWorker();
     expect(await worker.evaluate(() => (globalThis as unknown as { fixtureWorkerMarker?: string }).fixtureWorkerMarker)).toBeUndefined();
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await expect.poll(() => panelText(page)).toContain("Run completed");
     await expect.poll(() => panelText(page)).not.toContain("Extension connection lost");
   } finally { await page.close(); }
@@ -182,7 +183,7 @@ test("extension runtime interruption leaves a visible limitation and local Page 
   try {
     await page.goto("http://127.0.0.1:4173/page-exit/");
     await page.bringToFront();
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await expect.poll(() => panelText(page)).toContain("Apply Long Text");
     await click(page, "Apply Long Text");
     await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");

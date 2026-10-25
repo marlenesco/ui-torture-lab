@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { triggerFixtureAction } from "../support/extension-action";
 import { waitForExtensionPanel } from "../support/extension-panel";
 import path from "node:path";
 import { executeAsyncInIsolated } from "../support/extension-script";
@@ -34,7 +35,7 @@ let serviceWorker: WebWorker;
 
 const triggerToolbarAction = async (page: Page): Promise<void> => {
   await test.step("Activate Long Text fixture tab", () => page.bringToFront(), { timeout: 5000 });
-  await test.step("Authorize Long Text fixture", () => page.triggerExtensionAction(extension), { timeout: 5000 });
+  await test.step("Authorize Long Text fixture", () => triggerFixtureAction(page, extension), { timeout: 5000 });
   await test.step("Mount Long Text fixture panel", () => waitForExtensionPanel(page), { timeout: 5000 });
 };
 

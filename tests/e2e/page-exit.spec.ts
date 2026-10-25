@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { attachAuthorizationTrace, triggerFixtureAction } from "../support/extension-action";
 import path from "node:path";
 import puppeteer, { type Browser, type Extension, type Page, type WebWorker } from "puppeteer-core";
 import { executeAsyncInIsolated } from "../support/extension-script";
@@ -29,8 +30,9 @@ const clickPanel = (page: Page, name: string): Promise<void> => page.locator(`::
 async function open(page: Page): Promise<void> {
   await page.goto("http://127.0.0.1:4173/page-exit/");
   await page.bringToFront();
-  await page.triggerExtensionAction(extension);
-  await expect.poll(() => panelText(page)).toContain("Apply Long Text");
+  await triggerFixtureAction(page, extension);
+  try { await expect.poll(() => panelText(page)).toContain("Apply Long Text"); }
+  catch (error) { await attachAuthorizationTrace(page); throw error; }
 }
 
 test("pagehide restores synchronously without waiting for messaging or UI", async () => {
@@ -50,7 +52,7 @@ test("pagehide restores synchronously without waiting for messaging or UI", asyn
     expect(result).toEqual({ text: "Checkout", later: "Continue" });
     await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })));
     expect(await page.$eval("#boundary", (element) => element.textContent)).toBe("Checkout");
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await expect.poll(() => panelText(page)).toContain("Apply Long Text");
     expect(await panelText(page)).toContain("Previous Target Snapshot");
   } finally { await page.close(); }
@@ -76,7 +78,7 @@ test("successful BFCache restoration preserves cleaned DOM and never resumes the
     await expect.poll(() => panelText(page)).toContain("Target Page authorization ended");
     expect(await panelText(page)).not.toContain("Apply Long Text");
     expect(await panelText(page)).not.toContain("Highlight subject");
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await expect.poll(() => panelText(page)).toContain("Apply Long Text");
     expect(await page.$eval("#boundary", (element) => element.textContent)).toBe("Checkout");
     await page.goForward();
@@ -92,7 +94,7 @@ test("reload retains only a Previous-Target Snapshot after an active Run", async
     await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
     await page.reload();
     expect(await page.$$("[data-ui-torture-lab-root]")).toHaveLength(0);
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await expect.poll(() => panelText(page)).toContain("Apply Long Text");
     expect(await panelText(page)).toContain("Previous Target Snapshot");
     expect(await page.$eval("#boundary", (element) => element.textContent)).toBe("Checkout");
@@ -164,11 +166,11 @@ test("a pagehide Restore conflict stays reload-required after a BFCache-like res
     })).toEqual({ text: "External text", later: "Continue" });
     await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })));
     await expect.poll(() => panelText(page)).toContain("Reload required");
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     expect(await panelText(page)).not.toContain("Apply Long Text");
     expect(await panelText(page)).toContain("Restore conflict");
     await page.reload();
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await expect.poll(() => panelText(page)).toContain("Apply Long Text");
   } finally { await page.close(); }
 });

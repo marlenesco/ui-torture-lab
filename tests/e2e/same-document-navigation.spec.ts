@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { triggerFixtureAction } from "../support/extension-action";
 import { waitForExtensionPanel } from "../support/extension-panel";
 import path from "node:path";
 import puppeteer, { type Browser, type Extension, type Page, type WebWorker } from "puppeteer-core";
@@ -39,7 +40,7 @@ async function isolated<T>(func: () => T | Promise<T>): Promise<T> {
 async function open(page: Page): Promise<void> {
   await page.goto("http://127.0.0.1:4173/same-document-navigation/");
   await page.bringToFront();
-  await page.triggerExtensionAction(extension);
+  await triggerFixtureAction(page, extension);
   await waitForExtensionPanel(page);
 }
 
@@ -164,7 +165,7 @@ for (const selector of ["#push", "#replace", "#state", "#fragment", "#router"] a
       expect(markdown).toContain("Page path: /same\\-document\\-navigation/");
       expect(markdown).not.toContain("Router-owned content");
       await expect.poll(storedLifecycle).toBe("previous");
-      await page.triggerExtensionAction(extension);
+      await triggerFixtureAction(page, extension);
       await expect.poll(() => panelText(page)).toContain("Apply Long Text");
       expect(await page.$eval("#boundary", (element) => element.textContent)).toBe(selector === "#router" ? "Router-owned content" : "Checkout");
       await clickPanel(page, "Apply Long Text");
@@ -195,12 +196,12 @@ test("a route transition with a Restore conflict blocks same-Document toolbar re
     await page.$eval("#push", (element) => (element as HTMLElement).click());
     await expect.poll(() => panelText(page)).toContain("Reload required");
     expect(await report(page)).toContain("Restore status: conflict");
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await expect.poll(() => panelText(page)).toContain("Reload required");
     expect(await panelText(page)).not.toContain("Apply Long Text");
     expect(await page.$eval("#boundary", (element) => element.textContent)).toBe("External text");
     await page.reload();
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await expect.poll(() => panelText(page)).toContain("Apply Long Text");
   } finally { await page.close(); }
 });
@@ -234,7 +235,7 @@ for (const transition of ["push", "state"] as const) {
           })) : send(message);
         return true;
       });
-      const action = page.triggerExtensionAction(extension);
+      const action = triggerFixtureAction(page, extension);
       await expect.poll(() => isolated(() => typeof (globalThis as unknown as { releaseSnapshotAck?: unknown }).releaseSnapshotAck)).toBe("function");
       await page.$eval(`#${transition}`, (element) => (element as HTMLElement).click());
       await isolated(() => { (globalThis as unknown as { releaseSnapshotAck(): void }).releaseSnapshotAck(); return true; });
@@ -242,7 +243,7 @@ for (const transition of ["push", "state"] as const) {
       await expect.poll(activeBadge).toBe("!");
       expect(await panelText(page)).not.toContain("Apply Long Text");
       expect(await page.$eval("#boundary", (element) => element.textContent)).toBe("Checkout");
-      await page.triggerExtensionAction(extension);
+      await triggerFixtureAction(page, extension);
       await expect.poll(() => panelText(page)).toContain("Apply Long Text");
     } finally { await page.close(); }
   });
@@ -266,7 +267,7 @@ for (const stage of [1, 2, 3]) {
           return result;
         };
       })()`);
-      await page.triggerExtensionAction(extension);
+      await triggerFixtureAction(page, extension);
       await expect.poll(activeBadge).toBe("!");
       const text = await page.evaluate(() => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent ?? "");
       expect(text).not.toContain("Apply Long Text");

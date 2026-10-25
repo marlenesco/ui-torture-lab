@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { triggerFixtureAction } from "../support/extension-action";
 import { waitForExtensionPanel } from "../support/extension-panel";
 import path from "node:path";
 import { executeAsyncInIsolated } from "../support/extension-script";
@@ -50,7 +51,7 @@ test("built extension groups the completed Finding under Text Clipping", async (
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await page.bringToFront();
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await waitForExtensionPanel(page);
     const panelText = () => page.evaluate(() => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent ?? "");
     await test.step("Apply Long Text through the built panel", async () => {
@@ -75,7 +76,7 @@ test("built extension inspects a live Finding without rematching a disconnected 
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await page.bringToFront();
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await waitForExtensionPanel(page);
 
     await page.evaluate(() => {
@@ -204,7 +205,7 @@ test("built extension shows containment and Viewport Overflow from Unbreakable T
   try {
     await page.goto("http://127.0.0.1:4173/horizontal-containment-run/");
     await page.bringToFront();
-    await page.triggerExtensionAction(extension);
+    await triggerFixtureAction(page, extension);
     await waitForExtensionPanel(page);
     await executeAsyncInIsolated(serviceWorker, async () => {
           type Controller = { startScenario(scenarioId: "unbreakable-text"): Promise<void> };
