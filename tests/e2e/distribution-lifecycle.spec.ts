@@ -127,7 +127,7 @@ for (const scenario of ["Long Text", "Unbreakable Text", "Large Text"] as const)
 }
 
 test("worker suspension loses transport but preserves local Restore and reconnects only on toolbar action", async () => {
-  const page = await browser.newPage();
+  let page = await browser.newPage();
   try {
     await page.goto("http://127.0.0.1:4173/page-exit/");
     await page.bringToFront();
@@ -136,17 +136,26 @@ test("worker suspension loses transport but preserves local Restore and reconnec
     await click(page, "Apply Long Text");
     await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
     const mutated = await page.$eval("#boundary", (element) => element.textContent);
-    const oldTarget = browser.targets().find((target) => target.type() === "service_worker" && target.url().includes(extensionId));
-    // The public Puppeteer API also detaches its debugger, which otherwise prevents worker termination.
+    const endpoint = browser.wsEndpoint();
+    await worker.evaluate(() => { (globalThis as unknown as { fixtureWorkerMarker: string }).fixtureWorkerMarker = "before-suspension"; });
+    // Close natively and release debugger ownership; Target identity is not a worker-heap lifetime.
     await worker.close();
-    await expect.poll(() => browser.targets().includes(oldTarget!)).toBe(false);
     await expect.poll(() => panelText(page)).toContain("Extension connection lost");
     expect(await page.$eval("#boundary", (element) => element.textContent)).toBe(mutated);
     await click(page, "Restore");
     expect(await page.$eval("#boundary", (element) => element.textContent)).toBe("Checkout");
     await expect.poll(() => preview(page)).toContain("Restore status: restored");
-    // Restore messaging wakes Chrome's worker; wait for its native listener registration before the simulated action.
+    // A fresh driver connection must observe the restarted heap, even if Chrome retains a Target identity.
+    await browser.disconnect();
+    browser = await puppeteer.connect({ browserWSEndpoint: endpoint, defaultViewport: null });
+    const resumed = (await browser.pages()).find((candidate) => candidate.url() === "http://127.0.0.1:4173/page-exit/");
+    if (resumed === undefined) throw new Error("Live fixture tab was lost during worker suspension");
+    page = resumed;
+    const installed = (await browser.extensions()).get(extensionId);
+    if (installed === undefined) throw new Error("Installed extension was lost during driver reconnection");
+    extension = installed;
     await connectWorker();
+    expect(await worker.evaluate(() => (globalThis as unknown as { fixtureWorkerMarker?: string }).fixtureWorkerMarker)).toBeUndefined();
     await page.triggerExtensionAction(extension);
     await expect.poll(() => panelText(page)).toContain("Run completed");
     await expect.poll(() => panelText(page)).not.toContain("Extension connection lost");

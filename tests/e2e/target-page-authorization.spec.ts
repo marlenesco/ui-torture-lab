@@ -589,11 +589,11 @@ test("a replacement Document creates a fresh runtime only after a new toolbar ac
 });
 
 test("a completed Run survives reload only as a non-live Previous Target Snapshot", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create snapshot fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
-    await page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment");
-    await triggerToolbarAction(page);
-    await page.waitForSelector("[data-ui-torture-lab-root]");
+    await test.step("Navigate to snapshot fixture", () => page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment"), { timeout: 5000 });
+    await test.step("Authorize snapshot fixture", () => triggerToolbarAction(page), { timeout: 5000 });
+    await test.step("Mount snapshot fixture panel", () => page.waitForSelector("[data-ui-torture-lab-root]", { timeout: 5000 }), { timeout: 5000 });
     await page.evaluate(() => {
       const start = [...(
         document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
@@ -617,8 +617,8 @@ test("a completed Run survives reload only as a non-live Previous Target Snapsho
       () => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent?.includes("Run completed") === true,
     );
 
-    await page.reload();
-    await triggerToolbarAction(page);
+    await test.step("Reload snapshot fixture", () => page.reload(), { timeout: 5000 });
+    await test.step("Authorize snapshot fixture", () => triggerToolbarAction(page), { timeout: 5000 });
     await page.waitForFunction(
       () => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent?.includes("Previous Target Snapshot") === true,
     );

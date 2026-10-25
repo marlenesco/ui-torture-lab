@@ -68,10 +68,10 @@ const panelText = (page: Page): Promise<string | null> => page.$eval(
 const click = (page: Page, name: string): Promise<void> => test.step(`Panel click: ${name}`, () => page.locator(`::-p-aria(${name})`).setTimeout(5000).click());
 
 async function completedRun(page: Page): Promise<void> {
-  await page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment");
-  await page.bringToFront();
-  await page.triggerExtensionAction(extension);
-  await page.waitForSelector("[data-ui-torture-lab-root]");
+  await test.step("Navigate to clipboard fixture", () => page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment"), { timeout: 5000 });
+  await test.step("Activate clipboard fixture tab", () => page.bringToFront(), { timeout: 5000 });
+  await test.step("Authorize clipboard fixture by toolbar", () => page.triggerExtensionAction(extension), { timeout: 5000 });
+  await test.step("Mount clipboard fixture panel", () => page.waitForSelector("[data-ui-torture-lab-root]", { timeout: 5000 }), { timeout: 5000 });
   await click(page, "Apply Long Text");
   await expect.poll(() => panelText(page)).toContain("Long Text Scenario active");
   await click(page, "Restore");
@@ -79,7 +79,7 @@ async function completedRun(page: Page): Promise<void> {
 }
 
 test("built extension copies the exact visible Markdown only on a user click after Restore", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await page.bringToFront();
@@ -107,7 +107,7 @@ test("built extension copies the exact visible Markdown only on a user click aft
 
 for (const mode of ["denied", "unavailable"] as const) {
   test(`built extension keeps full selectable Markdown when clipboard is ${mode}`, async () => {
-    const page = await browser.newPage();
+    const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
     try {
       await completedRun(page);
       const markdown = await preview(page);
@@ -137,7 +137,7 @@ for (const mode of ["denied", "unavailable"] as const) {
 }
 
 test("Previous-Target Snapshot remains copyable after reload with no live Finding actions", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
     await completedRun(page);
     const current = await preview(page);
@@ -169,7 +169,7 @@ test("Previous-Target Snapshot remains copyable after reload with no live Findin
 });
 
 test("Chrome copies the report through its native permissionless Clipboard API", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
     await completedRun(page);
     const markdown = await preview(page);
@@ -180,7 +180,7 @@ test("Chrome copies the report through its native permissionless Clipboard API",
 });
 
 test("Restore conflicts keep the reload-required result available for copying", async () => {
-  const page = await browser.newPage();
+  const page = await test.step("Create clipboard fixture tab", () => browser.newPage(), { timeout: 5000 });
   try {
     await page.goto("http://127.0.0.1:4173/text-clipping-run/");
     await page.bringToFront();
