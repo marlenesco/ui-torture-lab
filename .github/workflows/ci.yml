@@ -36,6 +36,13 @@ jobs:
       - name: Install Google Chrome for Playwright
         run: pnpm exec playwright install --with-deps chrome
 
+      - name: Record validation environment
+        run: |
+          node --version
+          pnpm --version
+          google-chrome --version
+          node --input-type=module -e 'import os from "node:os"; console.log(JSON.stringify({parallelism:os.availableParallelism(),memoryGiB:Math.round(os.totalmem()/2**30)}))'
+
       - name: Verify workspace
         run: pnpm check
 

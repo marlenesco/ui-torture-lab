@@ -15,21 +15,6 @@ let browser: Browser;
 let extension: Extension;
 let serviceWorker: WebWorker;
 
-type ChromeApi = {
-  readonly scripting: {
-    executeScript<TResult>(details: {
-      readonly func: () => TResult | Promise<TResult>;
-      readonly target: { readonly frameIds: number[]; readonly tabId: number };
-      readonly world: "ISOLATED";
-    }): Promise<Array<{ readonly result?: TResult }>>;
-  };
-  readonly tabs: {
-    query(details: { readonly active: true; readonly currentWindow: true }): Promise<
-      Array<{ readonly id?: number }>
-    >;
-  };
-};
-
 test.beforeAll(async () => {
   browser = await puppeteer.launch({
     executablePath: await puppeteer.executablePath("chrome"),
@@ -66,58 +51,19 @@ test("built extension groups the completed Finding under Text Clipping", async (
     await page.bringToFront();
     await page.triggerExtensionAction(extension);
     await page.waitForSelector("[data-ui-torture-lab-root]");
-    await executeAsyncInIsolated(serviceWorker, async () => {
-          type Controller = {
-            getSnapshot(): {
-              readonly findings: readonly { readonly locator: string }[];
-              readonly result: { readonly findings: readonly { readonly locator: string }[] } | null;
-            };
-            restore(): void;
-            startScenario(scenarioId: "long-text"): Promise<void>;
-          };
-          const runtime = (globalThis as typeof globalThis & {
-            [key: symbol]: { readonly runController?: Controller } | undefined;
-          })[Symbol.for("ui-torture-lab/document-runtime")];
-          if (runtime?.runController === undefined) {
-            throw new Error("Run Controller was not available");
-          }
-          await runtime.runController.startScenario("long-text");
-          return runtime.runController.getSnapshot().findings;
-        });
-    const activePanelText = await page.evaluate(
-      () =>
-        document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot
-          ?.textContent ?? "",
-    );
-    expect(activePanelText).toContain("Text Clipping");
-    expect(activePanelText).toContain("Boundary p#clipping-boundary");
-    const result = await serviceWorker.evaluate(async () => {
-      const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-      const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id === undefined) throw new Error("No active fixture tab was available");
-      const [injection] = await chromeApi.scripting.executeScript({
-        target: { tabId: tab.id, frameIds: [0] },
-        world: "ISOLATED",
-        func: () => {
-          type Controller = {
-            getSnapshot(): {
-              readonly result: { readonly findings: readonly { readonly locator: string }[] } | null;
-            };
-            restore(): void;
-          };
-          const runtime = (globalThis as typeof globalThis & {
-            [key: symbol]: { readonly runController?: Controller } | undefined;
-          })[Symbol.for("ui-torture-lab/document-runtime")];
-          if (runtime?.runController === undefined) throw new Error("Run Controller was not available");
-          runtime.runController.restore();
-          return runtime.runController.getSnapshot().result;
-        },
-      });
-      return injection?.result;
+    const panelText = () => page.evaluate(() => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent ?? "");
+    await test.step("Apply Long Text through the built panel", async () => {
+      await page.locator("::-p-aria(Apply Long Text)").setTimeout(5000).click();
+      await expect.poll(panelText).toContain("Long Text Scenario active");
     });
-    expect(result?.findings).toContainEqual(
-      expect.objectContaining({ locator: "p#clipping-boundary" }),
-    );
+    expect(await panelText()).toContain("Text Clipping");
+    expect(await panelText()).toContain("Boundary p#clipping-boundary");
+    await test.step("Restore through the built panel and retain grouped Evidence", async () => {
+      await page.locator("::-p-aria(Restore)").setTimeout(5000).click();
+      await expect.poll(panelText).toContain("Run completed");
+      expect(await panelText()).toContain("Text Clipping");
+      expect(await panelText()).toContain("Boundary p#clipping-boundary");
+    });
   } finally {
     await page.close();
   }

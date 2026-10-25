@@ -11,6 +11,7 @@ const loadBackground = async ({
   executeScript,
   liveTabs = [{ id: 42 }],
   session = new Map(),
+  afterAuthorization = async () => undefined,
 }) => {
   const messageListeners = [];
   const connectListeners = [];
@@ -57,6 +58,7 @@ const loadBackground = async ({
       async executeScript(details) {
         scriptCalls.push(details);
         if (details.args?.[0]?.startsWith("tab-session-")) {
+          await afterAuthorization();
           return [{ documentId: details.target.documentIds[0], frameId: 0, result: "mounted" }];
         }
         return executeScript(details);
@@ -893,4 +895,19 @@ test("a late older toolbar probe cannot replace the newer grant or its feedback"
   await old;
   assert.equal(JSON.stringify(background.session.get("ui-torture-lab:tab-session:42")), current);
   assert.equal(background.feedback.length, feedback);
+});
+
+test("a context ended before toolbar feedback cannot be reported as authorized", async () => {
+  let injection = 0;
+  const background = await loadBackground({
+    executeScript: async () => [{ frameId: 0, documentId: "document-1", result: ++injection === 1
+      ? { type: "target-probe-response", status: "matched", protocol: "http:" }
+      : { type: "target-bootstrap-response", status: "bootstrapped", protocol: "http:", contentType: "text/html", topLevel: true } }],
+    afterAuthorization: async () => {
+      await background.invokeGrantedMessage({ type: "invalidate-page-grant", page: { origin: "http://127.0.0.1:4173", pathname: "/smoke/" }, result: null }, { tab: { id: 42 }, frameId: 0, documentId: "document-1" });
+    },
+  });
+  await background.invokeToolbar({ id: 42, url: "http://127.0.0.1:4173/smoke/" });
+  assert.equal(background.session.get("ui-torture-lab:tab-session:42").documentId, null);
+  assert.equal(background.feedback.filter(([kind]) => kind === "badge").at(-1)[1].text, "");
 });

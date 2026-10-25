@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "@playwright/test";
+import { executeAsyncInIsolated } from "../support/extension-script";
 import path from "node:path";
 import puppeteer, { type Browser, type Extension, type Page, type WebWorker } from "puppeteer-core";
 
@@ -9,14 +10,7 @@ type ClipboardProbe = { readonly writes: readonly string[]; readonly gestures: r
 type ChromeApi = {
   readonly storage: { readonly session: { get(key: null): Promise<Record<string, unknown>> } };
   readonly tabs: { query(details: { active: true; currentWindow: true }): Promise<{ id?: number }[]> };
-  readonly scripting: {
-    executeScript(details: {
-      target: { tabId: number; frameIds: number[] };
-      world: "ISOLATED";
-      args: ClipboardMode[];
-      func: (mode: ClipboardMode) => ClipboardProbe;
-    }): Promise<{ result?: ClipboardProbe }[]>;
-  };
+
 };
 
 test.describe.configure({ mode: "serial" });
@@ -41,31 +35,23 @@ test.beforeAll(async () => {
 test.afterAll(async () => { await browser?.close(); });
 
 // Replace only the external Clipboard API in the same world as the installed extension.
-const clipboardProbe = (mode: ClipboardMode): Promise<ClipboardProbe> => worker.evaluate(async (mode) => {
-  const chromeApi = (globalThis as unknown as { chrome: ChromeApi }).chrome;
-  const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
-  if (tab?.id === undefined) throw new Error("Fixture tab unavailable");
-  const [injection] = await chromeApi.scripting.executeScript({
-    target: { tabId: tab.id, frameIds: [0] }, world: "ISOLATED", args: [mode],
-    func: (mode) => {
-      const scope = globalThis as unknown as { clipboardProbe?: { writes: string[]; gestures: boolean[] } };
-      const probe = scope.clipboardProbe ??= { writes: [], gestures: [] };
-      Object.defineProperty(navigator, "clipboard", {
-        configurable: true,
-        value: mode === "unavailable" ? undefined : {
-          writeText: async (value: string) => {
-            probe.writes.push(value);
-            probe.gestures.push(navigator.userActivation.isActive);
-            if (mode === "denied") throw new DOMException("Clipboard denied", "NotAllowedError");
-          },
+const clipboardProbe = (mode: ClipboardMode): Promise<ClipboardProbe> => test.step(`Clipboard probe: ${mode}`, () =>
+  executeAsyncInIsolated(worker, async (mode: ClipboardMode) => {
+    const scope = globalThis as unknown as { clipboardProbe?: { writes: string[]; gestures: boolean[] } };
+    const probe = scope.clipboardProbe ??= { writes: [], gestures: [] };
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: mode === "unavailable" ? undefined : {
+        writeText: async (value: string) => {
+          probe.writes.push(value);
+          probe.gestures.push(navigator.userActivation.isActive);
+          if (mode === "denied") throw new DOMException("Clipboard denied", "NotAllowedError");
         },
-      });
-      return probe;
-    },
-  });
-  if (injection?.result === undefined) throw new Error("Clipboard probe unavailable");
-  return injection.result;
-}, mode);
+      },
+    });
+    return probe;
+  }, mode),
+);
 
 const preview = (page: Page): Promise<string> => page.$eval(
   '[data-ui-torture-lab-root] >>> textarea[aria-label="Markdown preview"]',
@@ -79,7 +65,7 @@ const waitForPreview = (page: Page): Promise<void> => expect.poll(() => page.eva
 const panelText = (page: Page): Promise<string | null> => page.$eval(
   "[data-ui-torture-lab-root]", (host) => host.shadowRoot?.textContent ?? null,
 );
-const click = (page: Page, name: string): Promise<void> => page.locator(`::-p-aria(${name})`).setTimeout(5000).click();
+const click = (page: Page, name: string): Promise<void> => test.step(`Panel click: ${name}`, () => page.locator(`::-p-aria(${name})`).setTimeout(5000).click());
 
 async function completedRun(page: Page): Promise<void> {
   await page.goto("http://127.0.0.1:4173/text-clipping-run/?private=query#fragment");

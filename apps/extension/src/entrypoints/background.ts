@@ -291,6 +291,7 @@ export default defineBackground(() => {
       await enqueueTab(tabId, async () => {
         const session = await readTabSession(tabId);
         if (!isLatest() || (grantId !== null && session?.grantId !== grantId)) return;
+        if (response.status === "authorized" && session?.documentId !== response.documentId) return;
         if (response.status !== "authorized" && session !== null) await writeTabSession(tabId, { ...session, documentId: null });
         if (!isLatest()) return;
         if (response.status === "authorized" && grantId !== null && reachability.isActive(tabId, grantId)) await showRunActivity(tabId, true);

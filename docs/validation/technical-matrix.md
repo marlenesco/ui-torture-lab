@@ -75,3 +75,11 @@ The temporary checkout and its processes were removed after verification. Local 
 ## Candidate review follow-up
 
 Independent standards/spec review found and corrected pending-authorization navigation races, reentrant Restore, stale pre-build release metadata, and a missing capture-API regression guard. See [candidate-review.md](candidate-review.md). The complete local check components after these corrections and transient-attempt cleanup passed 66 contract tests and 166 E2E tests (24.9 seconds), lint, strict types, build, and artifact checks. These follow-up results supersede the earlier automated test counts for the current code candidate; public CI and human launch gates are recorded separately.
+
+## Public Linux CI and stability follow-up
+
+[The first public candidate run](https://github.com/marlenesco/ui-torture-lab/actions/runs/40148667312) at `efcab568ffc1dc5e267c2786056f774f87feafbc` completed successfully on the declared Node 24.13.1 and pnpm 11.20.0. Playwright installed Google Chrome stable 156.0.8078.47 on the Ubuntu runner, which is newer than the local macOS 155 benchmark. Two tests required retries (clipboard-unavailable fallback and grouped Text Clipping), so that green result is not a clean stability sign-off.
+
+The follow-up uses the public panel for the grouping test and the existing bounded ISOLATED request/collect helper for clipboard probes. Five repetitions of the two affected files passed all 45 tests locally without retries. CI uses two workers to limit concurrent browser pressure, records actual tool/browser/resource versions, and fails on flaky tests even when a retry passes. Timeouts and retry counts were not increased. The current PR's latest strict CI result is the authority for candidate readiness; an earlier successful run with flakiness must not be substituted.
+
+An additional trusted-context regression ensures Page Exit or route invalidation between native mounting and toolbar feedback cannot later display a stale authorized badge. The updated contract suite passes 67 tests. Manual platform smoke checks, protected release source/tag evidence, deployment and Product Validation remain open.

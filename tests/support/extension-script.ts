@@ -4,7 +4,7 @@ import { expect } from "@playwright/test";
 import type { WebWorker } from "puppeteer-core";
 
 /** Starts work in ISOLATED, then collects its result through bounded synchronous injections. */
-export async function executeAsyncInIsolated<T>(worker: WebWorker, work: () => Promise<T>): Promise<T> {
+export async function executeAsyncInIsolated<T, Args extends unknown[]>(worker: WebWorker, work: (...args: Args) => Promise<T>, ...args: Args): Promise<T> {
   const key = `ui-torture-lab/test-task/${crypto.randomUUID()}`;
   const tabId = await worker.evaluate(async () => {
     const api = (globalThis as unknown as { chrome: { tabs: { query(query: object): Promise<{ id?: number }[]> } } }).chrome;
@@ -18,7 +18,7 @@ export async function executeAsyncInIsolated<T>(worker: WebWorker, work: () => P
       const key = Symbol.for(${JSON.stringify(key)});
       globalThis[key] = { status: "pending" };
       const work = ${work.toString()};
-      void work().then(
+      void work(...${JSON.stringify(args)}).then(
         (value) => { globalThis[key] = { status: "completed", value }; },
         (error) => { globalThis[key] = { status: "failed", error: String(error) }; }
       );

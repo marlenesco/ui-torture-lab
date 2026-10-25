@@ -40,3 +40,5 @@ pnpm test:e2e --workers=4
 Runtime and platform limits remain those in the [navigation](same-document-navigation.md) and [Page Exit](page-exit-bfcache.md) benchmarks. Cross-platform manual validation and release publication are separate launch gates.
 
 Milestone validation on Chrome 155.0.8059.85/macOS: lint, strict type checking, production build, 38 contract tests, and 141 E2E tests passed. The public workflow exposed an empty `style` attribute left by Large Text Restore; Restore now removes only that introduced empty attribute, preserving pre-existing attributes and external style properties.
+
+Hosted CI records its actual Node/pnpm/Chrome/resource versions, uses two workers, and treats flaky tests as failures even when a retry passes. Local validation defaults to four workers. Clipboard probes use the bounded ISOLATED request/collect helper, and the grouped Text Clipping workflow uses public panel controls. Named clipboard/click steps improve timeout diagnostics.
