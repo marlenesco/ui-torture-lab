@@ -610,6 +610,7 @@ test("a replacement Document creates a fresh runtime only after a new toolbar ac
       "http://127.0.0.1:4173/extension-ui-contamination/";
     await page.goto(fixtureUrl);
     await triggerToolbarAction(page);
+    await waitForExtensionPanel(page);
     const previousRuntimeId = await page.$eval(
       "[data-ui-torture-lab-root]",
       (host) => (host as HTMLElement).dataset.uiTortureLabRuntimeId,
