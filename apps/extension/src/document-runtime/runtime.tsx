@@ -5,6 +5,7 @@ import { createRunController, type MarkdownReportInput, type TargetEndReason, ty
 import { browser, type Browser } from "wxt/browser";
 import { ExtensionPanel } from "./panel";
 import { panelCss } from "./panel-style";
+import { DiagnosticHighlights } from "./diagnostic-highlights";
 import {
   isStoredRunResult,
   pageMetadataFor,
@@ -100,7 +101,6 @@ type Rect = {
 };
 
 type FindingAction =
-  | "copy-locator"
   | "highlight-ranges"
   | "highlight-subject"
   | "navigate";
@@ -194,7 +194,7 @@ class DocumentRuntime {
   readonly runtimeId = crypto.randomUUID();
   runController: RunController;
   private readonly ownership = new ExtensionDomOwnership();
-  private readonly diagnosticHighlights = new Set<HTMLElement>();
+  private readonly diagnosticHighlights = new DiagnosticHighlights(this.document, () => this.ensureOverlay().container);
   private readonly invalidLiveFindings = new Set<
     ReturnType<RunController["getSnapshot"]>["findings"][number]
   >();
@@ -235,7 +235,9 @@ class DocumentRuntime {
     this.unsubscribeEngine = controller.subscribe(() => {
       const snapshot = controller.getSnapshot();
       if (snapshot.phase !== "ready-for-inspection") {
+        this.clearDiagnosticHighlights();
         this.invalidLiveFindings.clear();
+        if (this.reachabilityBound) this.liveFindingMessage = null;
       }
       if (!this.ending && this.authorized && snapshot.result !== null && snapshot.result !== this.storedResult) {
         this.storedResult = snapshot.result;
@@ -349,27 +351,10 @@ class DocumentRuntime {
   }
 
   showDiagnosticHighlight(rect: Rect, kind: "range" | "subject" = "subject"): void {
-    const overlay = this.ensureOverlay();
-    const highlight = document.createElement("div");
-    highlight.dataset.uiTortureLabHighlight = "";
-    highlight.dataset.uiTortureLabHighlightKind = kind;
-    highlight.style.cssText = [
-      "position:fixed",
-      `inset:${rect.y}px auto auto ${rect.x}px`,
-      `width:${rect.width}px`,
-      `height:${rect.height}px`,
-      "box-sizing:border-box",
-      "border:2px solid #d7f36b",
-      "pointer-events:none",
-    ].join(";");
-    overlay.container.append(highlight);
-    this.diagnosticHighlights.add(highlight);
+    this.diagnosticHighlights.show(rect, kind);
   }
 
   clearDiagnosticHighlights(): void {
-    for (const highlight of this.diagnosticHighlights) {
-      highlight.remove();
-    }
     this.diagnosticHighlights.clear();
   }
 
@@ -378,11 +363,6 @@ class DocumentRuntime {
     action: FindingAction,
   ): void {
     if (!this.authorized) return;
-    if (action === "copy-locator") {
-      this.selectDiagnosticLocator(finding.locator);
-      return;
-    }
-
     const reference = this.runController.getLiveFindingReference(finding);
     if (reference === null) {
       this.disableFindingActions(finding);
@@ -400,32 +380,38 @@ class DocumentRuntime {
     }
 
     if (action === "navigate") {
-      subject.scrollIntoView({ block: "center", inline: "nearest" });
+      subject.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
       this.setLiveFindingMessage(`Navigated to ${finding.locator}.`);
       return;
     }
 
-    this.clearDiagnosticHighlights();
-    if (action === "highlight-subject") {
-      this.showDiagnosticHighlight(subject.getBoundingClientRect(), "subject");
-      this.setLiveFindingMessage(`Highlighted ${finding.locator}.`);
-      return;
-    }
-
-    const rectangles = reference.affectedRanges.flatMap((target) => {
-      if (!target.isConnected || target.ownerDocument !== this.document) return [];
-      const range = this.document.createRange();
-      range.selectNodeContents(target);
-      return [...range.getClientRects()];
-    });
-    if (rectangles.length === 0) {
+    const kind = action === "highlight-subject" ? "subject" : "range";
+    const firstTarget = kind === "subject" ? subject : reference.affectedRanges[0]?.parentElement;
+    if (firstTarget === null || firstTarget === undefined) {
       this.disableFindingActions(finding);
       return;
     }
-    for (const rectangle of rectangles) {
-      this.showDiagnosticHighlight(rectangle, "range");
+    firstTarget.scrollIntoView({ block: kind === "subject" ? "center" : "start", inline: "center", behavior: "instant" });
+    const shown = this.diagnosticHighlights.follow(kind, () => {
+      const current = this.runController.getLiveFindingReference(finding);
+      const currentSubject = current?.subject ?? current?.primaryContributor;
+      if (!this.authorized || current === null || !currentSubject?.isConnected || currentSubject.ownerDocument !== this.document) {
+        this.disableFindingActions(finding);
+        return null;
+      }
+      if (kind === "subject") return [currentSubject.getBoundingClientRect()];
+      return current.affectedRanges.flatMap(target => {
+        if (!target.isConnected || target.ownerDocument !== this.document) return [];
+        const range = this.document.createRange();
+        range.selectNodeContents(target);
+        return [...range.getClientRects()];
+      });
+    });
+    if (!shown) {
+      this.disableFindingActions(finding);
+      return;
     }
-    this.setLiveFindingMessage("Highlighted affected ranges.");
+    this.setLiveFindingMessage(kind === "subject" ? `Highlighted ${finding.locator}.` : "Highlighted affected ranges.");
   }
 
   async withMeasurementSafeUi<T>(measure: () => T | Promise<T>): Promise<T> {
@@ -448,9 +434,7 @@ class DocumentRuntime {
     return {
       diagnosticHighlightCount: this.diagnosticHighlights.size,
       diagnosticHighlightsRendered: overlayRendered
-        ? [...this.diagnosticHighlights].filter((highlight) =>
-            highlight.isConnected
-          ).length
+        ? this.diagnosticHighlights.connectedCount
         : 0,
       ownedRootCount: this.ownership.size,
       overlayRendered,
@@ -539,22 +523,9 @@ class DocumentRuntime {
   private disableFindingActions(
     finding: ReturnType<RunController["getSnapshot"]>["findings"][number],
   ): void {
+    this.clearDiagnosticHighlights();
     this.invalidLiveFindings.add(finding);
     this.setLiveFindingMessage("Live Finding reference is no longer available.");
-  }
-
-  private selectDiagnosticLocator(locator: string): void {
-    const locatorElement = [...(this.panel?.shadow.querySelectorAll<HTMLElement>(
-      "[data-ui-torture-lab-diagnostic-locator]",
-    ) ?? [])].find((element) => element.textContent === locator);
-    if (locatorElement === undefined) return;
-
-    const selection = this.document.getSelection();
-    if (selection === null) return;
-    const range = this.document.createRange();
-    range.selectNodeContents(locatorElement);
-    selection.removeAllRanges();
-    selection.addRange(range);
   }
 
   private storeCurrentRunResult(

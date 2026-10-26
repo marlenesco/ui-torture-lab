@@ -157,14 +157,11 @@ test("built extension inspects a live Finding without rematching a disconnected 
           ) !== null,
     );
 
-    await page.evaluate(() => {
-      document
-        .querySelector("[data-ui-torture-lab-root]")
-        ?.shadowRoot?.querySelector<HTMLButtonElement>(
-          '[aria-label="Copy diagnostic locator p#clipping-boundary"]',
-        )
-        ?.click();
+    await executeAsyncInIsolated(serviceWorker, async () => {
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
     });
+    await page.locator("::-p-aria(Copy locator p#clipping-boundary)").setTimeout(5000).click();
+    await page.waitForFunction(() => document.querySelector("[data-ui-torture-lab-root]")?.shadowRoot?.textContent?.includes("Locator selected"));
     expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(
       "p#clipping-boundary",
     );
@@ -195,6 +192,7 @@ test("built extension inspects a live Finding without rematching a disconnected 
           )?.disabled,
       ),
     ).toBe(true);
+    expect(await page.evaluate(() => document.querySelector("[data-ui-torture-lab-overlay-root]")?.shadowRoot?.querySelectorAll("[data-ui-torture-lab-highlight]").length ?? 0)).toBe(0);
   } finally {
     await page.close();
   }

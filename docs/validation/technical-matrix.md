@@ -87,3 +87,13 @@ Unsafe Restore, false attribution, undeclared retention, unexpected extension re
 Cloudflare deployment/preview/rollback evidence is recorded under #25. The owner replaced the human-participant launch criterion in #28 with [six explicitly simulated professional-role reviews](product/2026-10-26-simulated-review.md); human usability remains unverified. Official Distribution (#29) remains pending. Main protection was enabled and [read back on 2026-10-26](records/2026-10-26-main-protection.json). Canonical Store identity, final tag and release-record validation remain prerequisites. The Pages GitHub App was explicitly authorized for only this repository. No tags, Store submission or release publication were performed.
 
 The 2026-10-25 macOS session reported disconnected and overlapping control panels. [Runtime generation recovery](runtime-generation-recovery.md) records the synthetic reproduction, conservative admission correction, and manual retest requirement. This report does not complete a platform sign-off.
+
+## 2026-10-26 manual highlight follow-up
+
+The operator's current macOS session identified invisible or misplaced diagnostic
+highlights and a rectangle remaining after Restore. The actual target was the
+public Pages preview, so those reports are not controlled-fixture passes.
+[Inspection highlight recovery](inspection-highlight-recovery.md) records the
+independent native reproduction, correction and automated regressions. Resume
+manual validation on the corrected artifact with recorded source and hashes;
+previous draft ZIPs are superseded. Issue #26 and the technical gate remain open.

@@ -7,8 +7,8 @@ synthetic workspace page. Use them in order:
 2. `02-inspect.png`: active Long Text, measured Text Clipping Evidence and the
    highlighted boundary. The count and geometry come from the real Engine.
 3. `03-report.png`: exact original page content restored, retained Evidence and
-   Download Report with its Markdown preview collapsed. The selected diagnostic
-   boundary is still highlighted; the screenshot preserves the real UI state.
+   Download Report with its Markdown preview collapsed. Restore clears the
+   diagnostic highlight; the screenshot preserves the real UI state.
 
 `capture.json` records the extension source commit, browser, viewport, fixture
 hash, extension artifact hashes and screenshot hashes. Capture uses a temporary

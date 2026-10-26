@@ -1,0 +1,3 @@
+# ADR-0033: Explain panel actions and copy diagnostic Locators on explicit click
+
+The Extension UI provides a plain information icon opening an offline, dismissible Quick guide to Scenarios, inspection, locator ambiguity, Restore and report download; the guide stays inside measurement-owned UI. Copy locator attempts to write only the displayed diagnostic label during a trusted active user gesture, with exact-label selection when Clipboard access is unavailable or rejected; no Clipboard read, automatic copy, unique-selector claim or additional permission is introduced. This extends ADR-0031 with a narrowly scoped locator-copy capability: Markdown Reports remain explicit local downloads, and user-managed clipboard copies remain outside extension retention.

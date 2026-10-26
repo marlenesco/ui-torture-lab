@@ -2,7 +2,7 @@
 
 Prepared for the 1.0.0 candidate on 2026-10-26. These are draft materials, not a
 record of dashboard entry, owner certification, Google review or publication.
-Developer registration remains pending according to the owner.
+The owner reported developer registration complete; dashboard fields and certification remain pending.
 
 ## Listing and distribution
 
@@ -61,7 +61,7 @@ Data-practice facts to use when completing the actual questionnaire:
 | Temporary original values | Kept in memory for conflict-aware Restore and released at Run end |
 | Session result | Numeric Evidence, diagnostic Locators, short redacted excerpts, origin and pathname; query/fragment omitted; one reduced result per tab |
 | External transmission | No extension application network request, project-server upload, telemetry, advertising or sale of result data |
-| Export | Explicit local Markdown download only; its user-managed file survives extension retention cleanup |
+| Export | Explicit local Markdown report download and click-triggered diagnostic locator copying with manual-selection fallback; user-managed files and clipboard copies survive extension retention cleanup |
 | Hidden collection/capture | No automatic screenshot, form-value export, full-text serialization or hidden export fields |
 
 The owner must review the dashboard's current data-category definitions and

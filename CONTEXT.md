@@ -163,6 +163,10 @@ _Avoid_: Rich export, hidden payload
 The explicit user action that saves exactly the visible Markdown Report as a local Markdown file controlled by the user.
 _Avoid_: Copy Report, automatic export
 
+**Copy locator**:
+The explicit user action that copies a displayed diagnostic Locator to the clipboard, with manual selection when copying is unavailable. The copied label remains diagnostic metadata rather than a guaranteed unique selector.
+_Avoid_: Copy Report, unique element identity
+
 **Previous-Target Snapshot**:
 A Current Run Result retained after its Explicit Page Grant is invalidated by reload, document replacement, or observed same-document navigation. It remains available for evidence inspection only, with all live DOM actions disabled and no attempt to rematch its elements even when the same Document survives.
 _Avoid_: Live result, previous-document only
@@ -365,7 +369,7 @@ The exact same page element instance measured in the Baseline and while Mutation
 _Avoid_: CSS selector, DOM node
 
 **Locator**:
-Diagnostic metadata that helps a developer find or inspect an element. A Locator describes an element but does not prove its identity across measurements.
+Diagnostic metadata that helps a developer find or inspect an element. A Locator describes an element but does not prove its identity across measurements or guarantee a unique selector; multiple elements may share the same label.
 _Avoid_: Element identity, rematching key
 
 **Inconclusive Result**:

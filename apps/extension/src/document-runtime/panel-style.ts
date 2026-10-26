@@ -276,6 +276,44 @@ export const panelCss = `
     color: var(--panel-muted);
     cursor: pointer;
   }
+  .panel-plain-button {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 26px;
+    inline-size: 26px;
+    block-size: 30px;
+    padding: 4px;
+    border: 0;
+    background: transparent;
+    color: var(--panel-muted);
+    cursor: pointer;
+  }
+  .panel-plain-button:hover,
+  .panel-plain-button[aria-expanded="true"] {
+    color: var(--panel-accent);
+  }
+  .panel-help {
+    margin-block-start: 14px;
+    padding: 12px;
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+    background: #12160f;
+    font-size: 12px;
+  }
+  .panel-help-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-help dl { margin: 4px 0 12px; }
+  .panel-help dt { margin-block-start: 10px; font-weight: 600; }
+  .panel-help dd { margin: 3px 0 0; color: var(--panel-muted); }
+  .locator-copy { display: contents; }
+  .locator-copy-status { flex-basis: 100%; color: var(--panel-muted); }
+  .locator-copy-status:empty { display: none; }
   .markdown-preview-toggle:hover,
   .markdown-preview-toggle[aria-expanded="true"] {
     color: var(--panel-accent);

@@ -40,6 +40,10 @@ the exact uploaded ZIP and its hash with the final release evidence.
 
 ## Remaining release gates
 
+- [ ] Merge the inspection-highlight correction and retest the selected corrected
+  artifact with the real toolbar. Earlier draft ZIPs are superseded; use the
+  updated [manual preparation](../validation/manual-platform-smoke.md) and
+  [recovery record](../validation/inspection-highlight-recovery.md).
 - [ ] Complete and record the remaining installed-extension/manual Chrome stable
   checks on macOS, Windows and Linux in
   [issue #26](https://github.com/marlenesco/ui-torture-lab/issues/26).
