@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "5043d8711a8738a6ba43f7f7ee1bbdab59baa855",
+  "sourceCommit": "80955940957a5fe7207f5489eed0afd18568fd87",
   "version": "1.0.0",
   "browser": "Chrome/155.0.8059.85",
   "node": "24.13.1",
@@ -14,24 +14,24 @@
   "hashes": {
     "manifest.json": "67c6456a70e0ab3fc28fc0eb5fbe640b320890f4e6250b91cd53754cd0bd0d95",
     "background.js": "908907958c94aeaeb7d29c945573973546d1d3d6a13f56fa152aa1a7789ae371",
-    "document-runtime.js": "f507e571425cb93341c438482a26903c54e7ec31d321c1d4f947a1bf4b0a2ec0",
+    "document-runtime.js": "9784205b68300114c4fc5e08e8e8c5f267bd5c5d480d662878161feeea228047",
     "THIRD_PARTY_NOTICES.txt": "a07adcdadecf99d61fac82c73ee9953c85588a8362d9d06969e3498ac3978939"
   },
   "images": [
     {
       "file": "docs/distribution/store-assets/01-authorize.png",
       "state": "Authorized, before applying a Scenario",
-      "sha256": "2cdb187d9c11d154d24243144582ae743d25f24355d851f08e5f0fcec549ec72"
+      "sha256": "d3037943a6b9e8800f8337f6959b70ccebaad9c2eea8d9e9420d0cc859740472"
     },
     {
       "file": "docs/distribution/store-assets/02-inspect.png",
       "state": "Long Text active, measured Text Clipping Finding and highlighted subject",
-      "sha256": "e5a2e7878fad66336d035db39f417ddb154bf989b0aedb6347c5027efb5d8332"
+      "sha256": "b983740c5d7ca95d5c1c59831d90f9edd3f094b84753b6b79694b34a39f97879"
     },
     {
       "file": "docs/distribution/store-assets/03-report.png",
       "state": "Restored, Download Report available, Markdown preview collapsed",
-      "sha256": "c833e31b3d7ee83c0f24b83f6a8b8d71d581a41a06b5e9a449a21036e0cdbb94"
+      "sha256": "8a5246d01969f80da9479a7c470516243487519b10bb0beff9c23add30f4cce3"
     }
   ]
 }
