@@ -67,6 +67,7 @@ export function inspectJavaScript(code, { requireInjection = false, firstParty =
       if (["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "WebTransport", "sendBeacon", "importScripts", "eval", "Function", "captureVisibleTab", "captureTab", "chooseDesktopMedia", "getDisplayMedia", "getUserMedia", "captureStream"].includes(name) || expression.kind === ts.SyntaxKind.ImportKeyword) report(node, `unauthorized runtime capability ${name || "dynamic import"}`);
       if (name === "capture" && /(?:tabCapture|desktopCapture|pageCapture)/u.test(expression.getText(source))) report(node, "media or page capture is not authorized");
       if (["readText", "execCommand"].includes(name)) report(node, "clipboard reads and legacy clipboard commands are not authorized");
+      if (["read", "write"].includes(name) && /clipboard/iu.test(expression.getText(source))) report(node, "rich clipboard access is not authorized");
       if (firstParty && name === "writeText" && filename !== "apps/extension/src/document-runtime/locator-clipboard.ts") report(node, "clipboard writes belong only to the explicit locator-copy boundary");
       if (name === "CustomEvent") report(node, "CustomEvent page bridge is not authorized");
       if (name === "postMessage" && (!ts.isPropertyAccessExpression(expression) || /^(?:window|self|globalThis)$/u.test(expression.expression.getText(source)))) report(node, "window postMessage bridge is not authorized");

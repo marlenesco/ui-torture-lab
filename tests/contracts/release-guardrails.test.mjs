@@ -54,7 +54,7 @@ test("clipboard capability stays confined to explicit locator copying without re
   assert.deepEqual(inspectJavaScript("const clipboard = navigator.clipboard;", { firstParty: true, filename: ui }), []);
   assert.deepEqual(inspectJavaScript("boundary.clipboard.writeText(locator);", { firstParty: true, filename: boundary }), []);
   for (const source of ["navigator.clipboard", 'navigator["clipboard"]', "clipboard.writeText(text)"]) assert.ok(inspectJavaScript(source, { firstParty: true, filename: "apps/extension/src/other.ts" }).length > 0);
-  for (const source of ["navigator.clipboard.readText()", 'clipboard["readText"]()', 'document.execCommand("copy")']) {
+  for (const source of ["navigator.clipboard.readText()", "navigator.clipboard.read()", "navigator.clipboard.write(items)", 'clipboard["readText"]()', 'document.execCommand("copy")']) {
     assert.ok(inspectJavaScript(source, { firstParty: true, filename: ui }).length > 0);
     assert.ok(inspectJavaScript(source).length > 0);
   }

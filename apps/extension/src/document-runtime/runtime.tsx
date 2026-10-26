@@ -237,6 +237,7 @@ class DocumentRuntime {
       if (snapshot.phase !== "ready-for-inspection") {
         this.clearDiagnosticHighlights();
         this.invalidLiveFindings.clear();
+        if (this.reachabilityBound) this.liveFindingMessage = null;
       }
       if (!this.ending && this.authorized && snapshot.result !== null && snapshot.result !== this.storedResult) {
         this.storedResult = snapshot.result;

@@ -6,6 +6,8 @@ with a titled, nonmodal Quick guide. It explains Scenarios, boundaries and range
 locator ambiguity, Restore, collapse/close, report preview/download and saved-result
 cleanup. Escape and the guide close control return focus to the information icon.
 The guide remains inside extension-owned measurement-safe UI.
+Run end clears stale inspection feedback while preserving a lost-connection
+warning when the extension transport is unavailable.
 
 Copy locator attempts only the displayed label on a trusted active user gesture,
 without a new extension permission or clipboard read. Successful writes receive
@@ -21,6 +23,9 @@ guide open or closed, collapse/close cleanup, trusted versus synthetic clicks,
 copy feedback and duplicate-label fallback. Clipboard tests mock only the native
 write boundary in the extension's ISOLATED world; they neither read nor modify
 the operating-system clipboard and do not constitute manual permission sign-off.
+The stale post-Restore inspection message was reproduced by a failing native
+assertion before correction; afterward, 24 inspection/guide/Page Exit cases and
+release guards passed, including preservation of connection-loss feedback.
 
 Technical Validation in issue #26 remains pending. Native manual copying, guide
 usability and the remaining macOS/Windows/Linux checklist require the selected

@@ -85,6 +85,9 @@ for (const action of ["Restore", "Close UI Torture Lab", "Observed navigation"] 
     await page.setViewport({ width: 800, height: 600 });
     await paint(page);
     expect((await geometry(page, "#boundary")).highlight).toBeNull();
+    if (action === "Restore") {
+      expect(await page.$eval('[data-ui-torture-lab-root]', host => host.shadowRoot?.textContent)).not.toContain("Highlighted p#boundary.");
+    }
     if (action === "Close UI Torture Lab") expect(await page.$$("[data-ui-torture-lab-root], [data-ui-torture-lab-overlay-root]")).toHaveLength(0);
   }));
 }
