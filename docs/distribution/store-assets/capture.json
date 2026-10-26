@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "7b579c0662d1454ca92836761b9f85bb79748ad6",
+  "sourceCommit": "5043d8711a8738a6ba43f7f7ee1bbdab59baa855",
   "version": "1.0.0",
   "browser": "Chrome/155.0.8059.85",
   "node": "24.13.1",
@@ -14,7 +14,7 @@
   "hashes": {
     "manifest.json": "67c6456a70e0ab3fc28fc0eb5fbe640b320890f4e6250b91cd53754cd0bd0d95",
     "background.js": "908907958c94aeaeb7d29c945573973546d1d3d6a13f56fa152aa1a7789ae371",
-    "document-runtime.js": "524fdfd1d0f60922963ca6ddd53ee29dbb30760d617e54db43c09e969c57145f",
+    "document-runtime.js": "f507e571425cb93341c438482a26903c54e7ec31d321c1d4f947a1bf4b0a2ec0",
     "THIRD_PARTY_NOTICES.txt": "a07adcdadecf99d61fac82c73ee9953c85588a8362d9d06969e3498ac3978939"
   },
   "images": [
@@ -31,7 +31,7 @@
     {
       "file": "docs/distribution/store-assets/03-report.png",
       "state": "Restored, Download Report available, Markdown preview collapsed",
-      "sha256": "551c3dd94da411706c08a8bea85fb2dc9a41bc2356daa52f9e80f9d51a23e2f2"
+      "sha256": "c833e31b3d7ee83c0f24b83f6a8b8d71d581a41a06b5e9a449a21036e0cdbb94"
     }
   ]
 }

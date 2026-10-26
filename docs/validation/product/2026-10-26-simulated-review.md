@@ -92,3 +92,13 @@ Store draft identity and privacy classifications, final protected source/tag and
 release record, Google review and the final Store-installed smoke are not
 established by this report. The release-record guard must continue to reject the
 candidate while any required gate or identity is missing.
+
+## Subsequent manual finding
+
+Later on 2026-10-26, real operator testing found diagnostic highlight navigation,
+scroll alignment and Restore-cleanup defects in the reviewed runtime. The scoped
+AI desk passes above are preserved as historical outcomes, not a claim that the
+reviewed build was defect-free. [The recovery record](../inspection-highlight-recovery.md)
+links the reproduced symptoms and correction. The corrected UI requires focused
+native retesting through Technical Validation; publication remains blocked until
+that gate is completed.
