@@ -48,6 +48,18 @@ test("static-site guard rejects dynamic output, remote assets, trackers, and hid
   ]) assert.ok(inspectSiteFile(file, contents).length > 0, `${file}: ${contents}`);
 });
 
+test("clipboard capability stays confined to explicit locator copying without reads or legacy commands", () => {
+  const ui = "apps/extension/src/document-runtime/locator-copy.tsx";
+  const boundary = "apps/extension/src/document-runtime/locator-clipboard.ts";
+  assert.deepEqual(inspectJavaScript("const clipboard = navigator.clipboard;", { firstParty: true, filename: ui }), []);
+  assert.deepEqual(inspectJavaScript("boundary.clipboard.writeText(locator);", { firstParty: true, filename: boundary }), []);
+  for (const source of ["navigator.clipboard", 'navigator["clipboard"]', "clipboard.writeText(text)"]) assert.ok(inspectJavaScript(source, { firstParty: true, filename: "apps/extension/src/other.ts" }).length > 0);
+  for (const source of ["navigator.clipboard.readText()", 'clipboard["readText"]()', 'document.execCommand("copy")']) {
+    assert.ok(inspectJavaScript(source, { firstParty: true, filename: ui }).length > 0);
+    assert.ok(inspectJavaScript(source).length > 0);
+  }
+});
+
 test("provenance guard rejects credentials and private URLs while allowing synthetic public fixtures", () => {
   for (const value of ["-----BEGIN " + "PRIVATE KEY-----", "ghp_" + "a".repeat(36), "AKIA" + "A".repeat(16), "https://" + "name:pass@example.com", "https://" + "10.1.2.3/", "https://" + "192.168.1.2/", "http://" + "172.20.1.2/", "https://" + "portal.internal/"]) assert.ok(inspectProvenance(value).length > 0, value);
   assert.deepEqual(inspectProvenance("http://127.0.0.1:4173/ https://example.invalid/ https://github.com/marlenesco/ui-torture-lab"), []);

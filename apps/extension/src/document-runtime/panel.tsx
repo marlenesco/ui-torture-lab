@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { useSyncExternalStore } from "react";
+import { useId, useRef, useState, useSyncExternalStore } from "react";
 import type { MarkdownReportInput, RunController, ScenarioId } from "@ui-torture-lab/engine";
 import { MarkdownReport } from "./markdown-report";
 import { PanelIcon } from "./panel-icon";
 import { BrandLogo } from "./brand-logo";
+import { PanelHelp } from "./panel-help";
+import { LocatorCopy } from "./locator-copy";
 
 type ExtensionPanelProps = {
   readonly collapsed: boolean;
@@ -20,7 +22,7 @@ type ExtensionPanelProps = {
   readonly onExpand: () => void;
   readonly onInspectFinding: (
     finding: ReturnType<RunController["getSnapshot"]>["findings"][number],
-    action: "copy-locator" | "highlight-ranges" | "highlight-subject" | "navigate",
+    action: "highlight-ranges" | "highlight-subject" | "navigate",
   ) => void;
   readonly isFindingActionEnabled: (
     finding: ReturnType<RunController["getSnapshot"]>["findings"][number],
@@ -48,6 +50,13 @@ export function ExtensionPanel({
   onStartScenario,
   runController,
 }: ExtensionPanelProps) {
+  const [helpOpen, setHelpOpen] = useState(false);
+  const helpId = useId();
+  const helpButton = useRef<HTMLButtonElement>(null);
+  const closeHelp = () => {
+    setHelpOpen(false);
+    helpButton.current?.focus();
+  };
   const snapshot = useSyncExternalStore(
     runController.subscribe,
     runController.getSnapshot,
@@ -68,7 +77,13 @@ export function ExtensionPanel({
   }
 
   return (
-    <section aria-label="UI Torture Lab" className="panel-shell">
+    <section aria-label="UI Torture Lab" className="panel-shell" onKeyDown={(event) => {
+      if (event.key === "Escape" && helpOpen) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeHelp();
+      }
+    }}>
       <header className="panel-header">
         <div className="panel-brand">
           <BrandLogo />
@@ -79,9 +94,22 @@ export function ExtensionPanel({
         </div>
         <div className="panel-window-actions">
           <button
+            aria-controls={helpId}
+            aria-expanded={helpOpen}
+            aria-haspopup="dialog"
+            aria-label="Quick guide"
+            className="panel-plain-button"
+            onClick={() => helpOpen ? closeHelp() : setHelpOpen(true)}
+            ref={helpButton}
+            title="Quick guide to panel actions"
+            type="button"
+          >
+            <PanelIcon name="info" plain />
+          </button>
+          <button
             aria-label="Collapse UI Torture Lab"
             className="panel-toggle panel-icon-button"
-            onClick={onCollapse}
+            onClick={() => { setHelpOpen(false); onCollapse(); }}
             title="Collapse panel"
             type="button"
           >
@@ -98,6 +126,7 @@ export function ExtensionPanel({
           </button>
         </div>
       </header>
+      {helpOpen ? <PanelHelp id={helpId} onClose={closeHelp} /> : null}
       {liveFindingMessage === null ? null : <p className="panel-message" role="status">{liveFindingMessage}</p>}
       {!navigationComplete ? <p role="status">Navigation observation is incomplete. Restore before changing SPA routes.</p> : null}
       <RunControls
@@ -158,7 +187,7 @@ function RunControls({
             <RestoreSummary result={previousRunResult.result} />
             <p>{previousRunResult.result.summary}</p>
             <MarkdownReport report={previousRunResult} />
-            <button className="panel-toggle" onClick={onClearPreviousRunResult} type="button">
+            <button className="panel-toggle" onClick={onClearPreviousRunResult} title="Delete this tab's saved snapshot; downloaded files remain" type="button">
               <PanelIcon name="clear" />Clear saved result
             </button>
           </section>
@@ -185,7 +214,7 @@ function RunControls({
           isFindingActionEnabled={isFindingActionEnabled}
           onInspectFinding={onInspectFinding}
         />
-        <button className="panel-action" onClick={onRestore} type="button">
+        <button className="panel-action" onClick={onRestore} title="Reverse owned changes, clear outlines and complete this Run" type="button">
           <PanelIcon name="restore" />Restore
         </button>
       </div>
@@ -300,10 +329,11 @@ function FindingItem({
     | ExtensionPanelProps["isFindingActionEnabled"]
     | undefined;
 }) {
+  const locatorElement = useRef<HTMLElement>(null);
   return (
     <li>
       <article aria-label={`Finding detail ${finding.locator}`}>
-        <strong>Finding detail · <code data-ui-torture-lab-diagnostic-locator="">{finding.locator}</code></strong>
+        <strong>Finding detail · <code data-ui-torture-lab-diagnostic-locator="" ref={locatorElement}>{finding.locator}</code></strong>
         <p>{finding.detectorId === "viewport-overflow"
           ? `Target Page · baseline ${finding.baseline.documentExtent.toFixed(1)}px/${finding.baseline.viewportWidth.toFixed(1)}px · mutated ${finding.mutated.documentExtent.toFixed(1)}px/${finding.mutated.viewportWidth.toFixed(1)}px · delta ${finding.measuredDelta.toFixed(1)}px · ${finding.contributionSide} via ${finding.primaryContributor.locator} (${finding.primaryContributor.baseline.left.toFixed(1)}–${finding.primaryContributor.baseline.right.toFixed(1)}px → ${finding.primaryContributor.mutated.left.toFixed(1)}–${finding.primaryContributor.mutated.right.toFixed(1)}px; contribution ${finding.primaryContributor.contribution.toFixed(1)}px). Contributors: ${finding.contributors.map((contributor) => `${contributor.contributionSide} ${contributor.locator} ${contributor.contribution.toFixed(1)}px`).join("; ")}.`
           : `Boundary ${finding.locator}; delta ${finding.measuredDelta.toFixed(1)}px.`}</p>
@@ -322,6 +352,7 @@ function FindingItem({
             className="panel-toggle"
             disabled={isFindingActionEnabled?.(finding) === false}
             onClick={() => onInspectFinding(finding, "highlight-subject")}
+            title="Scroll to and outline the responsible boundary or Primary Contributor"
             type="button"
           >
             <PanelIcon name="highlight" />Highlight subject
@@ -331,6 +362,7 @@ function FindingItem({
             className="panel-toggle"
             disabled={isFindingActionEnabled?.(finding) === false}
             onClick={() => onInspectFinding(finding, "navigate")}
+            title="Scroll to the subject without adding an outline"
             type="button"
           >
             <PanelIcon name="navigate" />Navigate
@@ -341,19 +373,13 @@ function FindingItem({
               className="panel-toggle"
               disabled={isFindingActionEnabled?.(finding) === false}
               onClick={() => onInspectFinding(finding, "highlight-ranges")}
+              title="Reveal the first affected text and outline its ranges"
               type="button"
             >
               <PanelIcon name="highlight" />Highlight ranges
             </button>
           ) : null}
-          <button
-            aria-label={`Copy diagnostic locator ${finding.locator}`}
-            className="panel-toggle"
-            onClick={() => onInspectFinding(finding, "copy-locator")}
-            type="button"
-          >
-            <PanelIcon name="copy" />Select locator to copy
-          </button>
+          <LocatorCopy locator={finding.locator} target={locatorElement} />
         </div>}
       </article>
     </li>
@@ -386,6 +412,7 @@ function ScenarioButtons({
         className="panel-action"
         disabled={disabled}
         onClick={() => onStartScenario("large-text")}
+        title="Temporarily enlarge eligible text"
         type="button"
       >
         <PanelIcon name="large-text" />Apply Large Text
@@ -394,6 +421,7 @@ function ScenarioButtons({
         className="panel-action"
         disabled={disabled}
         onClick={() => onStartScenario("long-text")}
+        title="Temporarily repeat eligible text"
         type="button"
       >
         <PanelIcon name="long-text" />Apply Long Text
@@ -402,6 +430,7 @@ function ScenarioButtons({
         className="panel-action"
         disabled={disabled}
         onClick={() => onStartScenario("unbreakable-text")}
+        title="Temporarily add a long unbreakable token to eligible text"
         type="button"
       >
         <PanelIcon name="unbreakable-text" />Apply Unbreakable Text

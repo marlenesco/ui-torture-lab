@@ -30,9 +30,15 @@ test("published trust copy agrees with the exact manifest permission and browser
 });
 
 test("retention and export claims match executable release-contract commitments", async () => {
-  assert.equal(contract.schemaVersion, 2);
+  assert.equal(contract.schemaVersion, 3);
   assert.deepEqual(contract.retention, { area: "session", resultsPerTab: 1, history: false, tabCloseDeletes: true });
   assert.deepEqual(contract.export, { format: "Markdown", delivery: "download", extension: ".md", suggestedFilename: "ui-torture-lab-report.md", mimeType: "text/markdown;charset=utf-8", gestureRequired: true, previewEqualsPayload: true });
+  assert.deepEqual(contract.locatorCopy, { delivery: "clipboard", payload: "displayed diagnostic locator", gestureRequired: true, fallback: "selection", uniqueSelectorGuaranteed: false, clipboardRead: false });
+  for (const text of [pages.privacy, pages.docs, pages.permissions, listing]) {
+    assert.ok(text.includes("Copy locator"));
+    assert.match(text, /(?:explicit click|on your click)/u);
+  }
+  for (const text of [pages.privacy, pages.docs, listing]) assert.ok(text.includes("not guaranteed to be a unique selector"));
   for (const text of [pages.privacy, listing]) for (const term of ["Active Run State", "Previous-Target Snapshot", "session", "one", "redacted", "origin", "pathname", "query", "fragment", "Clear saved result", "tab", "no Run network request", "no automatic screenshot", "visible preview", "cannot guarantee anonymity"]) assert.ok(text.toLowerCase().includes(term.toLowerCase()), term);
   assert.equal(contract.runNetwork, false);
   assert.equal(contract.automaticScreenshots, false);

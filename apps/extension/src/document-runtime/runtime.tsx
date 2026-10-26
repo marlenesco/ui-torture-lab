@@ -101,7 +101,6 @@ type Rect = {
 };
 
 type FindingAction =
-  | "copy-locator"
   | "highlight-ranges"
   | "highlight-subject"
   | "navigate";
@@ -363,11 +362,6 @@ class DocumentRuntime {
     action: FindingAction,
   ): void {
     if (!this.authorized) return;
-    if (action === "copy-locator") {
-      this.selectDiagnosticLocator(finding.locator);
-      return;
-    }
-
     const reference = this.runController.getLiveFindingReference(finding);
     if (reference === null) {
       this.disableFindingActions(finding);
@@ -531,20 +525,6 @@ class DocumentRuntime {
     this.clearDiagnosticHighlights();
     this.invalidLiveFindings.add(finding);
     this.setLiveFindingMessage("Live Finding reference is no longer available.");
-  }
-
-  private selectDiagnosticLocator(locator: string): void {
-    const locatorElement = [...(this.panel?.shadow.querySelectorAll<HTMLElement>(
-      "[data-ui-torture-lab-diagnostic-locator]",
-    ) ?? [])].find((element) => element.textContent === locator);
-    if (locatorElement === undefined) return;
-
-    const selection = this.document.getSelection();
-    if (selection === null) return;
-    const range = this.document.createRange();
-    range.selectNodeContents(locatorElement);
-    selection.removeAllRanges();
-    selection.addRange(range);
   }
 
   private storeCurrentRunResult(

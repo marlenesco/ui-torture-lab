@@ -8,6 +8,7 @@ const paths = {
   collapse: "M5 12h14",
   expand: "M7 4h13v13M20 4 4 20",
   close: "M6 6l12 12M18 6 6 18",
+  info: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-11v6M12 7h.01",
   highlight: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M9 12h6",
   navigate: "m4 11 16-7-7 16-2-7-7-2Z",
   download: "M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5",

@@ -17,13 +17,16 @@ in a normal profile; Incognito and direct file: pages are unsupported.
 3. Click Apply Long Text. The synthetic plan name has a stable clipping boundary
    and produces a Text Clipping Finding. Read its Baseline/Mutated Evidence, then
    use Highlight subject or Navigate while the Run is active. Possible Cause is
-   a hypothesis, not a diagnosis; Findings have no severity score.
+   a hypothesis, not a diagnosis; Findings have no severity score. The plain i icon
+   opens the Quick guide; Esc or its × control closes it. Copy locator attempts to
+   copy the displayed label on your click, with selection fallback when blocked.
+   Labels can match multiple elements; live inspection uses the original element.
 4. Click Restore. The original owned text returns. The completed result retains
    Evidence; it does not represent a new page analysis. External changes are
    preserved, with reload-required where cleanup cannot be verified.
 5. Click Download Report to request the deterministic UTF-8 `.md` file, suggested
    name `ui-torture-lab-report.md`. The small eye icon reveals the optional Markdown
-   preview. Saving and cancellation are controlled by Chrome. No clipboard,
+   preview. Saving and cancellation are controlled by Chrome. No report clipboard write,
    downloads permission or remote upload is involved.
 6. Close the panel using its × control; reopen it only using the Chrome toolbar.
    Reload or navigate to end the old page authorization. Returning to a page does

@@ -66,6 +66,8 @@ export function inspectJavaScript(code, { requireInjection = false, firstParty =
       const name = ts.isPropertyAccessExpression(expression) ? expression.name.text : ts.isIdentifier(expression) ? expression.text : ts.isElementAccessExpression(expression) ? literal(expression.argumentExpression) : "";
       if (["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "WebTransport", "sendBeacon", "importScripts", "eval", "Function", "captureVisibleTab", "captureTab", "chooseDesktopMedia", "getDisplayMedia", "getUserMedia", "captureStream"].includes(name) || expression.kind === ts.SyntaxKind.ImportKeyword) report(node, `unauthorized runtime capability ${name || "dynamic import"}`);
       if (name === "capture" && /(?:tabCapture|desktopCapture|pageCapture)/u.test(expression.getText(source))) report(node, "media or page capture is not authorized");
+      if (["readText", "execCommand"].includes(name)) report(node, "clipboard reads and legacy clipboard commands are not authorized");
+      if (firstParty && name === "writeText" && filename !== "apps/extension/src/document-runtime/locator-clipboard.ts") report(node, "clipboard writes belong only to the explicit locator-copy boundary");
       if (name === "CustomEvent") report(node, "CustomEvent page bridge is not authorized");
       if (name === "postMessage" && (!ts.isPropertyAccessExpression(expression) || /^(?:window|self|globalThis)$/u.test(expression.expression.getText(source)))) report(node, "window postMessage bridge is not authorized");
       if (["createElement", "createElementNS"].includes(name) && node.arguments?.some((argument) => literal(argument)?.toLowerCase() === "script")) {
@@ -92,6 +94,10 @@ export function inspectJavaScript(code, { requireInjection = false, firstParty =
     if (firstParty && ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && ["script", "iframe"].includes(node.tagName.getText(source)))) report(node, "executable or embedded JSX is not authorized");
     if (firstParty && ts.isImportDeclaration(node) && literal(node.moduleSpecifier) === "react-dom") report(node, "first-party React DOM resource APIs require a separate review");
     if (firstParty && ts.isIdentifier(node) && ["localStorage", "sessionStorage", "indexedDB", "__NEXT_DATA__", "__VUE__", "__REACT_DEVTOOLS_GLOBAL_HOOK__"].includes(node.text)) report(node, `unapproved first-party storage or framework inspection ${node.text}`);
+    if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && node.expression.getText(source) === "navigator") {
+      const name = ts.isPropertyAccessExpression(node) ? node.name.text : literal(node.argumentExpression);
+      if (firstParty && name === "clipboard" && filename !== "apps/extension/src/document-runtime/locator-copy.tsx") report(node, "Clipboard access belongs only to the explicit locator-copy UI");
+    }
     if (ts.isCallExpression(node) && /\.storage\.(?:local|sync)\./u.test(node.expression.getText(source))) report(node, "persistent or synchronized storage is not authorized");
     ts.forEachChild(node, visit);
   };

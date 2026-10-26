@@ -23,7 +23,7 @@ for (const state of ["idle", "active", "completed", "navigation"] as const) {
         hidden: button.firstElementChild?.getAttribute("aria-hidden"),
         focusable: button.firstElementChild?.getAttribute("focusable"),
       })));
-      expect(icons).toHaveLength(5);
+      expect(icons).toHaveLength(6);
       expect(icons.every(icon => icon.leadingSvg && icon.hidden === "true" && icon.focusable === "false")).toBe(true);
       const runtime = await page.$eval("[data-ui-torture-lab-root]", host => host.getAttribute("data-ui-torture-lab-runtime-id"));
       const countSurfaces = () => page.evaluate(() => document.querySelectorAll("[data-ui-torture-lab-root], [data-ui-torture-lab-overlay-root]").length);
@@ -43,6 +43,8 @@ for (const state of ["idle", "active", "completed", "navigation"] as const) {
       }
       const beforeClose = await page.$eval("#boundary", node => node.textContent);
       if (state === "active") await page.screenshot({ path: test.info().outputPath("panel-icons.png") });
+      await page.locator("::-p-aria(Quick guide)").setTimeout(5000).click();
+      expect(await page.$('[data-ui-torture-lab-root] >>> [role="dialog"]')).not.toBeNull();
       const close = await page.$("::-p-aria(Close UI Torture Lab)");
       const closeIcon = await close?.$("svg");
       expect(closeIcon).toBeTruthy();
@@ -62,6 +64,7 @@ for (const state of ["idle", "active", "completed", "navigation"] as const) {
       await expect.poll(countSurfaces).toBe(2);
       expect(await page.$$("ui-torture-lab-runtime")).toHaveLength(0);
       expect(await page.$eval("[data-ui-torture-lab-root]", host => host.getAttribute("data-ui-torture-lab-runtime-id"))).toBe(runtime);
+      expect(await page.$('[data-ui-torture-lab-root] >>> [role="dialog"]')).toBeNull();
       expect(await page.evaluate(() => document.querySelector("[data-ui-torture-lab-overlay-root]")?.shadowRoot?.querySelectorAll("[data-ui-torture-lab-highlight]").length)).toBe(0);
       if (state === "active") {
         await expect.poll(panelText).toContain("Long Text Scenario active");
