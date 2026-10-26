@@ -195,6 +195,7 @@ test("built extension inspects a live Finding without rematching a disconnected 
           )?.disabled,
       ),
     ).toBe(true);
+    expect(await page.evaluate(() => document.querySelector("[data-ui-torture-lab-overlay-root]")?.shadowRoot?.querySelectorAll("[data-ui-torture-lab-highlight]").length ?? 0)).toBe(0);
   } finally {
     await page.close();
   }

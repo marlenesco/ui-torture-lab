@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Live inspection highlight fixture</title>
+    <style>
+      html { overflow-anchor: none; scroll-behavior: smooth; }
+      body { margin: 24px; font: 16px/1.5 Arial, sans-serif; }
+      .spacer { height: calc(100vh + 600px); }
+      #boundary, #nested-boundary { width: 120px; overflow: hidden; white-space: nowrap; margin: 0; }
+      #scroller { height: 240px; width: 300px; overflow: auto; }
+      .inner-spacer { height: 700px; }
+    </style>
+  </head>
+  <body>
+    <div class="spacer"></div>
+    <p id="boundary">Checkout</p>
+    <div class="spacer"></div>
+    <div id="scroller"><div class="inner-spacer"></div><p id="nested-boundary">Checkout</p><div class="inner-spacer"></div></div>
+    <div class="spacer"></div>
+  </body>
+</html>
